@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Fixed price: Example Heating &amp; Plumbing (sample)</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Shared look for audit and proposal pages. Palette from Logan's photos: sky over the tower, glass navy, snow. */
+:root {
+  --snow: #F5F7FA; --surface: #FFFFFF; --ink: #1B2A38; --muted: #566A7E; --rule: #D5DDE6;
+  --sky: #3E9BCE; --deep: #1E6C9C; --deep-ink: #FFFFFF; --spruce: #16242C; --on-dark: #EEF3F7;
+  --good: #2D7A4F; --leak: #B23A26; --unknown: #6A7C8E;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --snow: #0F1820; --surface: #15212C; --ink: #E8EEF3; --muted: #9AAFC2; --rule: #26384A;
+    --sky: #5AAEDB; --deep: #5AAEDB; --deep-ink: #0B141D; --spruce: #0A1217; --on-dark: #E8EEF3;
+    --good: #6CC596; --leak: #FF8A73; --unknown: #9AAFC2; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --snow: #0F1820; --surface: #15212C; --ink: #E8EEF3; --muted: #9AAFC2; --rule: #26384A;
+  --sky: #5AAEDB; --deep: #5AAEDB; --deep-ink: #0B141D; --spruce: #0A1217; --on-dark: #E8EEF3;
+  --good: #6CC596; --leak: #FF8A73; --unknown: #9AAFC2; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--snow); color: var(--ink); font: 17px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-underline-offset: 3px; }
+h1, h2, h3 { font-family: var(--display); font-stretch: 106%; margin: 0; line-height: 1.1; text-wrap: balance; }
+p { margin: 0; }
+:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; border-radius: 2px; }
+.wrap { max-width: 820px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 18px; }
+.wm { display: inline-grid; text-decoration: none; line-height: 1; color: var(--ink); }
+.wm-top { font-family: var(--display); font-weight: 900; font-stretch: 125%; font-size: 1.45rem; letter-spacing: 0.03em; }
+.wm-sub { font-family: var(--body); font-weight: 600; font-size: 0.52rem; letter-spacing: 0.37em; margin-top: 0.35em; color: var(--muted); }
+.doc-label { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.strip { height: clamp(120px, 22vw, 200px); background: var(--spruce) center 62% / cover no-repeat; border-radius: 6px; }
+.hero { display: grid; gap: 12px; padding-block: 32px 12px; }
+.label { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-weight: 800; font-size: clamp(2rem, 6vw, 3rem); }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.9rem; color: var(--muted); }
+.lede { font-size: 1.12rem; max-width: 40rem; margin-top: 4px; }
+section { padding-block: 26px; }
+h2 { font-weight: 750; font-size: 1.5rem; margin-bottom: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; font: 600 1.02rem/1.2 var(--body); text-decoration: none; background: var(--deep); color: var(--deep-ink); border: 0; border-radius: 6px; padding: 0.85em 1.3em; cursor: pointer; }
+.btn[disabled] { opacity: 0.6; cursor: progress; }
+.fine { font-size: 0.86rem; color: var(--muted); }
+.foot { padding-block: 24px 40px; border-top: 1px solid var(--rule); font-size: 0.86rem; color: var(--muted); display: grid; gap: 6px; }
+
+/* Layout: a one-page quote. What I'll do, what's included, timing, what I need, the price, one button. */
+.strip { background-image: url("/assets/tower-1200.jpg"); background-position: center 30%; }
+.plain { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
+.plain li { padding-block: 13px; border-bottom: 1px solid var(--rule); display: grid; gap: 2px; }
+.plain b { font-weight: 600; }
+.plain span { color: var(--muted); font-size: 0.96rem; }
+.ticks { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
+.price { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: clamp(20px, 4vw, 30px); display: grid; gap: 16px; }
+.price-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 24px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.price-row:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.price-row b { font-weight: 600; font-size: 1.05rem; }
+.price-row .amt { font-family: var(--display); font-weight: 800; font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.price-row .amt small { font-family: var(--body); font-weight: 500; font-size: 0.85rem; color: var(--muted); }
+.price-row p { flex-basis: 100%; color: var(--muted); font-size: 0.95rem; }
+.approve { display: grid; gap: 10px; justify-items: start; }
+.approved { border-left: 4px solid var(--good); padding: 10px 16px; background: var(--surface); border-radius: 4px; }
+.err { color: var(--leak); font-weight: 500; }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="wm" href="/" aria-label="Ledge Communications"><span class="wm-top" aria-hidden="true">LEDGE</span><span class="wm-sub" aria-hidden="true">COMMUNICATIONS</span></a>
+  <span class="doc-label">Fixed price</span>
+</header>
+<main class="wrap">
+  <div class="strip" role="img" aria-label="Looking up at a glass tower against a blue sky"></div>
+  <div class="hero">
+    <p class="label">Prepared for</p>
+    <h1>Example Heating &amp; Plumbing (sample)</h1>
+    <p class="meta"><span>Prepared Oct 25, 2026</span><span>Price good until Nov 24, 2026</span></p>
+    <p class="lede">Here's what I'd set up for you, based on your audit. Everything happens over email unless you'd like a call.</p>
+  </div>
+
+  <section aria-labelledby="what-title">
+    <h2 id="what-title">What I'll set up</h2>
+    <ol class="plain">
+      <li><b>Put tap-to-call and online booking at the top of every page</b><span>A booking button from the scheduling tool you already use, about an afternoon.</span></li>
+      <li><b>Cut the form to four fields and reply within a minute</b><span>A form change plus an automatic reply, a couple of hours.</span></li>
+      <li><b>Ask for a Google review after every paid job</b><span>An automatic text after each paid invoice, set up once.</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="inc-title">
+    <h2 id="inc-title">What's included</h2>
+    <ul class="ticks">
+      <li>Each fix set up and tested in the tools you already use</li>
+      <li>A short note showing what changed and anything you or your team need to know</li>
+      <li>30 days of tweaks after everything is live</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="time-title">
+    <h2 id="time-title">Timing and what I need from you</h2>
+    <ul class="ticks">
+      <li>The first fix is usually live within a week of your go-ahead, and all three within two to three weeks.</li>
+      <li>You add me as a user on the tools involved. I'll send the exact steps; it takes a few minutes.</li>
+      <li>You answer a few setup questions by email so everything matches how you work.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="price-title">
+    <h2 id="price-title">Price</h2>
+    <div class="price">
+      <div class="price-row"><b>Setting up the three fixes</b><span class="amt">$1,000 <small>+ GST</small></span><p>One fixed price. No hourly billing, no surprises.</p></div>
+      <div class="price-row"><b>Optional care plan once it's live</b><span class="amt">$250 <small>/month + GST</small></span><p>A one-page report every Monday, monitoring and small tweaks as your season changes. Month to month after the first three. Not required.</p></div>
+      <div class="approve" id="approve-box" >
+        <form id="approve-form" method="post" action="/api/approve">
+          <input type="hidden" name="id" value="sample">
+          <input type="hidden" name="t" value="sample">
+          <button class="btn" id="a-btn" type="submit">Approve and get started</button>
+        </form>
+        <p class="fine">Approving tells me to go ahead. I&#x27;ll send the invoice the same day.</p>
+        <p class="err" id="a-err" role="alert" hidden></p>
+      </div>
+      <div class="approved" id="approved-box" hidden><p><strong>Approved.</strong> Thanks. I'll be in touch with next steps.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <p>Questions or want to change the scope? Just reply to my email.</p>
+  </section>
+</main>
+<footer class="wrap foot">
+  <p>Logan, Ledge Communications, Calgary, Alberta.</p>
+</footer>
+<script>
+(function () {
+  var form = document.getElementById('approve-form');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = document.getElementById('a-btn'), err = document.getElementById('a-err');
+    btn.disabled = true; btn.textContent = 'Approving…'; err.hidden = true;
+    fetch('/api/approve', { method: 'POST', body: new FormData(form), headers: { 'accept': 'application/json' } })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || !j.ok) throw new Error(); }); })
+      .then(function () { document.getElementById('approve-box').hidden = true; document.getElementById('approved-box').hidden = false; })
+      .catch(function () {
+        btn.disabled = false; btn.textContent = 'Approve and get started';
+        err.textContent = "That didn't go through. Reply to my email with \"approved\" and I'll take it from there.";
+        err.hidden = false;
+      });
+  });
+})();
+</script>
+</body>
+</html>
