@@ -65,7 +65,7 @@ var SETTINGS_DEFAULTS = [
   ['MONTHLY_ENGINE_BUDGET_USD', '20', 'The engine pauses for the rest of the month once estimated spend passes this.']
 ];
 var STAGE_NAMES = ['Lead comes in', 'First response', 'Visit booked', 'Quote sent', 'Job done and paid', 'Customer comes back'];
-var PILL = { good: 'Looks good', leak: 'Leak', unknown: 'Couldn\'t check' };
+var PILL = { good: 'Looks good', leak: 'Needs work', unknown: 'Couldn\'t check' };
 var DONE_STATUSES = ['unsubscribed', 'bounced', 'not_interested', 'skipped', 'error', 'won', 'booked'];
 
 var OPT_OUT = /\b(unsubscribe|remove me|take me off|stop (emailing|contacting|sending)|don'?t (email|contact)|do not (email|contact)|please stop|leave me alone)\b/i;
@@ -618,7 +618,7 @@ function jobParams_(job) {
       { type: 'web_fetch_20250910', name: 'web_fetch', max_uses: 6, max_content_tokens: 12000 }
     ],
     messages: [{ role: 'user', content:
-      'Today is ' + today + '. Build a Lead Leak Audit for this shop.\n\n' +
+      'Today is ' + today + '. Build a Lead Handling Audit for this business.\n\n' +
       'Business: ' + (lead.business || 'unknown') + '\n' +
       'Website: ' + (site || 'not given, search for it') + '\n' +
       'Trade: ' + (lead.trade || 'heating, cooling or plumbing') + '\n' +
@@ -856,12 +856,12 @@ function fill_(tpl, text, raw) {
 
 var EMAILS = {
   inbound_confirm: {
-    subject: 'Your Lead Leak Audit for {business}',
+    subject: 'Your Lead Handling Audit for {business}',
     body: 'Hi {first},\n\nThanks for reaching out. I\'m putting your audit together now and you\'ll have it by end of day {next_day}.\n\nTalk soon,\n{sender}'
   },
   inbound_audit: {
     body: 'Hi {first},\n\nHere\'s your audit:\n{audit_url}\n\nThe top three fixes are in the order I\'d tackle them. The biggest one: {top_finding}\n\n' +
-      'If you\'d like a hand, there\'s a button at the bottom of the page to get a fixed price, or just reply "yes". No call needed.\n\n{sender}'
+      'If you\'d like a hand, there\'s a button at the bottom of the page to get a fixed price, or just reply "yes".{booking_line}\n\n{sender}'
   },
   inbound_nudge1: {
     body: 'Hi {first},\n\nQuick follow-up on your audit. If you only do one thing, I\'d start here: {fix_1}.\n\nReply "yes" and I\'ll send a fixed price for getting it done.\n\n{sender}'
@@ -871,11 +871,11 @@ var EMAILS = {
   },
   cold_1: {
     subject: '{business}: a quick look at your website and reviews',
-    body: 'Hi {first},\n\nHope you\'re keeping busy. I\'m {sender}, and I run Ledge Communications here in Calgary. ' +
+    body: 'Hi {first},\n\nHope you\'re keeping busy. I\'m {sender}, and I run Ledge Communications here in Alberta. ' +
       'I help trades businesses make sure the calls and requests they already get turn into booked jobs.\n\n' +
       'I took a look at {business} from the outside and put together a one-page audit. No cost and nothing to sign up for:\n{audit_url}\n\n' +
       'The biggest thing that stood out: {top_finding}\n\n' +
-      'If any of it is useful and you\'d like a hand, just reply "yes" and I\'ll send over a fixed price. No call needed.\n\nThanks,\n{sender}'
+      'If any of it is useful and you\'d like a hand, just reply "yes" and I\'ll send over a fixed price.{booking_line}\n\nThanks,\n{sender}'
   },
   cold_2: {
     body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only tackle one thing, I\'d start here: {fix_1}.\n\nHappy to set it up for you. Reply "yes" and I\'ll send a fixed price.\n\n{sender}'
@@ -921,7 +921,7 @@ function emailVars_(l) {
     fix_1: String(l.fix_1 || '').replace(/\.$/, ''),
     sender: setting_('SENDER_NAME') || 'Logan',
     next_day: nextBusinessDayName_(),
-    booking_line: booking ? ' Or if it\'s easier to talk it through, you can grab a time here: ' + booking : '',
+    booking_line: booking ? ' If a quick call is easier, grab a time here: ' + booking : '',
     payment_step: pay ? 'You can pay here whenever suits: ' + pay : 'I\'ll send the invoice today.'
   };
 }
@@ -1164,7 +1164,7 @@ function siteUrl_() { return String(setting_('SITE_URL') || 'https://ledgecommun
 function auditUrl_(l) { return siteUrl_() + '/audit/' + l.audit_slug; }
 function unsubUrl_(l) { return siteUrl_() + '/api/unsubscribe?id=' + encodeURIComponent(l.id) + '&t=' + token_(l.id); }
 function ownerLink_(action, l) { return prop_('WEB_APP_URL') + '?action=' + action + '&id=' + encodeURIComponent(l.id) + '&t=' + token_(l.id); }
-function paymentLine_() { return setting_('PAYMENT_URL') ? 'Approving tells me to go ahead. You\'ll get a payment link right away.' : 'Approving tells me to go ahead. I\'ll send the invoice the same day.'; }
+function paymentLine_() { return setting_('PAYMENT_URL') ? 'Approving tells us to go ahead. You\'ll get a payment link right away.' : 'Approving tells us to go ahead. The invoice follows the same day.'; }
 function money_(n) { return Number(n || 0).toLocaleString('en-CA', { maximumFractionDigits: 0 }); }
 function monthKey_() { return Utilities.formatDate(new Date(), tz_(), 'yyyy-MM'); }
 function firstName_(name) { return String(name || '').trim().split(/\s+/)[0] || ''; }

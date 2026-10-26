@@ -49,7 +49,6 @@ and Cloudflare redeploys in about a minute.
 | --- | --- | --- |
 | `TURNSTILE_SITE_KEY` | Turnstile site key | Text |
 | `TURNSTILE_SECRET` | Turnstile secret key | Secret |
-| `BOOKING_URL` | Your Superhuman booking link (step 6). Optional | Text |
 | `HUB_URL` | The web app URL from step 4 | Secret |
 | `HUB_KEY` | The HUB_KEY from step 4 | Secret |
 
@@ -106,13 +105,14 @@ In ledgecommunications@gmail.com:
 
 ## 6. Superhuman booking page (10 minutes, optional)
 
-Calls are optional; the emails always ask for a reply first. If you want the link available:
+Calls are optional and the link only ever appears in emails, never on the site. The emails always ask for a reply first.
+If you want the link available:
 1. Add ledgecommunications@gmail.com to Superhuman if it isn't already.
 2. Press **2** for the week view > **+** next to Booking Pages.
 3. Duration 15 minutes. Scheduling windows weekdays 4 to 5 pm Mountain. Calendar: the
    ledgecommunications@gmail.com calendar. Event title: something with "Ledge" in it, like
    "Ledge Communications call", so the hub recognises bookings from new people.
-4. Save, copy the link, and put it in Settings (`BOOKING_URL`) and Cloudflare (`BOOKING_URL`).
+4. Save, copy the link, and put it in Settings (`BOOKING_URL`). Cloudflare doesn't need it.
 
 If the booking page has to use another calendar, share that calendar with ledgecommunications@gmail.com and put its
 calendar ID in the `CALENDAR_ID` setting.

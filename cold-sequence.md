@@ -14,14 +14,14 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Hope you're keeping busy. I'm {sender}, and I run Ledge Communications here in Calgary. I help trades businesses make sure the calls and requests they already get turn into booked jobs.
+> Hope you're keeping busy. I'm {sender}, and I run Ledge Communications here in Alberta. I help trades businesses make sure the calls and requests they already get turn into booked jobs.
 >
 > I took a look at {business} from the outside and put together a one-page audit. No cost and nothing to sign up for:
 > {audit_url}
 >
 > The biggest thing that stood out: {top_finding}
 >
-> If any of it is useful and you'd like a hand, just reply "yes" and I'll send over a fixed price. No call needed.
+> If any of it is useful and you'd like a hand, just reply "yes" and I'll send over a fixed price.{booking_line}
 >
 > Thanks,
 > {sender}

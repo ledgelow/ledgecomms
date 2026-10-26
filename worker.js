@@ -157,11 +157,11 @@ async function approve(request, env) {
 
 const QUOTE_MSG = {
   ok: "<h1>Got it</h1><p>The fixed price and what's included will be in your inbox by end of day tomorrow.</p>",
-  fail: "<h1>That didn't go through</h1><p>Reply to my email with \"yes\" and I'll take it from there.</p>",
+  fail: "<h1>That didn't go through</h1><p>Reply to the email with \"yes\" and we'll take it from there.</p>",
 };
 const APPROVE_MSG = {
   ok: "<h1>Approved</h1><p>Thanks. Next steps are on their way to your inbox.</p>",
-  fail: "<h1>That didn't go through</h1><p>Reply to my email with \"approved\" and I'll take it from there.</p>",
+  fail: "<h1>That didn't go through</h1><p>Reply to the email with \"approved\" and we'll take it from there.</p>",
 };
 
 function buttonReply(request, ok, status, msg) {
@@ -192,8 +192,8 @@ async function unsubscribeGet(request, env) {
       status,
       headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
     });
-  if (r.bad) return html("Link not recognised", "<p>This unsubscribe link is incomplete. Reply to any email from me with \"unsubscribe\" and I'll take you off the list.</p>", 400);
-  if (!r.ok) return html("Something went wrong", "<p>I couldn't process that just now. Reply to any email from me with \"unsubscribe\" and I'll take you off the list within a day.</p>", 502);
+  if (r.bad) return html("Link not recognised", "<p>This unsubscribe link is incomplete. Reply to any of our emails with \"unsubscribe\" and you'll be taken off the list.</p>", 400);
+  if (!r.ok) return html("Something went wrong", "<p>That didn't go through just now. Reply to any of our emails with \"unsubscribe\" and you'll be taken off the list within a day.</p>", 502);
   return html("You're unsubscribed", "<p>You won't get any more emails from Ledge Communications.</p><p><a href=\"/\">Back to the site</a></p>", 200);
 }
 
@@ -217,7 +217,7 @@ async function hubPage(env, page, slug) {
   if (!body.startsWith("<!doctype")) {
     return new Response(
       simplePage("Not found | Ledge Communications",
-        "<h1>This page isn't here</h1><p>The link may be incomplete. Reply to the email it came in and I'll send it again.</p><p><a href=\"/\">Ledge Communications</a></p>"),
+        "<h1>This page isn't here</h1><p>The link may be incomplete. Reply to the email it came in and we'll send it again.</p><p><a href=\"/\">Ledge Communications</a></p>"),
       { status: 404, headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex, nofollow" } },
     );
   }

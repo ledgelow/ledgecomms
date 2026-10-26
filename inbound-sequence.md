@@ -10,7 +10,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 ## Right away
 
-**Subject:** Your Lead Leak Audit for {business}
+**Subject:** Your Lead Handling Audit for {business}
 
 > Hi {first},
 >
@@ -30,7 +30,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > The top three fixes are in the order I'd tackle them. The biggest one: {top_finding}
 >
-> If you'd like a hand, there's a button at the bottom of the page to get a fixed price, or just reply "yes". No call needed.
+> If you'd like a hand, there's a button at the bottom of the page to get a fixed price, or just reply "yes".{booking_line}
 >
 > {sender}
 

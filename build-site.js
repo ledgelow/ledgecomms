@@ -24,6 +24,12 @@ const FILES = {
   "river-2000.jpg": "assets/river-2000.jpg",
 };
 
+// Photo slots: a stock photo dropped into the repo as stock-N.jpg replaces Logan's photo in that spot.
+const SLOTS = {
+  "photo-1.jpg": ["stock-1.jpg", "river-2000.jpg"],
+  "photo-2.jpg": ["stock-2.jpg", "road-1200.jpg"],
+};
+
 fs.rmSync(out, { recursive: true, force: true });
 const missing = [];
 for (const [from, to] of Object.entries(FILES)) {
@@ -33,8 +39,15 @@ for (const [from, to] of Object.entries(FILES)) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
 }
+for (const [slot, choices] of Object.entries(SLOTS)) {
+  const pick = choices.find((f) => fs.existsSync(path.join(root, f)));
+  if (!pick) { missing.push(slot); continue; }
+  fs.mkdirSync(path.join(out, "assets"), { recursive: true });
+  fs.copyFileSync(path.join(root, pick), path.join(out, "assets", slot));
+  console.log(slot + " <- " + pick);
+}
 if (missing.length) {
   console.error("Missing from the repo: " + missing.join(", "));
   process.exit(1);
 }
-console.log("Built site/ with " + Object.keys(FILES).length + " files.");
+console.log("Built site/ with " + (Object.keys(FILES).length + Object.keys(SLOTS).length) + " files.");
