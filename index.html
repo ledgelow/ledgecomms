@@ -55,7 +55,7 @@
   color-scheme: light;
 }
 
-/* Layout, top to bottom: hero with a proof line, Sound familiar?, before and after, the tools we work in, one photo,
+/* Layout, top to bottom: hero with a proof line, what changes (owner's words vs after setup), one photo,
    how it works, a peek at the sample audit, About in its own band, questions, the form.
    Light only. Photos sit behind or between sections as atmosphere, never captioned. */
 *, *::before, *::after { box-sizing: border-box; }
@@ -121,50 +121,29 @@ p { margin: 0; }
 .proof b { color: #FFFFFF; font-weight: 700; }
 @media (max-width: 640px) { .proof { flex-direction: column; gap: 4px; } .proof li + li::before { display: none; } }
 
-/* Sound familiar? */
-.familiar { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 28px clamp(32px, 6vw, 80px); align-items: start; }
-.familiar .intro { margin-bottom: 0; position: sticky; top: 24px; }
-.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 2px solid var(--ink); }
-.checks li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; align-items: start; padding-block: 15px; border-bottom: 1px solid var(--rule); font-size: 1.08rem; }
-.checks li::before { content: ""; width: 22px; height: 22px; margin-top: 3px; border-radius: 5px; background: var(--accent)
-  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%230F1A2E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 15px no-repeat; }
-.familiar-end { margin-top: 26px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
-.familiar-end p { font-family: var(--display); font-weight: 700; font-size: 1.3rem; letter-spacing: -0.01em; }
-@media (max-width: 860px) { .familiar { grid-template-columns: minmax(0, 1fr); } .familiar .intro { position: static; } }
-
-/* What changes: before and after */
+/* If you've said any of these: the owner's words on the left, what changes on the right */
 .build { background: var(--surface); }
-.ba { list-style: none; margin: 0; padding: 0; display: grid; }
-.ba-head, .ba li { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px 28px; }
-.ba-head { padding-bottom: 12px; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.ba-head, .ba li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 32px; }
+.ba-head { padding-bottom: 12px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .ba-head span:last-child { color: var(--deep); }
-.ba li { align-items: start; padding-block: 22px; border-top: 1px solid var(--rule); }
+.ba { list-style: none; margin: 0; padding: 0; display: grid; }
+.ba li { align-items: center; padding-block: 14px; border-top: 1px solid var(--rule); }
 .ba li:first-child { border-top: 2px solid var(--ink); }
-.ba h3 { padding-top: 2px; }
-.ba-cell { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; }
+.ba-cell { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; margin: 0; }
 .ba-cell::before { content: ""; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; }
-.ba-today { color: var(--muted); }
-.ba-today::before { background: color-mix(in srgb, var(--muted) 18%, transparent)
+.ba-said { font-family: var(--display); font-weight: 700; font-size: 1.1rem; line-height: 1.35; letter-spacing: -0.01em; color: var(--ink); }
+.ba-said::before { background: color-mix(in srgb, var(--muted) 18%, transparent)
   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 5l6 6M11 5l-6 6' fill='none' stroke='%234D5870' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
-.ba-after { background: var(--snow); border-radius: 8px; padding: 12px 14px; margin-top: -12px; color: var(--ink); font-weight: 500; box-shadow: 0 1px 0 var(--rule); }
+.ba-after { background: var(--snow); border-radius: 8px; padding: 12px 14px; color: var(--ink); box-shadow: 0 1px 0 var(--rule); }
 .ba-after::before { background: var(--accent)
   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%230F1A2E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px no-repeat; }
-.ba-tag { display: none; }
-@media (max-width: 860px) {
+.ba-foot { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 28px; }
+.ba-foot p { color: var(--muted); max-width: 44rem; }
+.ba-foot b { color: var(--ink); font-weight: 600; }
+@media (max-width: 760px) {
   .ba-head { display: none; }
-  .ba li { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .ba-after { margin-top: 0; }
-  .ba-tag { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: -6px; }
-  .ba-after .ba-tag { color: var(--deep); }
+  .ba li { grid-template-columns: minmax(0, 1fr); gap: 10px; padding-block: 18px; }
 }
-
-/* Works with what you have */
-.works { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 32px; }
-.works li { display: grid; gap: 8px; align-content: start; padding-top: 16px; border-top: 2px solid var(--ink); min-width: 0; }
-.works p { color: var(--muted); }
-.works-note { margin-top: 28px; color: var(--muted); }
-@media (max-width: 900px) { .works { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .works { grid-template-columns: minmax(0, 1fr); } }
 
 /* One photo between sections, framed on the peaks */
 .band { margin: 0; height: clamp(240px, 36vw, 480px); overflow: hidden; background: var(--spruce); }
@@ -175,11 +154,7 @@ p { margin: 0; }
 .steps li { display: grid; gap: 10px; align-content: start; counter-increment: step; min-width: 0; }
 .steps li::before { content: counter(step); font-family: var(--display); font-weight: var(--display-weight); font-size: 3rem; line-height: 1; color: var(--accent-text); }
 .steps p { color: var(--muted); }
-.promises { list-style: none; margin: 48px 0 0; padding: 22px 0 0; border-top: 2px solid var(--ink); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 32px; }
-.promises li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; font-weight: 600; }
-.promises li::before { content: ""; width: 20px; height: 20px; margin-top: 3px; border-radius: 50%; background: var(--deep)
-  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5 5.5-6' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px no-repeat; }
-@media (max-width: 860px) { .steps, .promises { grid-template-columns: minmax(0, 1fr); } .steps { gap: 28px; } }
+@media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
 
 /* A peek at the sample audit */
 .peek { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 36px clamp(32px, 6vw, 80px); align-items: center; }
@@ -298,80 +273,41 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
     </div>
   </section>
 
-  <section class="section wrap familiar" aria-labelledby="familiar-title">
-    <div class="intro">
-      <p class="kicker">Sound familiar?</p>
-      <h2 id="familiar-title">Most missed jobs never show up as missed.</h2>
-      <p>They look like a quiet week. Here's where they usually go.</p>
-    </div>
-    <div>
-      <ul class="checks">
-        <li>You call a lead back and they've already booked someone else.</li>
-        <li>The phone rings while you're on a job, and later you can't tell which missed calls were work.</li>
-        <li>Web requests sit until you're home and through dinner.</li>
-        <li>Quotes go out and you rarely hear back, and nobody has time to chase them.</li>
-        <li>Your newest Google review is from months ago.</li>
-        <li>You pay for leads, but plenty of them never turn into a booked visit.</li>
-        <li>You have Jobber or Housecall Pro, but mostly use it for invoices.</li>
-      </ul>
-      <div class="familiar-end">
-        <p>If a couple of these sound like your week, that's what we fix.</p>
-        <a class="btn" href="#audit">Get a free audit</a>
-      </div>
-    </div>
-  </section>
-
   <section id="setup" class="build" aria-labelledby="setup-title">
     <div class="wrap section">
       <div class="intro">
         <p class="kicker">What we build</p>
-        <h2 id="setup-title">What changes after setup</h2>
-        <p>We set it up inside the tools you already use, or the simplest ones that fit if you don't have them. Then it runs on its own.</p>
+        <h2 id="setup-title">If you've said any of these, we can help.</h2>
+        <p>Most missed jobs never show up as missed. They just look like a quiet week.</p>
       </div>
-      <div class="ba-head" aria-hidden="true"><span></span><span>Today</span><span>After setup</span></div>
+      <div class="ba-head" aria-hidden="true"><span>Sound familiar?</span><span>After setup</span></div>
       <ol class="ba">
         <li>
-          <h3>Every lead in one place</h3>
-          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Calls, web forms, Google messages and ad leads land in different places, and some never get seen.</span></p>
-          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>They all land in one inbox you actually check, so nothing slips through.</span></p>
+          <p class="ba-cell ba-said"><span>&ldquo;By the time I called back, they'd booked someone else.&rdquo;</span></p>
+          <p class="ba-cell ba-after"><span>Missed calls get a text back in seconds, so you're the first to reply.</span></p>
         </li>
         <li>
-          <h3>Answered fast</h3>
-          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>A missed call goes to voicemail, and the caller tries the next shop on the list.</span></p>
-          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>They get a text back within seconds, and web requests get a reply in minutes, day or night.</span></p>
+          <p class="ba-cell ba-said"><span>&ldquo;Web requests sit until I'm home and through dinner.&rdquo;</span></p>
+          <p class="ba-cell ba-after"><span>Every form gets an instant reply, and the request lands where you'll see it.</span></p>
         </li>
         <li>
-          <h3>Booked</h3>
-          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Booking a visit takes a round of phone tag during office hours.</span></p>
-          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>Customers pick a time online, straight into the calendar you already use.</span></p>
+          <p class="ba-cell ba-said"><span>&ldquo;Booking a visit takes three rounds of phone tag.&rdquo;</span></p>
+          <p class="ba-cell ba-after"><span>Customers pick a time online, straight into the calendar you already use.</span></p>
         </li>
         <li>
-          <h3>Followed up</h3>
-          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Quotes go out and nobody has time to chase the ones that go quiet.</span></p>
-          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>Quotes with no answer get a friendly follow-up, twice, without anyone having to remember.</span></p>
+          <p class="ba-cell ba-said"><span>&ldquo;Quotes go out, and I rarely hear back.&rdquo;</span></p>
+          <p class="ba-cell ba-after"><span>Quiet quotes get a friendly follow-up, twice, without anyone having to remember.</span></p>
         </li>
         <li>
-          <h3>Reviewed and remembered</h3>
-          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Happy customers never get asked for a review, and past customers forget you by next season.</span></p>
-          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>Paid jobs get a Google review request, and past customers hear from you before the season turns.</span></p>
+          <p class="ba-cell ba-said"><span>&ldquo;Our newest Google review is from months ago.&rdquo;</span></p>
+          <p class="ba-cell ba-after"><span>Every paid job gets a review request while it's still fresh.</span></p>
         </li>
       </ol>
+      <div class="ba-foot">
+        <p><b>Works with what you already run:</b> your phone, your scheduling software, your Google listing and your website. Then it runs on its own.</p>
+        <a class="btn" href="#audit">Get a free audit</a>
+      </div>
     </div>
-  </section>
-
-  <section class="section wrap" aria-labelledby="works-title">
-    <div class="intro">
-      <p class="kicker">Works with what you have</p>
-      <h2 id="works-title">No new system to learn</h2>
-      <p>We work inside the tools you already use. If something new would help, you'll know what it is and why before anything starts.</p>
-    </div>
-    <ul class="works">
-      <li><h3>Phone and texting</h3><p>Your current number, plus a texting tool like Quo if you need one.</p></li>
-      <li><h3>Scheduling and quotes</h3><p>Jobber, Housecall Pro, ServiceTitan, or a calendar and a spreadsheet.</p></li>
-      <li><h3>Google</h3><p>Your Business Profile and reviews, Google Ads and Local Services Ads.</p></li>
-      <li><h3>Website and forms</h3><p>WordPress, Squarespace, Wix and most other site builders.</p></li>
-    </ul>
-    <p class="works-note">Don't see yours? <a class="text-link" href="#audit">Ask when you request your audit.</a></p>
   </section>
 
   <figure class="band" aria-hidden="true">
@@ -384,15 +320,10 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
       <h2 id="how-title">Start with a free audit. Decide from there.</h2>
     </div>
     <ol class="steps">
-      <li><h3>A free audit</h3><p>We look at your website, Google listing, reviews and ads, and send you one page on what's working, what needs work and what we'd fix first. Public information only.</p></li>
+      <li><h3>A free audit</h3><p>We look at your website, Google listing, reviews and ads, and send you one page on what's working, what needs work and what we'd fix first. No logins or access needed.</p></li>
       <li><h3>A fixed price</h3><p>If you want help, you get one price with exactly what's included, including anything new it would take. Approve it online, or talk it through first.</p></li>
       <li><h3>Set up and handed over</h3><p>Most setups are done in two to three weeks, with a short note on what changed. After that it runs on its own.</p></li>
     </ol>
-    <ul class="promises">
-      <li>One fixed price, before anything starts</li>
-      <li>Set up in your accounts, in your name</li>
-      <li>Runs on its own after handover</li>
-    </ul>
   </section>
 
   <section class="build" aria-labelledby="peek-title">
@@ -426,9 +357,9 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
         <p class="kicker">Who you're dealing with</p>
         <h2 id="about-title">Hi, I'm Logan.</h2>
         <ul class="creds">
-          <li><b>10+ years</b>in digital marketing</li>
-          <li><b>Local to global</b>from local restaurants to global brands</li>
-          <li><b>Full funnel</b>ads, search, email, websites and analytics</li>
+          <li><b>10+ years</b>Helping brands and businesses grow online</li>
+          <li><b>Local presence, global experience</b>Big&#8209;brand experience, sized for your business</li>
+          <li><b>Big-picture perspective</b>Making your tech work (almost) as hard as you do</li>
         </ul>
       </div>
       <div class="about-copy">
@@ -448,23 +379,23 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
     <div class="faq">
       <details>
         <summary>Will I need new software?</summary>
-        <p>Sometimes. Many fixes are settings in tools you already have, like Jobber or your phone system, and a phone, a calendar and a spreadsheet is a fine place to start. When something new would help, you'll know what it is, why and what it costs before anything starts.</p>
+        <p>Ideally not. We work inside what you already have, whether that's a full setup in Jobber or Housecall Pro, or a phone, a calendar and a spreadsheet. If a new tool is truly needed, we'll explain why, what it costs and your options before anything starts. No software company pays us to recommend them, so the advice fits your setup, not someone's sales target.</p>
       </details>
       <details>
         <summary>What does it cost?</summary>
-        <p>The audit is free. If you want help with the fixes, you get one fixed price before anything starts. No hourly billing and no long contract.</p>
+        <p>The first audit is free. If your setup is more involved, we can do a deeper dive inside your tools for a small fixed fee, agreed up front. If you want help with the fixes, you get one fixed price before anything starts. No hourly billing and no long contract.</p>
       </details>
       <details>
         <summary>What happens after setup?</summary>
-        <p>It runs on its own, in your accounts. If you'd like someone to keep an eye on it, or help with your Google Ads, we can quote that separately.</p>
+        <p>It runs on its own, in your accounts. If you want ongoing support and check-ins, or help with Google Ads and bringing in more leads, we can quote that separately.</p>
       </details>
       <details>
         <summary>Who owns the accounts?</summary>
-        <p>You do. Everything is set up in your name and billed to you, and we're added as a user. If we stop working together, nothing leaves with us.</p>
+        <p>You do. Everything stays in your name and is billed to you. We're added as a user while we set things up, and nothing depends on us, so it all keeps working once our access is removed.</p>
       </details>
       <details>
         <summary>Do you only work with trades?</summary>
-        <p>Mostly heating, cooling and plumbing, because the fixes are similar from shop to shop. If you run another kind of local service business with the same problems, ask anyway.</p>
+        <p>No. Heating, cooling and plumbing shops tend to have the same gaps, which is why they're named here, but any local business that loses leads the same way is a good fit. Have something different in mind? We're always open to interesting projects, big or small. Email <a class="text-link" href="mailto:ledgecommunications@gmail.com">ledgecommunications@gmail.com</a> and tell us about it.</p>
       </details>
     </div>
   </section>
