@@ -71,7 +71,7 @@ async function toHub(env, payload) {
 
 // POST /api/audit-request: the site form. Checks it's a real person (Turnstile + honeypot),
 // then hands the lead to the hub, which records it, sends the confirmation and queues the audit.
-const LIMITS = { name: 120, business: 160, website: 300, email: 200, phone: 40, trade: 60 };
+const LIMITS = { name: 120, business: 160, website: 300, email: 200, phone: 40, trade: 60, missed_calls: 60, tools: 300, tools_other: 120 };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function clean(value, max) {
@@ -82,7 +82,9 @@ async function readBody(request) {
   const type = request.headers.get("content-type") || "";
   if (type.includes("application/json")) return await request.json();
   const form = await request.formData();
-  return Object.fromEntries(form.entries());
+  const out = {};
+  for (const key of new Set(form.keys())) out[key] = form.getAll(key).map(String).join(", "); // checkboxes send several values
+  return out;
 }
 
 async function passesTurnstile(token, ip, secret) {

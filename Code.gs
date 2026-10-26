@@ -34,7 +34,7 @@ var HEAD = {
   leads: ['id', 'created', 'source', 'status', 'attention', 'first_name', 'name', 'business', 'website', 'email',
     'phone', 'trade', 'area', 'consent_basis', 'consent_proof', 'audit_slug', 'top_finding', 'fix_1',
     'proposal_slug', 'thread_id', 'last_msg_id', 'last_reply_at', 'touches', 'next_touch', 'last_touch',
-    'booked_at', 'notes'],
+    'booked_at', 'notes', 'owner_says'],
   audits: ['slug', 'lead_id', 'created', 'business', 'spec_json'],
   proposals: ['slug', 'lead_id', 'created', 'price_sprint', 'price_care', 'gst', 'status', 'sent_at', 'approved_at'],
   jobs: ['job_id', 'kind', 'lead_id', 'area', 'status', 'batch_id', 'attempts', 'created', 'updated', 'est_cost_usd', 'detail'],
@@ -181,7 +181,7 @@ function handleInbound_(f) {
   var lead = {
     id: newId_('L'), created: new Date(), source: 'inbound', status: 'requested', attention: '',
     first_name: firstName_(f.name), name: f.name || '', business: f.business || '', website: f.website || '',
-    email: email, phone: f.phone || '', trade: f.trade || '', area: '',
+    email: email, phone: f.phone || '', trade: f.trade || '', area: '', owner_says: ownerSays_(f),
     consent_basis: 'Inquiry through the site form (CASL implied consent, 6 months)',
     consent_proof: 'Form submitted ' + (f.submitted_at || new Date().toISOString()) + (f.page ? ' on ' + f.page : ''),
     touches: 0, last_reply_at: 0
@@ -193,6 +193,15 @@ function handleInbound_(f) {
   safeSend_(lead, 'inbound_confirm');
   queueJob_('audit', lead.id, '');
   return { ok: true, id: lead.id };
+}
+
+// The two optional form questions, as one line for the Leads tab and the audit request.
+function ownerSays_(f) {
+  var parts = [];
+  if (f.missed_calls) parts.push('missed calls: ' + f.missed_calls);
+  var tools = [f.tools, f.tools_other].filter(function (v) { return v; }).join(', ');
+  if (tools) parts.push('schedules jobs with: ' + tools);
+  return parts.join('; ');
 }
 
 function handleQuoteRequest_(id, t, notes) {
@@ -623,6 +632,7 @@ function jobParams_(job) {
       'Website: ' + (site || 'not given, search for it') + '\n' +
       'Trade: ' + (lead.trade || 'heating, cooling or plumbing') + '\n' +
       'Area: ' + (lead.area || 'Calgary, Alberta') + '\n' +
+      (lead.owner_says ? 'What the owner told us on the form: ' + lead.owner_says + '\n' : '') +
       'Purpose: ' + (lead.source === 'cold' ? 'cold' : 'inbound (they asked for it, no contact details needed)') }]
   };
 }
@@ -815,6 +825,8 @@ function renderAudit_(slug) {
     fixes: spec.fixes.map(function (f) {
       return '      <li><h3>' + esc_(f.title) + '</h3><p>' + esc_(f.why) + '</p><p class="effort">What it takes: ' + esc_(f.effort) + '</p></li>';
     }).join('\n'),
+    later: (spec.later || []).map(function (t) { return '        <li>' + esc_(t) + '</li>'; }).join('\n'),
+    later_hidden: (spec.later || []).length ? '' : 'hidden',
     sources: spec.sources.map(function (s) {
       return '      <li><a href="' + esc_(s.url) + '" rel="nofollow noopener" target="_blank">' + esc_(s.label || s.url) + '</a></li>';
     }).join('\n')

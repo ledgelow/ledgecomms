@@ -92,6 +92,8 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 .approve { display: grid; gap: 10px; justify-items: start; }
 .approved { border-left: 4px solid var(--good); padding: 10px 16px; background: var(--surface); border-radius: 4px; }
 .err { color: var(--leak); font-weight: 500; }
+.plain-list { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; color: var(--muted); }
+.plain-list + .fine { margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -126,11 +128,23 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
     </ul>
   </section>
 
+  <section aria-labelledby="out-title">
+    <h2 id="out-title">Not included</h2>
+    <ul class="plain-list">
+      <li>Website rebuilds or redesigns</li>
+      <li>Switching phone systems or job software</li>
+      <li>Cleaning up old customer data</li>
+      <li>Running your Google Ads or Local Services Ads (quoted separately if you want it)</li>
+    </ul>
+    <p class="fine">If something turns out bigger once we're in, you'll hear about it before any extra work, and you can say no.</p>
+  </section>
+
   <section aria-labelledby="time-title">
     <h2 id="time-title">Timing and what we need from you</h2>
     <ul class="ticks">
+      <li>Before we start, we take a quick look inside your tools. If a fix won't work as planned, we swap in another fix from your audit or take it off the price.</li>
       <li>The first fix is usually live within a week of your go-ahead, and all three within two to three weeks.</li>
-      <li>You add Ledge as a user on the tools involved. You'll get the exact steps; it takes a few minutes.</li>
+      <li>You add us as a user on the tools involved. You'll get the exact steps; it takes a few minutes.</li>
       <li>You answer a few setup questions by email so everything matches how you work.</li>
     </ul>
   </section>
@@ -155,7 +169,6 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 
   <section>
     <p>Questions or want to change the scope? Just reply to the email.</p>
-    <p class="fine">Want help bringing in more leads too? Google Ads and Local Services Ads management is quoted separately.</p>
   </section>
 </main>
 <footer class="wrap foot">

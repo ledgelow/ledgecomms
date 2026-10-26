@@ -55,7 +55,7 @@
   color-scheme: light;
 }
 
-/* Layout, top to bottom: hero with a proof line, Sound familiar?, one lead's path, one photo,
+/* Layout, top to bottom: hero with a proof line, Sound familiar?, before and after, the tools we work in, one photo,
    how it works, a peek at the sample audit, About in its own band, questions, the form.
    Light only. Photos sit behind or between sections as atmosphere, never captioned. */
 *, *::before, *::after { box-sizing: border-box; }
@@ -102,6 +102,7 @@ p { margin: 0; }
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, rgb(12 22 48 / 0.58) 0%, rgb(12 22 48 / 0.44) 30%, rgb(12 22 48 / 0) 68%); }
 .hero-inner { position: relative; z-index: 1; display: grid; gap: 22px; padding-block: clamp(84px, 12vw, 160px) clamp(76px, 11vw, 140px); }
 .hero-inner > * { max-width: 40rem; }
+.hero-inner > .proof { max-width: none; }
 .hero .kicker { color: rgb(255 255 255 / 0.86); }
 .hero h1 { text-shadow: 0 1px 24px rgb(5 8 10 / 0.3); }
 .hero-sub { font-size: 1.22rem; line-height: 1.55; color: rgb(255 255 255 / 0.94); max-width: 36rem; }
@@ -131,23 +132,39 @@ p { margin: 0; }
 .familiar-end p { font-family: var(--display); font-weight: 700; font-size: 1.3rem; letter-spacing: -0.01em; }
 @media (max-width: 860px) { .familiar { grid-template-columns: minmax(0, 1fr); } .familiar .intro { position: static; } }
 
-/* What we build: one lead's path */
+/* What changes: before and after */
 .build { background: var(--surface); }
-.path { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; counter-reset: stop; position: relative; }
-.path li { position: relative; display: grid; gap: 10px; align-content: start; counter-increment: stop; min-width: 0; }
-.path li:not(:last-child)::after { content: ""; position: absolute; top: 21px; left: 56px; width: calc(100% - 44px); height: 2px; background: var(--deep); opacity: 0.3; }
-.path li::before { content: counter(stop); display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--deep); color: var(--deep-ink);
-  font-family: var(--display); font-weight: 800; font-size: 1.15rem; box-shadow: 0 0 0 6px var(--surface); }
-.path h3 { margin-top: 6px; }
-.path p { color: var(--muted); line-height: 1.55; font-size: 0.98rem; }
-.path .tools { font-size: 0.86rem; font-weight: 600; color: var(--deep); line-height: 1.45; }
-@media (max-width: 980px) {
-  .path { grid-template-columns: minmax(0, 1fr); gap: 26px; }
-  .path li:not(:last-child)::after { top: 52px; left: 21px; width: 2px; height: calc(100% - 30px); }
-  .path li { grid-template-columns: 44px minmax(0, 1fr); column-gap: 18px; }
-  .path li::before { grid-row: span 3; }
-  .path h3 { margin-top: 9px; }
+.ba { list-style: none; margin: 0; padding: 0; display: grid; }
+.ba-head, .ba li { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px 28px; }
+.ba-head { padding-bottom: 12px; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.ba-head span:last-child { color: var(--deep); }
+.ba li { align-items: start; padding-block: 22px; border-top: 1px solid var(--rule); }
+.ba li:first-child { border-top: 2px solid var(--ink); }
+.ba h3 { padding-top: 2px; }
+.ba-cell { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; }
+.ba-cell::before { content: ""; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; }
+.ba-today { color: var(--muted); }
+.ba-today::before { background: color-mix(in srgb, var(--muted) 18%, transparent)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 5l6 6M11 5l-6 6' fill='none' stroke='%234D5870' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
+.ba-after { background: var(--snow); border-radius: 8px; padding: 12px 14px; margin-top: -12px; color: var(--ink); font-weight: 500; box-shadow: 0 1px 0 var(--rule); }
+.ba-after::before { background: var(--accent)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%230F1A2E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px no-repeat; }
+.ba-tag { display: none; }
+@media (max-width: 860px) {
+  .ba-head { display: none; }
+  .ba li { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .ba-after { margin-top: 0; }
+  .ba-tag { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: -6px; }
+  .ba-after .ba-tag { color: var(--deep); }
 }
+
+/* Works with what you have */
+.works { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 32px; }
+.works li { display: grid; gap: 8px; align-content: start; padding-top: 16px; border-top: 2px solid var(--ink); min-width: 0; }
+.works p { color: var(--muted); }
+.works-note { margin-top: 28px; color: var(--muted); }
+@media (max-width: 900px) { .works { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .works { grid-template-columns: minmax(0, 1fr); } }
 
 /* One photo between sections, framed on the peaks */
 .band { margin: 0; height: clamp(240px, 36vw, 480px); overflow: hidden; background: var(--spruce); }
@@ -222,6 +239,13 @@ p { margin: 0; }
 .field.full { grid-column: 1 / -1; }
 .field label { font-size: 0.92rem; font-weight: 600; }
 .field label small { font-weight: 400; color: var(--muted); }
+fieldset.field { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset.field legend { font-size: 0.92rem; font-weight: 600; padding: 0; margin-bottom: 6px; }
+fieldset.field legend small { font-weight: 400; color: var(--muted); }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.opts label { display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 500; background: var(--surface); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.45em 0.75em; cursor: pointer; }
+.opts input[type="checkbox"] { accent-color: var(--deep); width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; }
+.opts label:has(input:checked) { border-color: var(--deep); }
 .field input, .field select { width: 100%; font: inherit; font-size: 1.02rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.6em 0.7em; min-height: 46px; }
 .field input:focus, .field select:focus { outline: none; border-color: var(--deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--deep) 25%, transparent); }
 .field input[aria-invalid="true"] { border-color: var(--bad); }
@@ -266,9 +290,9 @@ p { margin: 0; }
         <a class="btn" href="#audit">Get a free audit</a>
         <a class="btn btn-line" href="audit/sample/">See a sample audit</a>
       </div>
-      <ul class="proof" aria-label="About Ledge">
-        <li><span><b>Since 2015</b></span></li>
-        <li><span><b>10+ years</b> in digital marketing</span></li>
+      <ul class="proof" aria-label="About Ledge Communications">
+        <li><span><b>10+ years</b> helping businesses grow online</span></li>
+        <li><span>Local shops to global brands</span></li>
         <li><span>Based in Alberta</span></li>
       </ul>
     </div>
@@ -301,17 +325,53 @@ p { margin: 0; }
     <div class="wrap section">
       <div class="intro">
         <p class="kicker">What we build</p>
-        <h2 id="setup-title">One lead, start to finish</h2>
+        <h2 id="setup-title">What changes after setup</h2>
         <p>We set it up inside the tools you already use, or the simplest ones that fit if you don't have them. Then it runs on its own.</p>
       </div>
-      <ol class="path">
-        <li><h3>Every lead in one place</h3><p>Calls, web forms, Google messages and ad leads land in one inbox you'll actually check.</p><p class="tools">Google Business Profile, your website forms, Jobber or Housecall Pro</p></li>
-        <li><h3>Answered fast</h3><p>Missed calls get a text back in seconds, and web requests get a reply in minutes.</p><p class="tools">Your phone system, Quo, Jobber Receptionist</p></li>
-        <li><h3>Booked</h3><p>Customers pick a time online, straight into the calendar you already use.</p><p class="tools">Jobber, Housecall Pro, ServiceTitan, Google Calendar</p></li>
-        <li><h3>Followed up</h3><p>Quotes with no answer get a friendly nudge, twice, without anyone having to remember.</p><p class="tools">Jobber, Housecall Pro, QuickBooks</p></li>
-        <li><h3>Reviewed and remembered</h3><p>Paid customers get asked for a Google review, and past customers hear from you before the season turns.</p><p class="tools">Google reviews, Jobber, Housecall Pro</p></li>
+      <div class="ba-head" aria-hidden="true"><span></span><span>Today</span><span>After setup</span></div>
+      <ol class="ba">
+        <li>
+          <h3>Every lead in one place</h3>
+          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Calls, web forms, Google messages and ad leads land in different places, and some never get seen.</span></p>
+          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>They all land in one inbox you actually check, so nothing slips through.</span></p>
+        </li>
+        <li>
+          <h3>Answered fast</h3>
+          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>A missed call goes to voicemail, and the caller tries the next shop on the list.</span></p>
+          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>They get a text back within seconds, and web requests get a reply in minutes, day or night.</span></p>
+        </li>
+        <li>
+          <h3>Booked</h3>
+          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Booking a visit takes a round of phone tag during office hours.</span></p>
+          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>Customers pick a time online, straight into the calendar you already use.</span></p>
+        </li>
+        <li>
+          <h3>Followed up</h3>
+          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Quotes go out and nobody has time to chase the ones that go quiet.</span></p>
+          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>Quotes with no answer get a friendly follow-up, twice, without anyone having to remember.</span></p>
+        </li>
+        <li>
+          <h3>Reviewed and remembered</h3>
+          <p class="ba-cell ba-today"><span><span class="ba-tag">Today</span>Happy customers never get asked for a review, and past customers forget you by next season.</span></p>
+          <p class="ba-cell ba-after"><span><span class="ba-tag">After setup</span>Paid jobs get a Google review request, and past customers hear from you before the season turns.</span></p>
+        </li>
       </ol>
     </div>
+  </section>
+
+  <section class="section wrap" aria-labelledby="works-title">
+    <div class="intro">
+      <p class="kicker">Works with what you have</p>
+      <h2 id="works-title">No new system to learn</h2>
+      <p>We work inside the tools you already use. If something new would help, you'll know what it is and why before anything starts.</p>
+    </div>
+    <ul class="works">
+      <li><h3>Phone and texting</h3><p>Your current number, plus a texting tool like Quo if you need one.</p></li>
+      <li><h3>Scheduling and quotes</h3><p>Jobber, Housecall Pro, ServiceTitan, or a calendar and a spreadsheet.</p></li>
+      <li><h3>Google</h3><p>Your Business Profile and reviews, Google Ads and Local Services Ads.</p></li>
+      <li><h3>Website and forms</h3><p>WordPress, Squarespace, Wix and most other site builders.</p></li>
+    </ul>
+    <p class="works-note">Don't see yours? <a class="text-link" href="#audit">Ask when you request your audit.</a></p>
   </section>
 
   <figure class="band" aria-hidden="true">
@@ -367,15 +427,15 @@ p { margin: 0; }
         <h2 id="about-title">Hi, I'm Logan.</h2>
         <ul class="creds">
           <li><b>10+ years</b>in digital marketing</li>
-          <li><b>Since 2015</b>running Ledge</li>
-          <li><b>From Edmonton</b>based in Alberta</li>
+          <li><b>Local to global</b>from local restaurants to global brands</li>
+          <li><b>Full funnel</b>ads, search, email, websites and analytics</li>
         </ul>
       </div>
       <div class="about-copy">
-        <p>I've spent more than ten years in digital marketing, mostly paid media and the systems behind it: ads, tracking, lead handling and audits. I've run Ledge since 2015, alongside agency work in Edmonton, my hometown.</p>
-        <p>I've worked with businesses of every size, from local restaurants and bootstrapped startups to B2B tech companies, nonprofits and energy companies.</p>
+        <p>I've spent more than ten years in digital marketing, across the whole funnel: ads, search, email, websites and the tracking that ties them together. I started Ledge Communications in 2015, alongside agency work in Edmonton, my hometown.</p>
+        <p>I've worked with local restaurants and retail shops, service providers and consultants, health and wellness brands, nonprofits, education, energy and utility companies, and global brands.</p>
         <p>I'm not a tradesperson. What I know is the part between someone finding you and the job getting booked, and that works much the same whether you fix furnaces or run a clinic.</p>
-        <p>Ledge is small on purpose. I take on a few businesses at a time, so you deal with me directly.</p>
+        <p>I keep my client list short on purpose, so you deal with me directly.</p>
       </div>
     </div>
   </section>
@@ -383,7 +443,7 @@ p { margin: 0; }
   <section id="faq" class="section wrap faq-wrap" aria-labelledby="faq-title">
     <div class="intro">
       <p class="kicker">Questions</p>
-      <h2 id="faq-title">What owners usually ask</h2>
+      <h2 id="faq-title">Fair questions, short answers</h2>
     </div>
     <div class="faq">
       <details>
@@ -400,7 +460,7 @@ p { margin: 0; }
       </details>
       <details>
         <summary>Who owns the accounts?</summary>
-        <p>You do. Everything is set up in your name and billed to you, and Ledge is added as a user. If we stop working together, nothing leaves with us.</p>
+        <p>You do. Everything is set up in your name and billed to you, and we're added as a user. If we stop working together, nothing leaves with us.</p>
       </details>
       <details>
         <summary>Do you only work with trades?</summary>
@@ -452,6 +512,27 @@ p { margin: 0; }
               <option>Another local service business</option>
             </select>
           </div>
+          <div class="field full">
+            <label for="f-missed">How are missed calls handled today? <small>(optional)</small></label>
+            <select id="f-missed" name="missed_calls">
+              <option value="">Choose one</option>
+              <option>They go to voicemail</option>
+              <option>Someone calls back when they can</option>
+              <option>An answering service picks up</option>
+              <option>Not sure</option>
+            </select>
+          </div>
+          <fieldset class="field full">
+            <legend>What do you use to schedule jobs? <small>(optional, pick any)</small></legend>
+            <div class="opts">
+              <label><input type="checkbox" name="tools" value="Jobber"> Jobber</label>
+              <label><input type="checkbox" name="tools" value="Housecall Pro"> Housecall Pro</label>
+              <label><input type="checkbox" name="tools" value="ServiceTitan"> ServiceTitan</label>
+              <label><input type="checkbox" name="tools" value="Google Calendar"> Google Calendar</label>
+              <label><input type="checkbox" name="tools" value="Spreadsheet or paper"> Spreadsheet or paper</label>
+            </div>
+            <input type="text" name="tools_other" aria-label="Something else" placeholder="Something else? Type it here">
+          </fieldset>
           <div class="hp" aria-hidden="true">
             <label for="f-fax">Fax</label>
             <input id="f-fax" name="fax" type="text" tabindex="-1" autocomplete="off">
