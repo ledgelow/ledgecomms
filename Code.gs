@@ -840,8 +840,8 @@ function renderProposal_(slug) {
   }, {
     fixes: fixes.map(function (f) { return '      <li><b>' + esc_(f.title) + '</b><span>' + esc_(f.effort) + '</span></li>'; }).join('\n'),
     care_row: care ? '      <div class="price-row"><b>Optional care plan once it\'s live</b><span class="amt">$' + money_(care) +
-      ' <small>/month ' + gst + '</small></span><p>A one-page report every Monday, monitoring and small tweaks as your season changes. ' +
-      'Month to month after the first three. Not required.</p></div>' : '',
+      ' <small>/month ' + gst + '</small></span><p>Each month we check that everything still runs, fix anything that breaks and adjust messages as your season changes. ' +
+      'Month to month. Not required.</p></div>' : '',
     approve_hidden: approved ? 'hidden' : '',
     approved_hidden: approved ? '' : 'hidden'
   });

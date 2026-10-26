@@ -26,8 +26,7 @@ const FILES = {
 
 // Photo slots: a stock photo dropped into the repo as stock-N.jpg replaces Logan's photo in that spot.
 const SLOTS = {
-  "photo-1.jpg": ["stock-1.jpg", "river-2000.jpg"],
-  "photo-2.jpg": ["stock-2.jpg", "road-1200.jpg"],
+  "photo-1.jpg": ["stock-1.jpg", "road-2000.jpg"],
 };
 
 fs.rmSync(out, { recursive: true, force: true });

@@ -12,7 +12,7 @@
 <style>
 /* Ledge theme: the one place colour and type are set, shared by the site, audit pages and proposal pages.
    Current picks: round 3 Amber 2 (royal blue and orange, a quiet vintage Oilers nod), on warm paper with deep navy
-   header and bands; type C (Inter Tight + Inter).
+   header and bands; type C (Inter Tight + Inter). Light only: no automatic dark version.
    --accent is the orange used for buttons; --deep is royal blue for kickers and links; --spruce is the dark bands. */
 :root {
   --snow: #F8F6F2;
@@ -45,24 +45,7 @@
   --body-size: 17px;
   --body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mark: "Archivo", "Helvetica Neue", Arial, sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --snow: #0A1120; --surface: #111A2E; --ink: #EEF0F4; --muted: #A8B2C6; --rule: #232E46;
-    --sky: #93ABE2; --deep: #93ABE2; --deep-ink: #0A1120; --ice: #1A2848;
-    --accent: #F39A3F; --accent-ink: #0A1120; --accent-text: #F39A3F;
-    --spruce: #060B17; --head-bg: #060B17; --head-ink: #EEF0F4; --head-muted: #A8B2C6;
-    --on-dark: #EEF0F4; --on-dark-muted: #A8B2C6; --scrim: rgb(6 11 23 / 0.66);
-    --bad: #FF8A73; --good: #6CC596; --leak: #F0A35E; --unknown: #A8B2C6; color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --snow: #0A1120; --surface: #111A2E; --ink: #EEF0F4; --muted: #A8B2C6; --rule: #232E46;
-    --sky: #93ABE2; --deep: #93ABE2; --deep-ink: #0A1120; --ice: #1A2848;
-    --accent: #F39A3F; --accent-ink: #0A1120; --accent-text: #F39A3F;
-    --spruce: #060B17; --head-bg: #060B17; --head-ink: #EEF0F4; --head-muted: #A8B2C6;
-    --on-dark: #EEF0F4; --on-dark-muted: #A8B2C6; --scrim: rgb(6 11 23 / 0.66);
-    --bad: #FF8A73; --good: #6CC596; --leak: #F0A35E; --unknown: #A8B2C6; color-scheme: dark;
+  color-scheme: light;
 }
 /* Shared layout for audit and proposal pages. Colour and type come from theme.css. */
 *, *::before, *::after { box-sizing: border-box; }

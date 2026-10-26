@@ -9,7 +9,7 @@ Cloudflare redeploys about a minute after each commit.
 | Files | What they are |
 | --- | --- |
 | `index.html`, `sample-audit.html`, `sample-proposal.html`, `favicon.svg`, `robots.txt`, `_headers`, the six `.jpg` photos | The website. |
-| `stock-1.jpg`, `stock-2.jpg` (optional) | Stock photos. When present, they replace the river photo in the wide band and the road photo beside "What I set up". |
+| `stock-1.jpg` (optional) | A stock photo. When present, it replaces the road photo in the wide band between sections. |
 | `worker.js` | Runs in front of the site: the audit form, the fixed-price and approve buttons, unsubscribe, each shop's audit and proposal page (fetched from the hub), and the booking link and spam check on every page. |
 | `build-site.js` | Arranges the files above into the site's folders on each deploy. |
 | `wrangler.jsonc` | Tells Cloudflare how to deploy. |
