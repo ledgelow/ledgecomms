@@ -16,4 +16,4 @@ Cloudflare redeploys about a minute after each commit.
 | `Code.gs`, `Templates.gs`, `appsscript.json` | The pipeline hub. These live in Apps Script (the Ledge Pipeline sheet); they're here as the record of what's running. |
 | `cold-sequence.md`, `inbound-sequence.md` | Every email, for review. |
 
-No lead data lives in this repo. Leads, consent records and the do-not-contact list stay in the Google Sheet.
+No lead data lives in this repo. Leads, consent records, and the do-not-contact list stay in the Google Sheet.

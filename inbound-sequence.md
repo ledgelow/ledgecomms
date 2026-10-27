@@ -81,7 +81,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > Here's the fixed price for setting up those fixes:
 > {proposal_url}
 >
-> It covers what I'll do, how long it takes and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
+> It covers what I'll do, how long it takes, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
 >
 > {sender}
 

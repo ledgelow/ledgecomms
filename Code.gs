@@ -630,7 +630,7 @@ function jobParams_(job) {
       'Today is ' + today + '. Build a Lead Handling Audit for this business.\n\n' +
       'Business: ' + (lead.business || 'unknown') + '\n' +
       'Website: ' + (site || 'not given, search for it') + '\n' +
-      'Trade: ' + (lead.trade || 'heating, cooling or plumbing') + '\n' +
+      'Trade: ' + (lead.trade || 'heating, cooling, or plumbing') + '\n' +
       'Area: ' + (lead.area || 'Calgary, Alberta') + '\n' +
       (lead.owner_says ? 'What the owner told us on the form: ' + lead.owner_says + '\n' : '') +
       'Purpose: ' + (lead.source === 'cold' ? 'cold' : 'inbound (they asked for it, no contact details needed)') }]
@@ -852,7 +852,7 @@ function renderProposal_(slug) {
   }, {
     fixes: fixes.map(function (f) { return '      <li><b>' + esc_(f.title) + '</b><span>' + esc_(f.effort) + '</span></li>'; }).join('\n'),
     care_row: care ? '      <div class="price-row"><b>Optional care plan once it\'s live</b><span class="amt">$' + money_(care) +
-      ' <small>/month ' + gst + '</small></span><p>Each month we check that everything still runs, fix anything that breaks and adjust messages as your season changes. ' +
+      ' <small>/month ' + gst + '</small></span><p>Each month we check that everything still runs, fix anything that breaks, and adjust messages as your season changes. ' +
       'Month to month. Not required.</p></div>' : '',
     approve_hidden: approved ? 'hidden' : '',
     approved_hidden: approved ? '' : 'hidden'
@@ -909,7 +909,7 @@ var EMAILS = {
   proposal: {
     fallbackSubject: 'Your fixed price from Ledge Communications',
     body: 'Hi {first},\n\nHere\'s the fixed price for setting up those fixes:\n{proposal_url}\n\n' +
-      'It covers what I\'ll do, how long it takes and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.\n\n{sender}'
+      'It covers what I\'ll do, how long it takes, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.\n\n{sender}'
   },
   proposal_nudge: {
     body: 'Hi {first},\n\nJust checking whether you had any questions on the proposal. Happy to adjust the scope if something doesn\'t fit:\n{proposal_url}\n\n{sender}'

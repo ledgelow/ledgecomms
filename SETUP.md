@@ -10,34 +10,47 @@ Two rules while you set up:
 What it costs: $0 a month in fixed tools. The Claude API is the only usage cost, about US$0.10 to $0.20 per audit,
 and the hub pauses itself at US$20 a month.
 
-Already done: DNS for ledgecommunications.com is on Cloudflare (Free plan), and the `ledgecomms` Worker exists.
-
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
+
+## Where you are (Oct 26)
+
+- **Done:** DNS on Cloudflare, step 1 (the repo), and step 2.1 to 2.3 (the Worker builds from GitHub). The new site is
+  up on the workers.dev address.
+- **Now:** upload the latest files (see "Updating the repo" in step 1). Replacing all 22 is simplest, since the hub
+  files changed too.
+- **Next, in order:** step 2.4 and 2.5 (Turnstile and its two keys), step 3 (Claude API key), step 4 (the hub, then
+  back to Cloudflare for `HUB_URL` and `HUB_KEY`), step 5, step 7, then the trial runs in step 8.
+- **After that:** step 9 (move ledgecommunications.com over) and step 10 (check the first real audits, then switch on
+  cold email).
+- **Optional, any time:** step 6 (booking link for emails) and a stock photo (`stock-1.jpg`) for the wide photo band.
+
+Roughly 90 minutes of setup is left, plus waiting for the first audits to come back.
 
 ---
 
 ## 1. Put the site in GitHub (10 minutes)
 
-The repo is flat on purpose: 22 files, no folders, so nothing can get lost in the upload.
+Done. Kept here for reference. The repo is flat on purpose: 22 files, no folders, so nothing can get lost in the upload.
 
 1. GitHub > `ledgecomms` > **Settings** > scroll to **Danger Zone** > **Delete this repository**.
 2. **New repository** > name `ledgecomms`, **Private** > **Create repository**.
 3. Download `ledgecomms-flat.zip` and unzip it (on Windows: right-click > **Extract All**).
 4. On the new repo's page, click **uploading an existing file**. Open the unzipped `ledgecomms-files` folder,
    select all 22 files and drag them in (or pick them with "choose your files"). **Commit changes**.
-5. The repo's main page should list 22 files, including `worker.js`, `build-site.js` and `wrangler.jsonc`,
+5. The repo's main page should list 22 files, including `worker.js`, `build-site.js`, and `wrangler.jsonc`,
    with no "(1)" or "(2)" in any name.
 
-Later changes work the same way: I send updated files, you drag them in (same names replace the old ones),
-and Cloudflare redeploys in about a minute.
+**Updating the repo:** on the repo's main page, **Add file** > **Upload files**, drag in the new files (same names
+replace the old ones), and **Commit changes**. Cloudflare rebuilds in about a minute; check the workers.dev address.
+Optional: `stock-1.jpg` (a Medium-size stock photo) replaces the road photo in the wide band when it's in the repo.
 
 ## 2. Cloudflare Worker (15 minutes)
 
 1. **Workers & Pages** > `ledgecomms` > **Settings** > **Builds**. Disconnect the old repo, then **Connect** >
    GitHub > `ledgecomms`. If it isn't in the list, use the link there to give Cloudflare's GitHub app access to it.
 2. Build settings: Build command blank. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
-   Save. `wrangler.jsonc` does the rest: it arranges the site's folders, runs `worker.js` and serves only the site.
+   Save. `wrangler.jsonc` does the rest: it arranges the site's folders, runs `worker.js`, and serves only the site.
 3. When the build finishes, open `https://ledgecomms.ledgelow.workers.dev` on your phone. You should see the new site.
    If the Builds settings look stuck, delete the Worker (Settings, bottom of the page) and make it again:
    **Create application** > **GitHub** > `ledgecomms`, keeping the name `ledgecomms`.
@@ -75,7 +88,7 @@ Do this signed in as **ledgecommunications@gmail.com**, because every email goes
    - Save.
 4. **Services** (+ next to Services) > **Gmail API** > Add. (The manifest asks for it too; this just confirms it.)
 5. Pick `setup` in the function menu > **Run**. Google warns the app isn't verified, because it's your own script:
-   **Advanced** > **Go to Ledge Pipeline (unsafe)** > **Allow**. It asks for Gmail, Sheets, Calendar and
+   **Advanced** > **Go to Ledge Pipeline (unsafe)** > **Allow**. It asks for Gmail, Sheets, Calendar, and
    outside connections, all used by the hub.
 6. **View** > **Logs** (or Execution log) shows `HUB_KEY`. Copy it for Cloudflare.
 7. **Project Settings** > **Script Properties** > add `ANTHROPIC_API_KEY` with the key from step 3.
@@ -90,6 +103,8 @@ Do this signed in as **ledgecommunications@gmail.com**, because every email goes
     - `MAILING_ADDRESS`: your home address, on one line (step 7)
     - `BOOKING_URL`: the Superhuman link (step 6), optional
     - `GST_REGISTERED`: leave it at **yes** (Ledge is registered)
+    - `PRICE_SPRINT` and `PRICE_CARE`: the setup price ($1,000) and the optional monthly care plan ($250), before GST.
+      Change them any time; you can also edit the price on a single proposal before approving it
     - Leave `COLD_EMAIL_ON` at **no** for now
 12. **Ledge** > **Check settings** should say the settings look complete.
 
@@ -101,7 +116,7 @@ The URL stays the same.
 In ledgecommunications@gmail.com:
 1. **Settings** > **Accounts** > **Send mail as**: edit the name to your full name.
 2. Add a short plain signature only if you want one; the hub already adds a footer with your name, mailing address,
-   the site and the unsubscribe link.
+   the site, and the unsubscribe link.
 
 ## 6. Superhuman booking page (10 minutes, optional)
 
@@ -120,7 +135,7 @@ calendar ID in the `CALENDAR_ID` setting.
 ## 7. Mailing address (1 minute)
 
 Canada's anti-spam law requires a mailing address in every commercial email, cold or not. Your home address is fine.
-It only appears in email footers, never on the site, audit or proposal pages. Put it in the `MAILING_ADDRESS`
+It only appears in email footers, never on the site, audit, or proposal pages. Put it in the `MAILING_ADDRESS`
 setting on one line. Cold email won't start until it's filled in.
 
 If you ever want it out of the footers, a Canada Post PO box (roughly $120 to $215 a year) is the cheap swap:
@@ -130,8 +145,8 @@ change the setting and every email after that uses the new address.
 
 Use a personal address that isn't ledgecommunications@gmail.com.
 
-1. **Site lead.** Fill in the form on `https://ledgecomms.ledgelow.workers.dev`. Expect a confirmation email within a minute and a row on
-   the Leads tab. Within a few hours (batches usually finish inside the hour, occasionally longer) you get a
+1. **Site lead.** Fill in the form on `https://ledgecomms.ledgelow.workers.dev`, including the two optional questions.
+   Expect a confirmation email within a minute and a row on the Leads tab, with your answers in the `owner_says` column. Within a few hours (batches usually finish inside the hour, occasionally longer) you get a
    "Check this audit" email. Open the preview, then approve it. The audit email lands in the same thread.
 2. **Fixed price.** On the audit page, tap **Send me a fixed price**. You get "Check this proposal"; approve it.
    The proposal email arrives. Open the page and tap **Approve and get started**. Expect the kickoff email and a
@@ -156,7 +171,7 @@ If anything looks off, the **Events** tab shows what happened and when. Send me 
 
 ## 10. Validate, then switch on cold email
 
-1. Read the first 5 audits and 3 proposals as they arrive. Approve, rebuild or skip from each email.
+1. Read the first 5 audits and 3 proposals as they arrive. Approve, rebuild, or skip from each email.
 2. Send me anything that reads wrong; I'll adjust the prompt or the copy.
 3. Once the site is live on ledgecommunications.com and you're happy, set `COLD_EMAIL_ON` to **yes**.
    It starts at 5 a day and adds 5 a week, up to 20.
@@ -167,7 +182,7 @@ If anything looks off, the **Events** tab shows what happened and when. Send me 
 
 | When | What |
 | --- | --- |
-| Every hour | Replies, bounces and bookings checked; Claude batches sent and collected; audits, proposals and emails sent |
+| Every hour | Replies, bounces, and bookings checked; Claude batches sent and collected; audits, proposals, and emails sent |
 | Daily, 5 pm | One email to you, only if there are replies it couldn't sort |
 | Monday 5 am | Claude looks for new shops in the next area |
 | Monday 7 am | Weekly digest to you |

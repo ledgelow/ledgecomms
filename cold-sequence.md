@@ -1,6 +1,6 @@
 # Cold sequence
 
-Sent from ledgecommunications@gmail.com through Gmail, plain text, one thread per shop. Starts only when COLD_EMAIL_ON is yes. Weekdays 8 am to 5 pm Mountain, 5 a day to start, plus 5 a week, up to 20. Stops on any reply, booking, bounce or unsubscribe.
+Sent from ledgecommunications@gmail.com through Gmail, plain text, one thread per shop. Starts only when COLD_EMAIL_ON is yes. Weekdays 8 am to 5 pm Mountain, 5 a day to start, plus 5 a week, up to 20. Stops on any reply, booking, bounce, or unsubscribe.
 
 Placeholders: {first} first name, {business}, {audit_url}, {proposal_url}, {top_finding}, {fix_1} (from the audit), {sender} (SENDER_NAME), {next_day} (next business day), {booking_line} (only when BOOKING_URL is set). Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com and a one-click unsubscribe link.
 
