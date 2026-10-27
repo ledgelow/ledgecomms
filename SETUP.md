@@ -13,15 +13,13 @@ and the hub pauses itself at US$20 a month.
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 26)
+## Where you are (Oct 26, evening)
 
-- **Done:** DNS on Cloudflare, step 1 (the repo), and step 2.1 to 2.3 (the Worker builds from GitHub). The new site is
-  up on the workers.dev address.
-- **Now:** upload the latest files (see "Updating the repo" in step 1). This round adds new photos, so upload the
-  whole set (23 files), then delete the four old photos the site no longer uses: `river-1200.jpg`, `river-2000.jpg`,
-  `road-1200.jpg`, and `road-2000.jpg`. Leaving them does no harm; deleting just keeps the repo tidy.
-- **Next, in order:** step 2.4 and 2.5 (Turnstile and its two keys), step 3 (Claude API key), step 4 (the hub, then
-  back to Cloudflare for `HUB_URL` and `HUB_KEY`), step 5, step 7, then the trial runs in step 8.
+- **Done:** DNS on Cloudflare, step 1 (the repo, with the new photos), step 2.1 to 2.4 (the Worker and the Turnstile
+  widget), and the two Turnstile entries in step 2.5.
+- **Now:** upload the latest small update (the new headline and footer), then step 3 (Claude API key) and step 4 (the hub).
+  Step 4 ends by giving you the two values Cloudflare still needs, `HUB_URL` and `HUB_KEY` (step 4.10).
+- **Then:** step 5, step 7, and the trial runs in step 8.
 - **After that:** step 9 (move ledgecommunications.com over) and step 10 (check the first real audits, then switch on
   cold email).
 - **Optional, any time:** step 6 (booking link for emails).
@@ -59,14 +57,19 @@ uses a photo that isn't there.
    **Create application** > **GitHub** > `ledgecomms`, keeping the name `ledgecomms`.
 4. **Turnstile** (left menu, under Application security) > **Add widget**. Name it Ledge. Hostnames:
    `ledgecommunications.com` and `ledgecomms.ledgelow.workers.dev`. Mode **Managed**. Keep the two keys handy.
-5. Worker > **Settings** > **Variables and Secrets** > **Add**. Saving deploys a new version on its own.
+5. Worker > **Settings** > **Variables and Secrets** > **Add**. Cloudflare offers two types: **Variable** (plain text,
+   stays visible) and **Secret** (hidden once saved). Names must match exactly, in capitals. Saving deploys a new
+   version on its own, and `wrangler.jsonc` tells GitHub deploys to keep these.
 
-| Name | Value | Type |
-| --- | --- | --- |
-| `TURNSTILE_SITE_KEY` | Turnstile site key | Text |
-| `TURNSTILE_SECRET` | Turnstile secret key | Secret |
-| `HUB_URL` | The web app URL from step 4 | Secret |
-| `HUB_KEY` | The HUB_KEY from step 4 | Secret |
+| Name | Type | Value | When |
+| --- | --- | --- | --- |
+| `TURNSTILE_SITE_KEY` | Variable | The Turnstile **site key** | Now |
+| `TURNSTILE_SECRET` | Secret | The Turnstile **secret key**. The name is `TURNSTILE_SECRET`, with no `_KEY` on the end | Now |
+| `HUB_URL` | Secret | The hub's web address, from step 4.8. Starts `https://script.google.com/macros/s/` and ends `/exec` | After step 4 |
+| `HUB_KEY` | Secret | The hub's password, from step 4.6. A long string of letters and numbers the hub makes for itself | After step 4 |
+
+`HUB_URL` is where the site sends each audit request; `HUB_KEY` proves the request came from your site. Until both are
+in, the form says it couldn't send. A secret can't be renamed: to fix a name, delete it and add it again.
 
 The custom domain comes last (step 9), once the site reads right.
 
@@ -93,12 +96,15 @@ Do this signed in as **ledgecommunications@gmail.com**, because every email goes
 5. Pick `setup` in the function menu > **Run**. Google warns the app isn't verified, because it's your own script:
    **Advanced** > **Go to Ledge Pipeline (unsafe)** > **Allow**. It asks for Gmail, Sheets, Calendar, and
    outside connections, all used by the hub.
-6. **View** > **Logs** (or Execution log) shows `HUB_KEY`. Copy it for Cloudflare.
+6. The **Execution log** opens at the bottom of the editor. One line reads
+   `HUB_KEY (paste into Cloudflare as HUB_KEY): ` followed by a long string of letters and numbers. Copy just that
+   string. This is `HUB_KEY`. (Lost it? It's also under **Project Settings** > **Script Properties**.)
 7. **Project Settings** > **Script Properties** > add `ANTHROPIC_API_KEY` with the key from step 3.
-8. **Deploy** > **New deployment** > type **Web app**. Execute as **Me**, Who has access **Anyone**. Deploy and copy the
-   web app URL.
+8. **Deploy** > **New deployment** > gear > **Web app**. Execute as **Me**, Who has access **Anyone**. Deploy. The
+   confirmation shows a Deployment ID and a **Web app** URL; copy the URL (it ends in `/exec`). This is `HUB_URL`.
 9. Add one more Script Property: `WEB_APP_URL` = that URL.
-10. Back in Cloudflare (step 2.5), add `HUB_URL` (the web app URL) and `HUB_KEY`.
+10. Back in Cloudflare: Worker > **Settings** > **Variables and Secrets** > **Add**, twice, both as **Secret**:
+    `HUB_URL` = the web app URL from step 8, and `HUB_KEY` = the string from step 6.
 11. Back in the Sheet, reload it. A **Ledge** menu appears. Fill in the **Settings** tab:
     - `SITE_URL`: `https://ledgecomms.ledgelow.workers.dev` while you test, so links in emails work (step 9 switches it back)
     - `OWNER_EMAIL`: your everyday inbox, where review emails and the 5 pm list go
@@ -149,7 +155,8 @@ change the setting and every email after that uses the new address.
 Use a personal address that isn't ledgecommunications@gmail.com.
 
 1. **Site lead.** Fill in the form on `https://ledgecomms.ledgelow.workers.dev`, including the two optional questions.
-   Expect a confirmation email within a minute and a row on the Leads tab, with your answers in the `owner_says` column. Within a few hours (batches usually finish inside the hour, occasionally longer) you get a
+   Expect a confirmation email within a minute and a row on the Leads tab, with your answers in the `owner_says`
+   column. Within a few hours (batches usually finish inside the hour, occasionally longer) you get a
    "Check this audit" email. Open the preview, then approve it. The audit email lands in the same thread.
 2. **Fixed price.** On the audit page, tap **Send me a fixed price**. You get "Check this proposal"; approve it.
    The proposal email arrives. Open the page and tap **Approve and get started**. Expect the kickoff email and a
