@@ -17,13 +17,14 @@ Your Squarespace site stays up on ledgecommunications.com until step 9, so you c
 
 - **Done:** DNS on Cloudflare, step 1 (the repo), and step 2.1 to 2.3 (the Worker builds from GitHub). The new site is
   up on the workers.dev address.
-- **Now:** upload the latest files (see "Updating the repo" in step 1). Replacing all 22 is simplest, since the hub
-  files changed too.
+- **Now:** upload the latest files (see "Updating the repo" in step 1). This round adds new photos, so upload the
+  whole set (23 files), then delete the four old photos the site no longer uses: `river-1200.jpg`, `river-2000.jpg`,
+  `road-1200.jpg`, and `road-2000.jpg`. Leaving them does no harm; deleting just keeps the repo tidy.
 - **Next, in order:** step 2.4 and 2.5 (Turnstile and its two keys), step 3 (Claude API key), step 4 (the hub, then
   back to Cloudflare for `HUB_URL` and `HUB_KEY`), step 5, step 7, then the trial runs in step 8.
 - **After that:** step 9 (move ledgecommunications.com over) and step 10 (check the first real audits, then switch on
   cold email).
-- **Optional, any time:** step 6 (booking link for emails) and a stock photo (`stock-1.jpg`) for the wide photo band.
+- **Optional, any time:** step 6 (booking link for emails).
 
 Roughly 90 minutes of setup is left, plus waiting for the first audits to come back.
 
@@ -31,19 +32,21 @@ Roughly 90 minutes of setup is left, plus waiting for the first audits to come b
 
 ## 1. Put the site in GitHub (10 minutes)
 
-Done. Kept here for reference. The repo is flat on purpose: 22 files, no folders, so nothing can get lost in the upload.
+Done. Kept here for reference. The repo is flat on purpose: 23 files, no folders, so nothing can get lost in the upload.
 
 1. GitHub > `ledgecomms` > **Settings** > scroll to **Danger Zone** > **Delete this repository**.
 2. **New repository** > name `ledgecomms`, **Private** > **Create repository**.
 3. Download `ledgecomms-flat.zip` and unzip it (on Windows: right-click > **Extract All**).
 4. On the new repo's page, click **uploading an existing file**. Open the unzipped `ledgecomms-files` folder,
-   select all 22 files and drag them in (or pick them with "choose your files"). **Commit changes**.
-5. The repo's main page should list 22 files, including `worker.js`, `build-site.js`, and `wrangler.jsonc`,
+   select all 23 files and drag them in (or pick them with "choose your files"). **Commit changes**.
+5. The repo's main page should list 23 files, including `worker.js`, `build-site.js`, and `wrangler.jsonc`,
    with no "(1)" or "(2)" in any name.
 
 **Updating the repo:** on the repo's main page, **Add file** > **Upload files**, drag in the new files (same names
 replace the old ones), and **Commit changes**. Cloudflare rebuilds in about a minute; check the workers.dev address.
-Optional: `stock-1.jpg` (a Medium-size stock photo) replaces the road photo in the wide band when it's in the repo.
+To delete a file: click its name > the **...** menu (top right) > **Delete file** > **Commit changes**.
+Photos: every `.jpg` in the repo is published, and the build stops with a "Missing from the repo" message if a page
+uses a photo that isn't there.
 
 ## 2. Cloudflare Worker (15 minutes)
 

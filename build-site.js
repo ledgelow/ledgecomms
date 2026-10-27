@@ -16,18 +16,9 @@ const FILES = {
   "favicon.svg": "favicon.svg",
   "robots.txt": "robots.txt",
   "_headers": "_headers",
-  "tower-1200.jpg": "assets/tower-1200.jpg",
-  "tower-2000.jpg": "assets/tower-2000.jpg",
-  "road-1200.jpg": "assets/road-1200.jpg",
-  "road-2000.jpg": "assets/road-2000.jpg",
-  "river-1200.jpg": "assets/river-1200.jpg",
-  "river-2000.jpg": "assets/river-2000.jpg",
 };
 
-// Photo slots: a stock photo dropped into the repo as stock-N.jpg replaces Logan's photo in that spot.
-const SLOTS = {
-  "photo-1.jpg": ["stock-1.jpg", "road-2000.jpg"],
-};
+// Every photo in the repo (any .jpg) goes to assets/. The build stops if a page uses a photo that isn't there.
 
 fs.rmSync(out, { recursive: true, force: true });
 const missing = [];
@@ -38,15 +29,19 @@ for (const [from, to] of Object.entries(FILES)) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.copyFileSync(src, dest);
 }
-for (const [slot, choices] of Object.entries(SLOTS)) {
-  const pick = choices.find((f) => fs.existsSync(path.join(root, f)));
-  if (!pick) { missing.push(slot); continue; }
-  fs.mkdirSync(path.join(out, "assets"), { recursive: true });
-  fs.copyFileSync(path.join(root, pick), path.join(out, "assets", slot));
-  console.log(slot + " <- " + pick);
+fs.mkdirSync(path.join(out, "assets"), { recursive: true });
+const photos = fs.readdirSync(root).filter((f) => f.toLowerCase().endsWith(".jpg"));
+for (const f of photos) fs.copyFileSync(path.join(root, f), path.join(out, "assets", f));
+for (const page of ["index.html", "sample-audit.html", "sample-proposal.html"]) {
+  if (!fs.existsSync(path.join(root, page))) continue;
+  const used = fs.readFileSync(path.join(root, page), "utf8").match(/assets\/[\w.-]+\.jpg/g) || [];
+  for (const u of used) {
+    const f = u.slice("assets/".length);
+    if (!photos.includes(f) && !missing.includes(f)) missing.push(f);
+  }
 }
 if (missing.length) {
   console.error("Missing from the repo: " + missing.join(", "));
   process.exit(1);
 }
-console.log("Built site/ with " + (Object.keys(FILES).length + Object.keys(SLOTS).length) + " files.");
+console.log("Built site/ with " + Object.keys(FILES).length + " pages and files, and " + photos.length + " photos.");
