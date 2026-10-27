@@ -2,7 +2,7 @@
 
 For people who ask for an audit on the site (CASL implied consent from the inquiry), and for anyone who asks for a fixed price.
 
-Placeholders: {first} first name, {business}, {audit_url}, {proposal_url}, {top_finding}, {fix_1} (from the audit), {sender} (SENDER_NAME), {next_day} (next business day), {booking_line} (only when BOOKING_URL is set). Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com and a one-click unsubscribe link.
+Placeholders: {first} first name, {business}, {audit_url}, {proposal_url}, {top_finding}, {fix_1} (from the audit), {sender} (SENDER_NAME), {sign} (the first name from it, for sign-offs), {next_day} (next business day), {booking_line} (only when BOOKING_URL is set). Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com, and a one-click unsubscribe link.
 
 The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your markup) and this file gets regenerated.
 
@@ -16,8 +16,10 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > Thanks for reaching out. I'm putting your audit together now and you'll have it by end of day {next_day}.
 >
+> If there's anything you'd like me to look at in particular, just reply to this email.
+>
 > Talk soon,
-> {sender}
+> {sign}
 
 ## Next business day, once the audit is ready
 
@@ -32,7 +34,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > If you'd like a hand, there's a button at the bottom of the page to get a fixed price, or just reply "yes".{booking_line}
 >
-> {sender}
+> {sign}
 
 ## 2 business days later
 
@@ -44,7 +46,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > Reply "yes" and I'll send a fixed price for getting it done.
 >
-> {sender}
+> {sign}
 
 ## 3 business days after that (last)
 
@@ -56,7 +58,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > {audit_url}
 >
 > All the best,
-> {sender}
+> {sign}
 
 ---
 
@@ -70,7 +72,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > Got it. I'll send the fixed price and what's included by end of day {next_day}.
 >
-> {sender}
+> {sign}
 
 ## Next business day, the proposal
 
@@ -83,7 +85,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > It covers what I'll do, how long it takes, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
 >
-> {sender}
+> {sign}
 
 ## 3 business days later, if not approved
 
@@ -94,7 +96,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > Just checking whether you had any questions on the proposal. Happy to adjust the scope if something doesn't fit:
 > {proposal_url}
 >
-> {sender}
+> {sign}
 
 ## When they approve it online
 
@@ -110,5 +112,5 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > I'll keep you posted as each one goes live.
 >
-> {sender}
+> {sign}
 

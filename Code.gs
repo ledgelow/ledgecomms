@@ -60,9 +60,10 @@ var SETTINGS_DEFAULTS = [
   ['COLD_PER_DAY_MAX', '20', 'Ceiling after adding 5 a week.'],
   ['PROSPECTS_PER_WEEK', '15', 'New shops to look for each Monday.'],
   ['AREAS', 'Calgary NE, Calgary NW, Calgary SE, Calgary SW, Airdrie, Chestermere, Cochrane, Okotoks', 'Areas to work through, in order.'],
-  ['TRADES', 'heating and cooling, plumbing', 'Trades to look for.'],
-  ['MODEL', 'claude-sonnet-5-5', 'Claude model for research.'],
-  ['MONTHLY_ENGINE_BUDGET_USD', '20', 'The engine pauses for the rest of the month once estimated spend passes this.']
+  ['TRADES', 'heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair',
+    'Trades to look for. All share the same gaps: urgent calls while the crew is on a job, and quotes that need chasing.'],
+  ['MODEL', 'claude-opus-5-5', 'Claude model for finding shops and writing audits. claude-sonnet-5-5 costs about half.'],
+  ['MONTHLY_ENGINE_BUDGET_USD', '60', 'The engine pauses for the rest of the month once estimated spend passes this.']
 ];
 var STAGE_NAMES = ['Lead comes in', 'First response', 'Visit booked', 'Quote sent', 'Job done and paid', 'Customer comes back'];
 var PILL = { good: 'Looks good', leak: 'Needs work', unknown: 'Couldn\'t check' };
@@ -114,9 +115,11 @@ function onOpen() {
     .addToUi();
 }
 
+// From the Sheet's Ledge menu this shows a pop-up; run from the script editor it writes to the Execution log instead.
 function showSettingsCheck() {
   var missing = checkSettings_();
-  SpreadsheetApp.getUi().alert(missing.length ? 'Still to fill in:\n\n' + missing.join('\n') : 'Settings look complete.');
+  var msg = missing.length ? 'Still to fill in:\n\n' + missing.join('\n') : 'Settings look complete.';
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
 }
 
 function checkSettings_() {
@@ -236,6 +239,7 @@ function handleApprove_(id, t) {
     'Audit: ' + auditUrl_(lead) + '\n\n' +
     'They were told: ' + paymentLine_() + ' Next from you: ' +
     (setting_('PAYMENT_URL') ? '' : 'the invoice, then ') + 'the steps to add you as a user on their tools.' +
+    '\n\n' + invoiceBlock_(lead, prop) +
     (lead.notes ? '\n\nNotes: ' + lead.notes : ''));
   return { ok: true };
 }
@@ -603,7 +607,7 @@ function submitJobs_() {
 }
 
 function jobParams_(job) {
-  var model = setting_('MODEL') || 'claude-sonnet-5-5';
+  var model = setting_('MODEL') || 'claude-opus-5-5';
   var loc = { type: 'approximate', city: 'Calgary', region: 'Alberta', country: 'CA', timezone: 'America/Edmonton' };
   var today = Utilities.formatDate(new Date(), tz_(), 'EEEE, MMMM d, yyyy');
   if (job.kind === 'find') {
@@ -787,7 +791,8 @@ function extractJson_(content) {
 
 // Batch prices per million tokens (50% of standard) plus $0.01 per web search.
 function estimateCost_(model, usage) {
-  var rates = /haiku/i.test(model || '') ? [0.05, 0.25] : /opus/i.test(model || '') ? [2, 10] : [1, 5]; // Batch API rates per million tokens (Oct 2026)
+  var m = model || '';
+  var rates = /haiku/i.test(m) ? [0.05, 0.25] : /opus/i.test(m) ? [2, 10] : /fable|mythos/i.test(m) ? [5, 25] : [1, 5]; // Batch API rates per million tokens (Oct 2026)
   var input = Number(usage.input_tokens || 0) + Number(usage.cache_creation_input_tokens || 0) + Number(usage.cache_read_input_tokens || 0) * 0.1;
   var searches = Number((usage.server_tool_use || {}).web_search_requests || 0);
   return input / 1e6 * rates[0] + Number(usage.output_tokens || 0) / 1e6 * rates[1] + searches * 0.01;
@@ -869,17 +874,18 @@ function fill_(tpl, text, raw) {
 var EMAILS = {
   inbound_confirm: {
     subject: 'Your Lead Handling Audit for {business}',
-    body: 'Hi {first},\n\nThanks for reaching out. I\'m putting your audit together now and you\'ll have it by end of day {next_day}.\n\nTalk soon,\n{sender}'
+    body: 'Hi {first},\n\nThanks for reaching out. I\'m putting your audit together now and you\'ll have it by end of day {next_day}.\n\n' +
+      'If there\'s anything you\'d like me to look at in particular, just reply to this email.\n\nTalk soon,\n{sign}'
   },
   inbound_audit: {
     body: 'Hi {first},\n\nHere\'s your audit:\n{audit_url}\n\nThe top three fixes are in the order I\'d tackle them. The biggest one: {top_finding}\n\n' +
-      'If you\'d like a hand, there\'s a button at the bottom of the page to get a fixed price, or just reply "yes".{booking_line}\n\n{sender}'
+      'If you\'d like a hand, there\'s a button at the bottom of the page to get a fixed price, or just reply "yes".{booking_line}\n\n{sign}'
   },
   inbound_nudge1: {
-    body: 'Hi {first},\n\nQuick follow-up on your audit. If you only do one thing, I\'d start here: {fix_1}.\n\nReply "yes" and I\'ll send a fixed price for getting it done.\n\n{sender}'
+    body: 'Hi {first},\n\nQuick follow-up on your audit. If you only do one thing, I\'d start here: {fix_1}.\n\nReply "yes" and I\'ll send a fixed price for getting it done.\n\n{sign}'
   },
   inbound_nudge2: {
-    body: 'Hi {first},\n\nLast note from me. Your audit will stay up here whenever you want it:\n{audit_url}\n\nAll the best,\n{sender}'
+    body: 'Hi {first},\n\nLast note from me. Your audit will stay up here whenever you want it:\n{audit_url}\n\nAll the best,\n{sign}'
   },
   cold_1: {
     subject: '{business}: a quick look at your website and reviews',
@@ -887,37 +893,37 @@ var EMAILS = {
       'I help trades businesses make sure the calls and requests they already get turn into booked jobs.\n\n' +
       'I took a look at {business} from the outside and put together a one-page audit. No cost and nothing to sign up for:\n{audit_url}\n\n' +
       'The biggest thing that stood out: {top_finding}\n\n' +
-      'If any of it is useful and you\'d like a hand, just reply "yes" and I\'ll send over a fixed price.{booking_line}\n\nThanks,\n{sender}'
+      'If any of it is useful and you\'d like a hand, just reply "yes" and I\'ll send over a fixed price.{booking_line}\n\nThanks,\n{sign}'
   },
   cold_2: {
-    body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only tackle one thing, I\'d start here: {fix_1}.\n\nHappy to set it up for you. Reply "yes" and I\'ll send a fixed price.\n\n{sender}'
+    body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only tackle one thing, I\'d start here: {fix_1}.\n\nHappy to set it up for you. Reply "yes" and I\'ll send a fixed price.\n\n{sign}'
   },
   cold_3: {
     body: 'Hi {first},\n\nI know this time of year is busy, so I\'ll keep it short. If you want your after-hours calls and quote follow-ups taken care of before things get busier, ' +
-      'I can have it set up in two or three weeks.\n\nReply "yes" and I\'ll send the details.{booking_line}\n\n{sender}'
+      'I can have it set up in two or three weeks.\n\nReply "yes" and I\'ll send the details.{booking_line}\n\n{sign}'
   },
   cold_4: {
-    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to look at it later:\n{audit_url}\n\nAll the best with the season,\n{sender}'
+    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to look at it later:\n{audit_url}\n\nAll the best with the season,\n{sign}'
   },
   positive_ack: {
-    body: 'Thanks {first}, appreciate you getting back to me.\n\nI\'ll put together a fixed price for those fixes and send it over by end of day {next_day}.{booking_line}\n\n{sender}'
+    body: 'Thanks {first}, appreciate you getting back to me.\n\nI\'ll put together a fixed price for those fixes and send it over by end of day {next_day}.{booking_line}\n\n{sign}'
   },
   quote_ack: {
     fallbackSubject: 'Your fixed price from Ledge Communications',
-    body: 'Hi {first},\n\nGot it. I\'ll send the fixed price and what\'s included by end of day {next_day}.\n\n{sender}'
+    body: 'Hi {first},\n\nGot it. I\'ll send the fixed price and what\'s included by end of day {next_day}.\n\n{sign}'
   },
   proposal: {
     fallbackSubject: 'Your fixed price from Ledge Communications',
     body: 'Hi {first},\n\nHere\'s the fixed price for setting up those fixes:\n{proposal_url}\n\n' +
-      'It covers what I\'ll do, how long it takes, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.\n\n{sender}'
+      'It covers what I\'ll do, how long it takes, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.\n\n{sign}'
   },
   proposal_nudge: {
-    body: 'Hi {first},\n\nJust checking whether you had any questions on the proposal. Happy to adjust the scope if something doesn\'t fit:\n{proposal_url}\n\n{sender}'
+    body: 'Hi {first},\n\nJust checking whether you had any questions on the proposal. Happy to adjust the scope if something doesn\'t fit:\n{proposal_url}\n\n{sign}'
   },
   kickoff: {
     body: 'Hi {first},\n\nThanks, we\'re on. Here\'s what happens next:\n\n1. {payment_step}\n' +
       '2. I\'ll send the steps to add me as a user on the tools involved. It only takes a few minutes.\n' +
-      '3. The first fix will be live within a week, and all three within two to three weeks.\n\nI\'ll keep you posted as each one goes live.\n\n{sender}'
+      '3. The first fix will be live within a week, and all three within two to three weeks.\n\nI\'ll keep you posted as each one goes live.\n\n{sign}'
   }
 };
 
@@ -932,6 +938,7 @@ function emailVars_(l) {
     top_finding: l.top_finding || '',
     fix_1: String(l.fix_1 || '').replace(/\.$/, ''),
     sender: setting_('SENDER_NAME') || 'Logan',
+    sign: String(setting_('SENDER_NAME') || 'Logan').trim().split(/\s+/)[0],
     next_day: nextBusinessDayName_(),
     booking_line: booking ? ' If a quick call is easier, grab a time here: ' + booking : '',
     payment_step: pay ? 'You can pay here whenever suits: ' + pay : 'I\'ll send the invoice today.'
@@ -1178,6 +1185,25 @@ function unsubUrl_(l) { return siteUrl_() + '/api/unsubscribe?id=' + encodeURICo
 function ownerLink_(action, l) { return prop_('WEB_APP_URL') + '?action=' + action + '&id=' + encodeURIComponent(l.id) + '&t=' + token_(l.id); }
 function paymentLine_() { return setting_('PAYMENT_URL') ? 'Approving tells us to go ahead. You\'ll get a payment link right away.' : 'Approving tells us to go ahead. The invoice follows the same day.'; }
 function money_(n) { return Number(n || 0).toLocaleString('en-CA', { maximumFractionDigits: 0 }); }
+function cents_(n) { return Number(n || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// Everything the FreshBooks invoice needs, ready to copy. GST is 5% in Alberta.
+function invoiceBlock_(lead, prop) {
+  var sub = Number(prop.price_sprint || 0);
+  var gst = yes_(prop.gst) ? Math.round(sub * 5) / 100 : 0;
+  var fixes = [];
+  try {
+    var audit = lead.audit_slug ? findRow_(TAB.audits, HEAD.audits, 'slug', lead.audit_slug) : null;
+    fixes = audit ? (JSON.parse(audit.spec_json).fixes || []).map(function (f) { return f.title; }) : [];
+  } catch (e) { fixes = []; }
+  return 'For the invoice:\n' +
+    'Client: ' + lead.business + ', ' + (lead.name || lead.first_name || '') + ', ' + lead.email + '\n' +
+    'Item: Lead handling setup' + (fixes.length ? ': ' + fixes.join('; ') : '') + '\n' +
+    'Amount: $' + cents_(sub) + '\n' +
+    (gst ? 'GST (5%): $' + cents_(gst) + '\n' : '') +
+    'Total: $' + cents_(sub + gst) + ' CAD' +
+    (Number(prop.price_care) ? '\nCare plan, if they add it later: $' + money_(prop.price_care) + '/month' + (gst ? ' + GST' : '') : '');
+}
 function monthKey_() { return Utilities.formatDate(new Date(), tz_(), 'yyyy-MM'); }
 function firstName_(name) { return String(name || '').trim().split(/\s+/)[0] || ''; }
 function appendNote_(notes, line) { return (notes ? String(notes) + '\n' : '') + line; }
@@ -1231,6 +1257,9 @@ function esc_(s) {
 function toHtml_(text) {
   var e = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   e = e.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
+  // Footer niceties: a plain "Unsubscribe" link instead of the long address, and the site as a proper https link.
+  e = e.replace(/Unsubscribe: <a href="([^"]+)">[^<]*<\/a>/, '<a href="$1">Unsubscribe</a>');
+  e = e.replace(/(^|[\s>])ledgecommunications\.com(?=[\s<·])/g, '$1<a href="https://ledgecommunications.com">ledgecommunications.com</a>');
   return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#1B2A38">' +
     e.split(/\n{2,}/).map(function (p) { return '<p style="margin:0 0 14px">' + p.replace(/\n/g, '<br>') + '</p>'; }).join('') + '</div>';
 }

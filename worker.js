@@ -270,7 +270,7 @@ function fillPageValues(res, env) {
         if (siteKey) {
           el.setAttribute("class", "cf-turnstile");
           el.setAttribute("data-sitekey", siteKey);
-          el.setAttribute("data-theme", "auto");
+          el.setAttribute("data-theme", "light"); // the site is light only
         } else {
           el.remove();
         }

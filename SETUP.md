@@ -13,18 +13,16 @@ and the hub pauses itself at US$20 a month.
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 26, evening)
+## Where you are (Oct 27)
 
-- **Done:** DNS on Cloudflare, step 1 (the repo, with the new photos), step 2.1 to 2.4 (the Worker and the Turnstile
-  widget), and the two Turnstile entries in step 2.5.
-- **Now:** upload the latest small update (the new headline and footer), then step 3 (Claude API key) and step 4 (the hub).
-  Step 4 ends by giving you the two values Cloudflare still needs, `HUB_URL` and `HUB_KEY` (step 4.10).
-- **Then:** step 5, step 7, and the trial runs in step 8.
-- **After that:** step 9 (move ledgecommunications.com over) and step 10 (check the first real audits, then switch on
-  cold email).
-- **Optional, any time:** step 6 (booking link for emails).
+- **Done:** steps 1 to 7. The first trial lead went through: the spam check showed, the form succeeded, and the
+  confirmation email went out (it landed in spam at Kulin; see step 9.4 for the main fix).
+- **Now:** upload the latest files, paste the new `Code.gs` into Apps Script (then **Deploy** > **Manage deployments** >
+  edit > **New version**), and go live (step 9).
+- **Then:** finish the trial runs in step 8 as the test audit comes back, then step 10 (check the first real audits,
+  then switch on cold email).
 
-Roughly 90 minutes of setup is left, plus waiting for the first audits to come back.
+About 20 minutes of setup is left, plus waiting for the first audits to come back.
 
 ---
 
@@ -57,13 +55,15 @@ uses a photo that isn't there.
    **Create application** > **GitHub** > `ledgecomms`, keeping the name `ledgecomms`.
 4. **Turnstile** (left menu, under Application security) > **Add widget**. Name it Ledge. Hostnames:
    `ledgecommunications.com` and `ledgecomms.ledgelow.workers.dev`. Mode **Managed**. Keep the two keys handy.
-5. Worker > **Settings** > **Variables and Secrets** > **Add**. Cloudflare offers two types: **Variable** (plain text,
-   stays visible) and **Secret** (hidden once saved). Names must match exactly, in capitals. Saving deploys a new
+5. Worker > **Settings** > the **Variables and Secrets** card near the top of the page > **Add**. There's a second
+   "Variables and secrets" box further down, inside the **Build** section (under Root directory, Build watch paths, and
+   API token). That one only feeds the build step; the live site never sees it, so don't use it. Types: **Text** (plain,
+   stays visible) or **Secret** (hidden once saved). Names must match exactly, in capitals. Saving there deploys a new
    version on its own, and `wrangler.jsonc` tells GitHub deploys to keep these.
 
 | Name | Type | Value | When |
 | --- | --- | --- | --- |
-| `TURNSTILE_SITE_KEY` | Variable | The Turnstile **site key** | Now |
+| `TURNSTILE_SITE_KEY` | Text | The Turnstile **site key** | Now |
 | `TURNSTILE_SECRET` | Secret | The Turnstile **secret key**. The name is `TURNSTILE_SECRET`, with no `_KEY` on the end | Now |
 | `HUB_URL` | Secret | The hub's web address, from step 4.8. Starts `https://script.google.com/macros/s/` and ends `/exec` | After step 4 |
 | `HUB_KEY` | Secret | The hub's password, from step 4.6. A long string of letters and numbers the hub makes for itself | After step 4 |
@@ -71,13 +71,22 @@ uses a photo that isn't there.
 `HUB_URL` is where the site sends each audit request; `HUB_KEY` proves the request came from your site. Until both are
 in, the form says it couldn't send. A secret can't be renamed: to fix a name, delete it and add it again.
 
+These go under **Settings** > **Variables and Secrets**, not under **Settings** > **Builds** (that section is for build
+settings, and the site never sees what's there). To check the site key is working, open the site: a small Cloudflare
+box appears just above **Send me my audit**. If it's missing, the site isn't seeing `TURNSTILE_SITE_KEY`. With the secret
+set and the box missing, every form submission is turned away, so fix this before the trial runs. The usual causes:
+the keys were added under **Builds** instead of **Variables and Secrets**, the name has a typo or a space, or the change
+was saved as a version without being deployed (choose **Deploy**).
+
 The custom domain comes last (step 9), once the site reads right.
 
 ## 3. Claude API key (10 minutes)
 
 1. console.anthropic.com, signed in with ledgelow@gmail.com (or the Ledge account, your call).
-2. **Billing**: add about US$10 of credit. That covers the first 50 or so audits.
-3. **Limits**: set a monthly spend limit, for example US$25. The hub also stops itself at US$20.
+2. **Billing**: make sure there's credit on the account. On the Opus model an audit costs roughly 50 cents to a dollar,
+   searches and page reads included; finding a week of prospects is about the same.
+3. **Limits**: set a monthly spend limit, for example US$75. The hub also pauses itself once its own estimate passes
+   `MONTHLY_ENGINE_BUDGET_USD` (60 to start), and the weekly digest shows the month's spend so far.
 4. **API keys** > Create key, name it "Ledge hub". Copy it for step 4. Don't paste it anywhere else.
 
 ## 4. The pipeline hub (25 minutes)
@@ -115,31 +124,73 @@ Do this signed in as **ledgecommunications@gmail.com**, because every email goes
     - `PRICE_SPRINT` and `PRICE_CARE`: the setup price ($1,000) and the optional monthly care plan ($250), before GST.
       Change them any time; you can also edit the price on a single proposal before approving it
     - Leave `COLD_EMAIL_ON` at **no** for now
-12. **Ledge** > **Check settings** should say the settings look complete.
+    - `MODEL`: `claude-opus-5-5`, the stronger model for research and writing. `claude-sonnet-5-5` costs about half
+    - `MONTHLY_ENGINE_BUDGET_USD`: `60` to start. Raise it any time
+    - `TRADES`: `heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair`.
+      They share the same gaps: urgent calls while the crew is on a job, and quotes that need chasing. Roofing adds hail
+      season, when quotes pile up and follow-up decides who gets the job
+    If you ran `setup` before these defaults changed, those three cells still hold the old values; type the new ones in.
+12. In the **Sheet** (not the script editor), reload the page. A **Ledge** menu appears at the top, to the right of
+    **Help**. **Ledge** > **Check settings** should say the settings look complete. The first time, Google asks you to
+    allow the script again; that's expected. (Running `showSettingsCheck` from the script editor writes the same
+    answer to the Execution log instead.)
 
 If you ever change `Code.gs`: **Deploy** > **Manage deployments** > edit > Version **New version** > Deploy.
 The URL stays the same.
 
-## 5. Gmail details (5 minutes)
+## 5. Gmail details (15 minutes)
 
-In ledgecommunications@gmail.com:
-1. **Settings** > **Accounts** > **Send mail as**: edit the name to your full name.
-2. Add a short plain signature only if you want one; the hub already adds a footer with your name, mailing address,
-   the site, and the unsubscribe link.
+In ledgecommunications@gmail.com. The files come from `ledge-brand-kit.zip`.
+
+1. **Name:** **Settings** > **Accounts** > **Send mail as**: your full name. (Done.)
+2. **Profile photo:** myaccount.google.com > **Personal info** > **Profile picture** > `ledge-mark-profile-photo.jpg`.
+   It shows next to your emails in Gmail and on calendar invites. A clear headshot works too, and for cold email from
+   one person it can feel more personal; your call.
+3. **Signature** (for emails you write yourself; the hub's emails carry their own footer): **Settings** > **See all
+   settings** > **General** > **Signature** > **Create new**, then paste:
+
+       Logan [last name]
+       Ledge Communications
+       Alberta, Canada · ledgecommunications.com
+
+   Set it as the default for new emails and for replies, and tick **Insert this signature before quoted text**. Plain
+   text is the better choice: images in signatures can push cold email toward spam folders and show up as attachments.
+   If you want the logo on emails you write yourself, insert `ledge-logo-email-signature.png` and set it to small.
+   Superhuman has its own signature setting, so paste the same text there.
+4. **Undo send:** **General** > **Undo Send** > 30 seconds.
+5. **2-Step Verification:** myaccount.google.com > **Security**. Turn it on; this account sends every email and runs the hub.
+6. **Leave threads alone:** archiving and labels are fine, but don't delete emails from leads. The hub reads each
+   conversation to notice replies.
+
+**One inbox: ledgelow@gmail.com, through Superhuman.** Superhuman runs on ledgelow@gmail.com, so Ledge mail comes to you
+there and you reply as Ledge. The hub keeps its own copy and keeps working.
+
+1. In **ledgecommunications@gmail.com**: **Settings** > **See all settings** > **Forwarding and POP/IMAP** > **Add a
+   forwarding address** > `ledgelow@gmail.com`. Google emails a confirmation code to ledgelow; enter it. Then pick
+   **Forward a copy of incoming mail to ledgelow@gmail.com** and **keep Gmail's copy in the Inbox**. Keep the copy:
+   the hub reads it to notice replies, opt-outs, and bounces.
+2. In **ledgelow@gmail.com**: **Settings** > **See all settings** > **Accounts and Import** > **Send mail as** > **Add
+   another email address**. Your full name, `ledgecommunications@gmail.com`, leave **Treat as an alias** ticked. The
+   verification email arrives through the forward from step 1; click it. Then, in the same section, choose **Reply from
+   the same address the message was sent to**.
+3. In Superhuman, reply to a Ledge email and check the From line shows ledgecommunications@gmail.com. Superhuman uses
+   the addresses set up in Gmail.
+
+A few inboxes (mostly Outlook) may show those replies as sent "on behalf of" the other address. It's cosmetic. The hub
+notices a lead's reply on its own copy and stops its follow-ups, so you and the hub won't talk over each other.
 
 ## 6. Superhuman booking page (10 minutes, optional)
 
 Calls are optional and the link only ever appears in emails, never on the site. The emails always ask for a reply first.
-If you want the link available:
-1. Add ledgecommunications@gmail.com to Superhuman if it isn't already.
-2. Press **2** for the week view > **+** next to Booking Pages.
-3. Duration 15 minutes. Scheduling windows weekdays 4 to 5 pm Mountain. Calendar: the
-   ledgecommunications@gmail.com calendar. Event title: something with "Ledge" in it, like
-   "Ledge Communications call", so the hub recognises bookings from new people.
-4. Save, copy the link, and put it in Settings (`BOOKING_URL`). Cloudflare doesn't need it.
+Your booking page lives on ledgelow@gmail.com (Superhuman), so bookings land on that calendar. Done so far: the link is
+in `BOOKING_URL`, and your Kulin calendar counts as busy time. Two things let the hub see the bookings:
+1. In Google Calendar on **ledgelow@gmail.com**: your calendar's **Settings and sharing** > **Share with specific
+   people** > add `ledgecommunications@gmail.com` with **See all event details**. In the Ledge account, open the share
+   email and click **Add this calendar**.
+2. In the Ledge Pipeline sheet, Settings tab: `CALENDAR_ID` = `ledgelow@gmail.com`.
 
-If the booking page has to use another calendar, share that calendar with ledgecommunications@gmail.com and put its
-calendar ID in the `CALENDAR_ID` setting.
+Keep "Ledge" in the booking page's event title (for example "Ledge Communications call"): the hub only looks at events
+with that word in the title, so the rest of your calendar is left alone.
 
 ## 7. Mailing address (1 minute)
 
@@ -168,6 +219,10 @@ Use a personal address that isn't ledgecommunications@gmail.com.
 
 If anything looks off, the **Events** tab shows what happened and when. Send me a screenshot of it.
 
+**Invoicing (FreshBooks):** when a client approves, the "Approved" email to you ends with everything the invoice needs:
+client, line item (the three fixes by name), amount, 5% GST, and total. Make the invoice in FreshBooks from that. Turn on
+online payments in FreshBooks so the client can pay by card straight from the invoice email.
+
 ## 9. Go live on ledgecommunications.com (10 minutes, once the copy reads right)
 
 1. Worker > **Settings** > **Domains & Routes** > **Add** > **Custom domain** > `ledgecommunications.com`.
@@ -175,7 +230,9 @@ If anything looks off, the **Events** tab shows what happened and when. Send me 
 2. If Cloudflare says a DNS record already exists: **DNS** > **Records**, delete the Squarespace records (the A records
    on `ledgecommunications.com` and the `www` CNAME), then add the custom domain again. Leave any other records alone.
 3. Open ledgecommunications.com on your phone. It can take a few minutes to switch over.
-4. In the Sheet's **Settings** tab, change `SITE_URL` back to `https://ledgecommunications.com`.
+4. In the Sheet's **Settings** tab, change `SITE_URL` back to `https://ledgecommunications.com`. Do this as soon as the
+   domain works: until then, every email links to the workers.dev address, and spam filters distrust workers.dev links
+   because phishing sites use them a lot.
 5. Cancel the Squarespace **website** plan before Jan 18, 2027. The domain registration can stay there
    (it renews Mar 31, 2027) or move to Cloudflare Registrar later.
 
