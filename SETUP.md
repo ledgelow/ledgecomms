@@ -17,20 +17,20 @@ Your Squarespace site stays up on ledgecommunications.com until step 9, so you c
 
 ## Where you are (Oct 28, evening): first Google Ads audits on the way
 
-The Google Ads version is live: site, hub, and DataForSEO. **Find prospects now** ran for Airdrie and found 15 shops.
-Over the next few hours the hub runs their searches (6 shops an hour), then Claude writes the audits.
+The Google Ads version is live: site, pricing page, hub, DataForSEO, and the manager account (871-805-0188).
+**Find prospects now** ran for Airdrie and found 15 shops, and the 10 Calgary shops from Oct 27 are being redone.
+The hub runs searches for 6 shops an hour, then Claude writes the audits.
 
-**Ship this update (about 10 minutes)**
+**Ship this update (5 minutes)**
 1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, **Deploy** > **Manage deployments** > edit > **New
-   version** > **Deploy**. On its next run the hub:
-   - adds three rows to the Settings tab: `ADS_MANAGER_ID` (871-805-0188, Ledge's Google Ads manager account),
-     `PRICE_PAGE_FIXES` (500), and `PRICE_LANDING_PAGE` (1000). If you already deployed the version with 400 and 900,
-     those two rows exist already: type 500 and 1000 into them.
-   - queues the 10 Calgary audits from Oct 27 again as Local Search Audits (same shops, same emails found). Ignore
-     or delete the old "Check this audit" emails from Oct 27; new ones replace them.
-2. **GitHub:** upload all 24 files from the new zip. One is new: `pricing.html`, which becomes ledgecommunications.com/pricing.
-   The home page no longer has the price list; it links to the pricing page from the menu, the questions, and the footer.
-3. `REVIEW_AUDITS_FIRST` = 10, so you read more of the new audits before they're approved automatically.
+   version** > **Deploy**. On its next run the hub moves the old default prices on by itself: the new fee tiers
+   (`0:450, 1000:650, 2000:950, 4000:1450, 8000:20%`), `MIN_AD_BUDGET` 750, page fixes $500, and landing page $1,000.
+   Cells you changed yourself are left alone.
+2. **GitHub:** upload all 24 files from the new zip. The site then picks up price changes from the Settings tab within
+   about 10 minutes.
+
+**Prices from here on** are just the Settings tab: edit a cell and proposals use it right away; the site follows
+within about 10 minutes.
 
 **When the audits arrive**
 4. They come in one "Check these N audits" email per hourly run, not one email each. Open each audit, then use its

@@ -35,7 +35,7 @@ export default {
 /* ───────────── live prices ───────────── */
 
 // The hub's Settings tab is the one place prices live. A copy is kept for a day and refreshed in the background once
-// it's an hour old, so a price change shows up within about an hour and no visitor waits on the hub.
+// it's 10 minutes old, so a price change shows up within minutes and no visitor waits on the hub.
 const PRICING_CACHE_KEY = "https://pricing.ledgecommunications.com/v1";
 
 async function livePricing(env, ctx) {
@@ -52,7 +52,7 @@ async function livePricing(env, ctx) {
   };
   const hit = await cache.match(PRICING_CACHE_KEY).catch(() => null);
   if (!hit) { ctx.waitUntil(refresh()); return null; }
-  if (Date.now() - Number(hit.headers.get("x-fetched") || 0) > 3600e3) ctx.waitUntil(refresh());
+  if (Date.now() - Number(hit.headers.get("x-fetched") || 0) > 600e3) ctx.waitUntil(refresh());
   const data = await hit.json().catch(() => null);
   return validPricing(data) ? data : null;
 }

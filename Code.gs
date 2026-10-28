@@ -50,7 +50,12 @@ var HEAD = {
   evidence: ['lead_id', 'created', 'segment', 'town', 'cost_usd', 'evidence_json'],
   volumes: ['keyword', 'location', 'volume', 'bid_low_usd', 'bid_high_usd', 'fetched']
 };
-var SCHEMA_VERSION = '4';
+var SCHEMA_VERSION = '5';
+// Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
+var OLD_DEFAULTS = {
+  MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
+  PRICE_PAGE_FIXES: ['400'], PRICE_LANDING_PAGE: ['900']
+};
 var SETTINGS_DEFAULTS = [
   ['OWNER_EMAIL', '', 'Where your notifications go (your everyday inbox).'],
   ['SENDER_NAME', '', 'Your full name, as it appears on every email.'],
@@ -76,10 +81,10 @@ var SETTINGS_DEFAULTS = [
   ['MONTHLY_ENGINE_BUDGET_USD', '60', 'The engine pauses for the rest of the month once estimated spend passes this (Claude and search data together).'],
   ['PRICE_ACCOUNT_AUDIT', '500', 'Paid Google Ads account audit, CAD before GST. Shown on audits for shops already running ads.'],
   ['ACCOUNT_AUDIT_CREDIT_DAYS', '30', 'The account audit fee comes off setup or management if they go ahead within this many days. 0 hides the line.'],
-  ['MGMT_TIERS', '1000:500, 2000:800, 4000:1200, 8000:15%',
-    'Monthly management fee by monthly ad budget, CAD before GST. Each entry is budget-from:fee, or budget-from:percent of the budget.'],
-  ['MGMT_MIN_FEE', '500', 'The lowest monthly management fee, CAD before GST.'],
-  ['MIN_AD_BUDGET', '1000', 'The smallest monthly ad budget a starting plan is built on, CAD. Keeps the fee at half the budget or less.'],
+  ['MGMT_TIERS', '0:450, 1000:650, 2000:950, 4000:1450, 8000:20%',
+    'Monthly management fee by monthly ad budget, CAD before GST. Each entry is budget-from:fee, or budget-from:percent of the budget (0 means "under the next one").'],
+  ['MGMT_MIN_FEE', '500', 'The lowest fee on a percentage tier, CAD before GST. Fixed tiers charge exactly what MGMT_TIERS says.'],
+  ['MIN_AD_BUDGET', '750', 'The smallest monthly ad budget a plan is built on, CAD. The site says plans start here.'],
   ['SETUP_MONTHS', '1', 'Setup fee, as months of the monthly fee (1 = setup costs the same as one month).'],
   ['ADS_MANAGER_ID', '871-805-0188', 'Ledge\'s Google Ads manager account. Clients link their accounts to it; the kickoff emails tell them how.'],
   ['PRICE_PAGE_FIXES', '500', 'Add-on: page fixes on their current site (tap-to-call near the top, a shorter form, a booking button, call tracking). CAD before GST, one time.'],
@@ -206,9 +211,24 @@ function ensureSchema_(force) {
   if (st.getLastRow() < 1) st.getRange(1, 1, 1, 3).setValues([['setting', 'value', 'what it does']]).setFontWeight('bold');
   var have = st.getLastRow() > 1 ? st.getRange(2, 1, st.getLastRow() - 1, 1).getValues().map(function (r) { return r[0]; }) : [];
   SETTINGS_DEFAULTS.forEach(function (row) { if (have.indexOf(row[0]) === -1) st.appendRow(row); });
+  if (from > 0 && from < Number(SCHEMA_VERSION)) refreshSettingDefaults_(st);
   _settings = null;
   props_().setProperty('SCHEMA_VERSION', SCHEMA_VERSION);
   if (from > 0 && from < 4) rebuildLegacyAudits_();
+}
+
+function refreshSettingDefaults_(st) {
+  var norm = function (v) { return /^[\d.]+$/.test(String(v).trim()) ? String(Number(v)) : String(v).replace(/\s+/g, ' ').trim(); };
+  var defaults = {};
+  SETTINGS_DEFAULTS.forEach(function (r) { defaults[r[0]] = r; });
+  var vals = st.getRange(2, 1, st.getLastRow() - 1, 3).getValues();
+  vals.forEach(function (r, i) {
+    var d = defaults[String(r[0]).trim()];
+    if (!d) return;
+    var old = OLD_DEFAULTS[d[0]];
+    if (old && old.map(norm).indexOf(norm(r[1])) > -1) st.getRange(i + 2, 2).setValue(d[1]);
+    if (r[2] !== d[2]) st.getRange(i + 2, 3).setValue(d[2]); // descriptions are ours: keep them current
+  });
 }
 
 // Audits written before the switch to Google Ads (lead handling) that nobody has been sent yet are rebuilt as
@@ -534,12 +554,11 @@ function tiers_() {
 function feeFor_(spend) {
   var pick = null;
   tiers_().forEach(function (t) { if (!pick || spend >= t.from) pick = t; });
-  var fee = pick.pct ? Math.round(spend * pick.pct / 100) : pick.fee;
-  return Math.max(fee, Number(setting_('MGMT_MIN_FEE') || 0));
+  return pick.pct ? Math.max(Math.round(spend * pick.pct / 100), Number(setting_('MGMT_MIN_FEE') || 0)) : pick.fee;
 }
 // The budget picked on the audit page, as the monthly ad budget a plan is built on.
 function plannedBudget_(budget) {
-  var min = Number(setting_('MIN_AD_BUDGET') || 1000);
+  var min = Number(setting_('MIN_AD_BUDGET') || 0);
   var b = String(budget || '').toLowerCase().replace(/[$,\s]/g, '');
   var plan = { 'under1000': min, '1000-2000': 1500, '2000-4000': 3000, '4000+': 5000 }[b];
   if (!plan && /^\d+$/.test(b)) plan = Number(b);
@@ -1750,23 +1769,26 @@ function pricingSummary_() {
   var t = tiers_(), min = Number(setting_('MGMT_MIN_FEE') || 0);
   return {
     ok: true, price_audit: money_(setting_('PRICE_ACCOUNT_AUDIT') || 500), credit_days: String(Number(setting_('ACCOUNT_AUDIT_CREDIT_DAYS') || 0)),
-    min_fee: money_(Math.max(t[0].pct ? Math.round(t[0].from * t[0].pct / 100) : t[0].fee, min)),
+    min_fee: money_(t[0].pct ? Math.max(Math.round(Math.max(t[0].from, 1) * t[0].pct / 100), min) : t[0].fee),
     min_budget: money_(Math.max(Number(setting_('MIN_AD_BUDGET') || 0), t[0].from)),
     cap_line: feeCapLine_(t, min),
     price_page_fixes: money_(addonPrice_('page_fixes')), price_landing_page: money_(addonPrice_('landing_page')),
     setup_months: (function (n) { return n === 1 ? 'one month' : n === 2 ? 'two months' : n + ' months'; })(Number(setting_('SETUP_MONTHS') || 1)),
-    rows: t.map(function (x, i) {
-      var n = t[i + 1];
-      return [n ? '$' + money_(x.from) + ' to $' + money_(n.from - 1) : '$' + money_(x.from) + ' and up',
-        x.pct ? x.pct + '% of the budget' : '$' + money_(Math.max(x.fee, min))];
-    })
+    rows: t.map(function (x, i) { return tierLabels_(x, i, t, min); })
   };
 }
 
+function tierLabels_(t, i, tiers, minFee) {
+  var next = tiers[i + 1];
+  var range = !next ? '$' + money_(t.from) + ' and up' : t.from === 0 ? 'Under $' + money_(next.from) : '$' + money_(t.from) + ' to $' + money_(next.from - 1);
+  return [range, t.pct ? t.pct + '% of the budget' : '$' + money_(t.fee)];
+}
+
 // "Our fee is never more than half of your ad budget", worked out from the tiers so it stays true if they change.
+// The bottom tier is measured at the smallest budget a plan is built on. Left out when the fee can pass 60%.
 function feeCapLine_(tiers, minFee) {
-  var worst = 0;
-  tiers.forEach(function (t) { worst = Math.max(worst, t.pct ? t.pct / 100 : Math.max(t.fee, minFee || 0) / Math.max(t.from, 1)); });
+  var worst = 0, minBudget = Number(setting_('MIN_AD_BUDGET') || 0);
+  tiers.forEach(function (t) { worst = Math.max(worst, t.pct ? t.pct / 100 : t.fee / Math.max(t.from, minBudget, 1)); });
   if (!worst || worst > 0.6) return '';
   return worst <= 0.5 ? 'Our fee is never more than half of your ad budget.' : 'Our fee is never more than ' + Math.ceil(worst * 100) + '% of your ad budget.';
 }
@@ -1804,11 +1826,9 @@ function renderProposalSpec_(p, lead, aspec, o) {
   }
   var tiers = o.tiers || [];
   var tierRows = tiers.map(function (t, i) {
-    var next = tiers[i + 1];
-    var range = next ? '$' + money_(t.from) + ' to $' + money_(next.from - 1) : '$' + money_(t.from) + ' and up';
-    var fee = t.pct ? t.pct + '% of the budget' : '$' + money_(Math.max(t.fee, o.min_fee || 0));
+    var next = tiers[i + 1], label = tierLabels_(t, i, tiers, o.min_fee);
     var mine = spend >= t.from && (!next || spend < next.from);
-    return '            <tr' + (mine ? ' class="yours"' : '') + '><td>' + esc_(range) + '</td><td>' + esc_(fee) + '</td></tr>';
+    return '            <tr' + (mine ? ' class="yours"' : '') + '><td>' + esc_(label[0]) + '</td><td>' + esc_(label[1]) + '</td></tr>';
   });
   var lowest = tiers[0] || { from: 0, fee: 0 };
   var chosen = String(p.addons || '').split(',').filter(String);
@@ -1824,7 +1844,7 @@ function renderProposalSpec_(p, lead, aspec, o) {
     payment_line: o.payment_line, lead_id: lead.id, token: o.token, sender_name: o.sender_name,
     approved_on: (approved && p.approved_at ? ' on ' + Utilities.formatDate(new Date(p.approved_at), tz_(), 'MMM d') : '') +
       (approved && chosen.length ? ', with ' + oxford_(chosen.map(function (a) { return ADDONS[a] ? ADDONS[a].item.toLowerCase() : a; })) : ''),
-    tiers_note: 'Plans start at $' + money_(lowest.from) + ' a month in ad budget, so there\'s enough to learn what works. ' + feeCapLine_(tiers, o.min_fee)
+    tiers_note: 'Plans start at $' + money_(Math.max(lowest.from, Number(setting_('MIN_AD_BUDGET') || 0))) + ' a month in ad budget, so there\'s enough to learn what works. ' + feeCapLine_(tiers, o.min_fee)
   }, {
     scope: scope.map(function (s) { return '      <li><b>' + esc_(fillv(s[0])) + '</b>' + (s[1] ? '<span>' + esc_(fillv(s[1])) + '</span>' : '') + '</li>'; }).join('\n'),
     included: c.included.map(li).filter(String).join('\n'),
