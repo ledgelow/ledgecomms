@@ -15,43 +15,40 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 28): switching to Google Ads
+## Where you are (Oct 28, evening): first Google Ads audits on the way
 
-ledgecommunications.com is live, DataForSEO is paid for and its login is in Script Properties. This update switches the
-whole system from lead handling to Google Ads: the site, the free audit, the proposals, and the cold emails.
+The Google Ads version is live: site, hub, and DataForSEO. **Find prospects now** ran for Airdrie and found 15 shops.
+Over the next few hours the hub runs their searches (6 shops an hour), then Claude writes the audits.
 
-**Ship it (about 20 minutes)**
-1. **Apps Script:** replace `Code.gs` and `Templates.gs` with the new ones and save. Then **Deploy** > **Manage
-   deployments** > edit > Version **New version** > **Deploy**. On its next run the Sheet adds its new columns, an
-   **Evidence** tab, and the new pricing rows on the Settings tab by itself. Nothing to re-run.
-2. **GitHub:** **Add file** > **Upload files**, drag in every file from the new zip (same names replace the old ones),
-   **Commit changes**. Cloudflare rebuilds in about a minute. Check the home page, `/audit/sample/`, and
-   `/proposal/sample/` on your phone.
-3. **Settings tab:** look over the new pricing rows: `PRICE_ACCOUNT_AUDIT` (500), `ACCOUNT_AUDIT_CREDIT_DAYS` (30),
-   `MGMT_TIERS`, `MGMT_MIN_FEE` (500), `MIN_AD_BUDGET` (1000), and `SETUP_MONTHS` (1). Proposals use whatever is there,
-   and the home page's pricing section follows the same cells within about an hour. Raising prices later is just an edit
-   here.
-4. Reload the Sheet, then **Ledge** > **Check one shop** on two or three real shops (for example
-   bigspringsplumbing.ca, plumbing, Airdrie). It shows exactly what a customer sees and costs about 2 cents a shop.
-   If a line says "couldn't check", send me a screenshot.
+**Ship this update (about 10 minutes)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, **Deploy** > **Manage deployments** > edit > **New
+   version** > **Deploy**. On its next run the hub:
+   - adds three rows to the Settings tab: `ADS_MANAGER_ID` (871-805-0188, Ledge's Google Ads manager account),
+     `PRICE_PAGE_FIXES` (500), and `PRICE_LANDING_PAGE` (1000). If you already deployed the version with 400 and 900,
+     those two rows exist already: type 500 and 1000 into them.
+   - queues the 10 Calgary audits from Oct 27 again as Local Search Audits (same shops, same emails found). Ignore
+     or delete the old "Check this audit" emails from Oct 27; new ones replace them.
+2. **GitHub:** upload all 24 files from the new zip. One is new: `pricing.html`, which becomes ledgecommunications.com/pricing.
+   The home page no longer has the price list; it links to the pricing page from the menu, the questions, and the footer.
+3. `REVIEW_AUDITS_FIRST` = 10, so you read more of the new audits before they're approved automatically.
 
-**Then (this week)**
-5. **Trial run** from a personal Gmail: request an audit on the site and answer "Running Google Ads now?". Approve the
-   audit, use the form at the bottom of the audit page, approve the proposal, and approve it again on the proposal page.
-   Check the kickoff email and your "Approved" note.
-6. **Prospects:** put one area back in `AREAS` (for example `Airdrie`) and **Ledge** > **Find prospects now**. New shops
-   come straight from Google Maps and their audits come to you for review. Read the first 5 properly.
-7. When the audits read right: `COLD_EMAIL_ON` = yes. Shops running ads get the account audit emails; everyone else gets
-   the starting plan emails.
+**When the audits arrive**
+4. They come in one "Check these N audits" email per hourly run, not one email each. Open each audit, then use its
+   **Looks right**, **Rebuild**, or **Skip** link. Approving sends nothing while `COLD_EMAIL_ON` is no.
+5. Send me anything that reads off. When they read right, `COLD_EMAIL_ON` = yes.
+
+**Google Ads manager account: done (871-805-0188).** Clients link to it. After an approval, the kickoff email asks
+for their 10-digit customer ID; your "Approved" email says what to send: a link request for an account audit or
+management, or a new account under the manager account for a starting plan.
 
 **Later**
-8. A Google Ads manager account for Ledge (ads.google.com/home/tools/manager-accounts, signed in as
-   ledgecommunications@gmail.com), so clients can give you access from their own account. Needed before the first paid
-   account audit.
-9. Next builds: a page per industry, the account audit report (a Google Ads script exports the account, Claude writes
-   the report), and monthly reports for clients.
-10. Optional: move the domain registration from Squarespace to Cloudflare Registrar before Mar 31, 2027. FreshBooks
-    invoice automation once sales are moving.
+7. Next builds: the account audit report (a Google Ads script exports the account, Claude writes the report, including
+   page and conversion recommendations), a page per industry, and monthly reports for clients.
+8. Optional: move the domain registration to Cloudflare Registrar before Mar 31, 2027. FreshBooks automation later.
+
+**Add-ons.** Audits can tag one move as a page fix or a landing page, with its price. Proposals then show it as an
+optional checkbox next to the approve button, and the "Approved" note and invoice details include whatever they tick.
+The pricing section on the site lists both. Prices live on the Settings tab like everything else.
 
 **New on the Ledge menu**
 - **Check one shop**: runs the audit searches on any website and shows the results. Nothing is saved to Leads.
@@ -63,14 +60,14 @@ whole system from lead handling to Google Ads: the site, the free audit, the pro
 
 ## 1. Put the site in GitHub (10 minutes)
 
-Done. Kept here for reference. The repo is flat on purpose: 23 files, no folders, so nothing can get lost in the upload.
+Done. Kept here for reference. The repo is flat on purpose: 24 files, no folders, so nothing can get lost in the upload.
 
 1. GitHub > `ledgecomms` > **Settings** > scroll to **Danger Zone** > **Delete this repository**.
 2. **New repository** > name `ledgecomms`, **Private** > **Create repository**.
 3. Download `ledgecomms-flat.zip` and unzip it (on Windows: right-click > **Extract All**).
 4. On the new repo's page, click **uploading an existing file**. Open the unzipped `ledgecomms-files` folder,
-   select all 23 files and drag them in (or pick them with "choose your files"). **Commit changes**.
-5. The repo's main page should list 23 files, including `worker.js`, `build-site.js`, and `wrangler.jsonc`,
+   select all 24 files and drag them in (or pick them with "choose your files"). **Commit changes**.
+5. The repo's main page should list 24 files, including `worker.js`, `build-site.js`, and `wrangler.jsonc`,
    with no "(1)" or "(2)" in any name.
 
 **Updating the repo:** on the repo's main page, **Add file** > **Upload files**, drag in the new files (same names

@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="What Ledge Communications charges for Google Ads setup and management, the account audit, and page add-ons. Month to month, and your ad budget is paid to Google directly.">
+<link rel="canonical" href="https://ledgecommunications.com/pricing/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ledgecommunications.com/pricing/">
+<meta property="og:title" content="Pricing | Ledge Communications">
+<meta property="og:description" content="What Ledge Communications charges for Google Ads setup and management, the account audit, and page add-ons. Month to month, and your ad budget is paid to Google directly.">
+<meta property="og:image" content="https://ledgecommunications.com/assets/sunset-1200.jpg">
+<meta name="theme-color" content="#0C1630">
+<title>Pricing | Ledge Communications</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,900&family=Inter+Tight:wght@700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Ledge theme: the one place colour and type are set, shared by the site, audit pages, and proposal pages.
+   Current picks: round 3 Amber 2 (royal blue and orange, a quiet vintage Oilers nod), on warm paper with deep navy
+   header and bands; type C (Inter Tight + Inter). Light only: no automatic dark version.
+   --accent is the orange used for buttons; --deep is royal blue for kickers and links; --spruce is the dark bands. */
+:root {
+  --snow: #F8F6F2;
+  --surface: #EFEAE2;
+  --ink: #0F1A2E;
+  --muted: #4D5870;
+  --rule: #E0D9CE;
+  --sky: #2A4FA0;
+  --deep: #2A4FA0;
+  --deep-ink: #FFFFFF;
+  --accent: #F08A24;
+  --accent-ink: #0F1A2E;
+  --accent-text: #A04F0A;
+  --ice: #DDE4F2;
+  --spruce: #0C1630;
+  --head-bg: #0C1630;
+  --head-ink: #FFFFFF;
+  --head-muted: #B9C3D8;
+  --on-dark: #FFFFFF;
+  --on-dark-muted: #B9C3D8;
+  --scrim: rgb(12 22 48 / 0.62);
+  --bad: #B23A26;
+  --good: #2D7A4F;
+  --leak: #A84B0C;
+  --unknown: #5F6B75;
+  --display: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
+  --display-weight: 800;
+  --display-track: -0.02em;
+  --h3-weight: 700;
+  --body-size: 17px;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mark: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+
+/* Layout, top to bottom: hero with a proof line, the four places to show up on a phone search (the thesis), the usual
+   gaps (owner's words vs what we do), one photo, why Google Ads, how it works, a peek at the sample audit, who it's for,
+   About in its own band, questions, the form, then a footer. Pricing has its own page (src/pricing.html) on the same styles
+   whose big LEDGE wordmark is filled with Logan's tower photo (the original logo's idea).
+   Light only. Photos sit behind or between sections as atmosphere, never captioned. */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--snow); color: var(--ink); font: var(--body-size)/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-underline-offset: 3px; }
+img { max-width: 100%; display: block; }
+h1, h2, h3 { font-family: var(--display); font-weight: var(--display-weight); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.6rem, 6.4vw, 4.6rem); line-height: 1.02; letter-spacing: var(--display-track); }
+h2 { font-size: clamp(1.9rem, 3.8vw, 2.6rem); line-height: 1.08; letter-spacing: calc(var(--display-track) * 0.8); }
+h3 { font-size: 1.28rem; line-height: 1.22; font-weight: var(--h3-weight); letter-spacing: -0.01em; }
+p { margin: 0; }
+:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; border-radius: 2px; }
+
+.wrap { width: 100%; max-width: 1140px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.section { padding-block: clamp(64px, 9vw, 108px); }
+.kicker { font-size: 0.82rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--deep); }
+.intro { display: grid; gap: 16px; max-width: 46rem; margin-bottom: 44px; }
+.intro p:not(.kicker) { color: var(--muted); font-size: 1.12rem; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 1.06rem/1.2 var(--body); text-decoration: none;
+  background: var(--accent); color: var(--accent-ink); border: 2px solid var(--accent); border-radius: 6px; padding: 0.82em 1.3em; cursor: pointer; }
+.btn:hover { filter: brightness(1.08); }
+.btn-small { padding: 0.6em 1em; font-size: 1rem; }
+.text-link { font-weight: 600; color: var(--deep); }
+
+/* Header: a dark band */
+.head-band { background: var(--head-bg); }
+.site-head { display: flex; align-items: center; gap: 28px; padding-block: 16px; }
+.wm { display: inline-grid; text-decoration: none; line-height: 1; margin-right: auto; color: var(--head-ink); }
+.wm-top { font-family: var(--mark); font-weight: 900; font-stretch: 125%; font-size: 1.6rem; letter-spacing: 0.03em; }
+.wm-sub { font-family: var(--body); font-weight: 600; font-size: 0.56rem; letter-spacing: 0.4em; margin-top: 0.38em; color: var(--head-muted); }
+.site-head nav { display: flex; gap: 24px; }
+.site-head nav a { text-decoration: none; font-weight: 500; color: var(--head-muted); }
+.site-head nav a:hover { color: var(--head-ink); }
+.site-head :focus-visible { outline-color: var(--accent); }
+@media (max-width: 860px) { .site-head nav { display: none; } }
+
+/* Hero: the photo picked in build.py (HERO_PICK), framed per photo */
+.hero { position: relative; color: #FFFFFF; background: #10202C; overflow: hidden; }
+.hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, rgb(12 22 48 / 0.58) 0%, rgb(12 22 48 / 0.44) 30%, rgb(12 22 48 / 0) 68%); }
+.hero-inner { position: relative; z-index: 1; display: grid; gap: 22px; padding-block: clamp(84px, 12vw, 160px) clamp(76px, 11vw, 140px); }
+.hero-inner > * { max-width: 40rem; }
+.hero-inner > .proof { max-width: none; }
+.hero .kicker { color: rgb(255 255 255 / 0.86); }
+.hero h1 { text-shadow: 0 1px 24px rgb(5 8 10 / 0.3); }
+.hero-sub { font-size: 1.22rem; line-height: 1.55; color: rgb(255 255 255 / 0.94); max-width: 36rem; }
+.hero .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+.hero .btn { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.hero .btn-line { background: transparent; color: #FFFFFF; border-color: rgb(255 255 255 / 0.85); }
+@media (max-width: 640px) {
+  .hero img { object-position: 62% 70%; }
+  .hero::after { background: linear-gradient(180deg, rgb(12 22 48 / 0.66) 0%, rgb(12 22 48 / 0.5) 60%, rgb(12 22 48 / 0.34) 100%); }
+}
+
+/* Proof line under the hero buttons */
+.proof { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.95rem; color: rgb(255 255 255 / 0.9); }
+.proof li { display: flex; align-items: center; gap: 22px; }
+.proof li + li::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin-left: -12px; }
+.proof b { color: #FFFFFF; font-weight: 700; }
+@media (max-width: 640px) { .proof { flex-direction: column; gap: 4px; } .proof li + li::before { display: none; } }
+
+/* Four places to show up: a phone's search page on the left, what each place is and what we do on the right */
+.build { background: var(--surface); }
+.places-grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 36px clamp(32px, 6vw, 80px); align-items: start; }
+.phone { background: var(--snow); border: 1px solid var(--rule); border-radius: 28px; padding: 18px 14px 22px; box-shadow: 0 18px 40px rgb(15 26 46 / 0.12); display: grid; gap: 10px; position: sticky; top: 24px; }
+.phone-q { display: flex; align-items: center; gap: 8px; border: 1px solid var(--rule); border-radius: 99px; padding: 8px 14px; font-size: 0.88rem; color: var(--ink); background: var(--surface); }
+.phone-q::before { content: ""; width: 12px; height: 12px; border: 2px solid var(--muted); border-radius: 50%; flex: none; }
+.blk { border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; background: var(--surface); }
+.blk b { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.blk b i { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--deep); color: var(--deep-ink); font-size: 0.68rem; letter-spacing: 0; }
+.blk span { display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 22%, transparent); }
+.blk span:nth-child(odd) { width: 78%; } .blk span:nth-child(even) { width: 62%; }
+.blk.map { background: color-mix(in srgb, var(--ice) 70%, var(--surface)); }
+.blk.map em { display: block; height: 54px; border-radius: 6px; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--deep) 10%, transparent) 0 6px, transparent 6px 14px); }
+.places { list-style: none; margin: 0; padding: 0; display: grid; }
+.places li { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 4px 14px; padding-block: 18px; border-top: 1px solid var(--rule); counter-increment: place; }
+.places li:first-child { border-top: 2px solid var(--ink); }
+.places { counter-reset: place; }
+.places li::before { content: counter(place); grid-row: span 3; font-family: var(--display); font-weight: var(--display-weight); font-size: 1.7rem; line-height: 1; color: var(--accent-text); }
+.places p { color: var(--muted); }
+.places .we { color: var(--ink); }
+.places .we b { font-weight: 600; }
+.places-foot { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 28px; }
+.places-foot p { color: var(--muted); max-width: 40rem; }
+.places-foot b { color: var(--ink); font-weight: 600; }
+@media (max-width: 820px) { .places-grid { grid-template-columns: minmax(0, 1fr); } .phone { position: static; max-width: 300px; } }
+
+/* Pricing: three offers, then the fee table */
+.offers { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.offer { background: var(--snow); border: 1px solid var(--rule); border-radius: 10px; padding: clamp(20px, 3vw, 28px); display: grid; gap: 12px; align-content: start; min-width: 0; }
+.offer.main { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.offer .who { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--deep); }
+.offer .amt { font-family: var(--display); font-weight: var(--display-weight); font-size: 2.4rem; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.offer .amt small { font-family: var(--body); font-weight: 500; font-size: 0.95rem; letter-spacing: 0; color: var(--muted); }
+.offer p { color: var(--muted); }
+.offer .note { color: var(--ink); font-size: 0.95rem; border-top: 1px solid var(--rule); padding-top: 12px; }
+.fees { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 20px clamp(32px, 6vw, 80px); align-items: start; }
+.fees h3 { margin-bottom: 8px; }
+.fees p { color: var(--muted); }
+.fee-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.fee-table th, .fee-table td { text-align: left; padding: 11px 4px; border-bottom: 1px solid var(--rule); }
+.fee-table thead th { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--ink); }
+.fee-table td:last-child, .fee-table th:last-child { text-align: right; font-weight: 600; }
+@media (max-width: 900px) { .offers { grid-template-columns: minmax(0, 1fr); } .fees { grid-template-columns: minmax(0, 1fr); } }
+.addons-line { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--rule); display: grid; gap: 8px; max-width: 52rem; }
+.addons-line p { color: var(--muted); }
+.addons-line b { color: var(--ink); font-weight: 600; }
+
+/* Who it's for: one card per kind of business, each with the searches that matter */
+.trades { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.trade { border: 1px solid var(--rule); border-radius: 10px; padding: 20px 22px; display: grid; gap: 10px; align-content: start; background: var(--snow); min-width: 0; }
+.trade .qs { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.trade .qs li { font-size: 0.86rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 99px; padding: 3px 10px; color: var(--ink); }
+.trade p { color: var(--muted); font-size: 0.98rem; }
+.trade a { font-weight: 600; color: var(--deep); justify-self: start; }
+.trade.wide > div { display: grid; gap: 10px; min-width: 0; }
+.trade.wide { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 10px 28px; }
+@media (max-width: 900px) { .trade.wide { grid-template-columns: minmax(0, 1fr); } }
+
+/* The usual gaps: the owner's words on the left, what we do on the right */
+.ba-head, .ba li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 32px; }
+.ba-head { padding-bottom: 12px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.ba-head span:last-child { color: var(--deep); }
+.ba { list-style: none; margin: 0; padding: 0; display: grid; }
+.ba li { align-items: center; padding-block: 14px; border-top: 1px solid var(--rule); }
+.ba li:first-child { border-top: 2px solid var(--ink); }
+.ba-cell { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; margin: 0; }
+.ba-cell::before { content: ""; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; }
+.ba-said { font-family: var(--display); font-weight: 700; font-size: 1.1rem; line-height: 1.35; letter-spacing: -0.01em; color: var(--ink); }
+.ba-said::before { background: color-mix(in srgb, var(--muted) 18%, transparent)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 5l6 6M11 5l-6 6' fill='none' stroke='%234D5870' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
+.ba-after { background: var(--surface); border-radius: 8px; padding: 12px 14px; color: var(--ink); box-shadow: 0 1px 0 var(--rule); }
+.ba-after::before { background: var(--accent)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%230F1A2E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px no-repeat; }
+.ba-foot { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 28px; }
+.ba-foot p { color: var(--muted); max-width: 44rem; }
+.ba-foot b { color: var(--ink); font-weight: 600; }
+@media (max-width: 760px) {
+  .ba-head { display: none; }
+  .ba li { grid-template-columns: minmax(0, 1fr); gap: 10px; padding-block: 18px; }
+}
+
+/* Why Google Ads: three plain reasons, not a sequence */
+.why { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+.why li { display: grid; gap: 10px; align-content: start; padding-top: 18px; border-top: 3px solid var(--accent); min-width: 0; }
+.why p { color: var(--muted); }
+@media (max-width: 860px) { .why { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+
+/* Pricing page: a short navy heading band instead of a photo */
+.page-head { background: var(--spruce); color: var(--on-dark); }
+.page-head .wrap { display: grid; gap: 14px; padding-block: clamp(56px, 8vw, 88px) clamp(44px, 6vw, 64px); }
+.page-head .kicker { color: var(--on-dark-muted); }
+.page-head p:not(.kicker) { color: var(--on-dark-muted); font-size: 1.15rem; max-width: 40rem; }
+.cta-band { background: var(--ice); }
+.cta-band .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px 32px; padding-block: clamp(48px, 7vw, 72px); }
+.cta-band .wrap > div { display: grid; gap: 10px; min-width: 0; }
+.cta-band p { color: var(--muted); max-width: 40rem; }
+.site-head nav a[aria-current="page"] { color: var(--head-ink); }
+
+/* One photo between sections: Calgary homes with the Rockies behind */
+.band { margin: 0; height: clamp(240px, 36vw, 480px); overflow: hidden; background: var(--spruce); }
+.band img { width: 100%; height: 100%; object-fit: cover; object-position: center 76%; }
+
+/* How it works */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; counter-reset: step; }
+.steps li { display: grid; gap: 10px; align-content: start; counter-increment: step; min-width: 0; }
+.steps li::before { content: counter(step); font-family: var(--display); font-weight: var(--display-weight); font-size: 3rem; line-height: 1; color: var(--accent-text); }
+.steps p { color: var(--muted); }
+@media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+
+/* A peek at the sample audit */
+.peek { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 36px clamp(32px, 6vw, 80px); align-items: center; }
+.peek .intro { margin-bottom: 0; }
+.peek-actions { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 8px; }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
+.mock { display: block; text-decoration: none; position: relative; background: #FFFFFF; color: #0F1A2E; border: 1px solid var(--rule); border-radius: 10px; padding: 26px; box-shadow: 0 18px 40px rgb(15 26 46 / 0.12); transition: transform 0.15s ease; }
+.mock:hover { transform: translateY(-3px); }
+.mock-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #E6E8EE; }
+.mock-wm { font-family: var(--mark); font-weight: 900; font-stretch: 125%; font-size: 1.05rem; letter-spacing: 0.03em; }
+.mock-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #4D5870; }
+.mock h3 { font-size: 1.45rem; margin: 18px 0 4px; }
+.mock .meta { font-size: 0.82rem; color: #4D5870; margin-bottom: 14px; }
+.mock-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding-block: 10px; border-top: 1px solid #E6E8EE; font-size: 0.92rem; font-weight: 600; }
+.pill { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.pill.leak, .pill.gap { color: var(--leak); } .pill.good { color: var(--good); } .pill.unknown { color: var(--unknown); }
+.mock-fix { margin-top: 16px; padding: 14px 16px; background: #F3F4F7; border-radius: 6px; font-size: 0.9rem; }
+.mock-fix b { display: block; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: #4D5870; margin-bottom: 4px; }
+@media (max-width: 860px) { .peek { grid-template-columns: minmax(0, 1fr); } }
+
+/* About: its own band */
+.about-band { background: var(--ice); }
+.about { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 32px clamp(32px, 6vw, 80px); align-items: start; }
+.about-head { display: grid; gap: 16px; }
+.creds { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 0; }
+.creds li { padding-block: 14px; border-top: 1px solid color-mix(in srgb, var(--deep) 25%, transparent); color: var(--muted); }
+.creds b { display: block; font-family: var(--display); font-weight: 800; font-size: 1.55rem; letter-spacing: -0.015em; color: var(--ink); line-height: 1.15; }
+.about-copy { display: grid; gap: 16px; min-width: 0; }
+.about-copy p { font-size: 1.1rem; }
+@media (max-width: 820px) { .about { grid-template-columns: minmax(0, 1fr); } }
+
+/* Questions: heading left, answers right */
+.faq-wrap { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 28px clamp(32px, 6vw, 80px); align-items: start; }
+.faq-wrap .intro { margin-bottom: 0; position: sticky; top: 24px; }
+.faq { display: grid; }
+.faq details { border-bottom: 1px solid var(--rule); }
+.faq details:first-of-type { border-top: 2px solid var(--ink); }
+.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; align-items: baseline; padding-block: 18px; font-weight: 600; font-size: 1.12rem; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-size: 1.4rem; font-weight: 400; color: var(--deep); flex: none; line-height: 1; }
+.faq details[open] summary::after { content: "\2212"; }
+.faq details p { padding-bottom: 20px; color: var(--muted); }
+@media (max-width: 820px) { .faq-wrap { grid-template-columns: minmax(0, 1fr); } .faq-wrap .intro { position: static; } }
+
+/* Audit request: the tower photo sits far back behind a dark wash */
+.cta { position: relative; background: var(--spruce); color: var(--on-dark); overflow: hidden; isolation: isolate; }
+.cta-bg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; object-position: 70% 100%; opacity: 0.2; }
+.cta-inner { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 36px clamp(32px, 6vw, 72px); align-items: start; padding-block: clamp(64px, 10vw, 104px); }
+.cta-copy { display: grid; gap: 16px; min-width: 0; }
+.cta .kicker { color: var(--on-dark-muted); }
+.cta-copy p:not(.kicker) { color: var(--on-dark-muted); font-size: 1.1rem; max-width: 30rem; }
+.cta-copy a { color: var(--on-dark); font-weight: 600; }
+@media (max-width: 880px) { .cta-inner { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--snow); color: var(--ink); border-radius: 8px; padding: clamp(20px, 3vw, 30px); min-width: 0; }
+.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: 0.92rem; font-weight: 600; }
+.field label small { font-weight: 400; color: var(--muted); }
+fieldset.field { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset.field legend { font-size: 0.92rem; font-weight: 600; padding: 0; margin-bottom: 6px; }
+fieldset.field legend small { font-weight: 400; color: var(--muted); }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.opts label { display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 500; background: var(--surface); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.45em 0.75em; cursor: pointer; }
+.opts input[type="checkbox"] { accent-color: var(--deep); width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; }
+.opts label:has(input:checked) { border-color: var(--deep); }
+.field input, .field select { width: 100%; font: inherit; font-size: 1.02rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.6em 0.7em; min-height: 46px; }
+.field input:focus, .field select:focus { outline: none; border-color: var(--deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--deep) 25%, transparent); }
+.field input[aria-invalid="true"] { border-color: var(--bad); }
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.form-foot { grid-column: 1 / -1; display: grid; gap: 12px; }
+.form-foot .btn { width: 100%; font-size: 1.1rem; padding-block: 0.9em; }
+.form-foot .btn[disabled] { opacity: 0.6; cursor: progress; }
+.fine { font-size: 0.88rem; color: var(--muted); }
+.form-error { color: var(--bad); font-size: 0.95rem; font-weight: 500; }
+.done { display: grid; gap: 12px; }
+.done h3 { font-size: 1.6rem; }
+.done p { color: var(--muted); }
+@media (max-width: 560px) { .form { grid-template-columns: minmax(0, 1fr); } }
+
+.site-foot { display: grid; gap: 22px; padding-block: clamp(40px, 7vw, 72px) 40px; }
+.foot-mark { display: inline-grid; justify-self: start; text-decoration: none; line-height: 1; color: var(--deep); font-size: clamp(3rem, 8vw, 6rem); }
+.foot-ledge { font-family: var(--mark); font-weight: 900; font-stretch: 125%; font-size: 1em; letter-spacing: 0.03em; line-height: 0.84; color: var(--deep); }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .foot-ledge { background: linear-gradient(rgb(12 22 48 / 0.12), rgb(12 22 48 / 0.12)), url("/assets/tower-1200.jpg") 50% 78% / 100% auto no-repeat; -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.foot-sub { font-family: var(--body); font-weight: 600; font-size: max(0.7rem, 0.11em); letter-spacing: 0.62em; margin-top: 0.9em; color: var(--muted); }
+.foot-mark:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 4px; }
+.foot-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 0.9rem; color: var(--muted); }
+.foot-links { display: flex; gap: 18px; }
+.foot-links a { color: var(--deep); font-weight: 600; text-decoration: none; }
+.foot-links a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="head-band">
+<header class="site-head wrap">
+  <a class="wm" href="/" aria-label="Ledge Communications, home">
+    <span class="wm-top" aria-hidden="true">LEDGE</span>
+    <span class="wm-sub" aria-hidden="true">COMMUNICATIONS</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="/#gaps">What we find</a>
+    <a href="/#how">How it works</a>
+    <a href="/#who">Who it's for</a>
+    <a href="/#about">About</a>
+    <a href="/pricing/" aria-current="page">Pricing</a>
+  </nav>
+  <a class="btn btn-small" href="/#audit">Free audit</a>
+</header>
+</div>
+
+<main id="top">
+  <section class="page-head" aria-labelledby="pricing-title">
+    <div class="wrap">
+      <p class="kicker">Pricing</p>
+      <h1 id="pricing-title">Plain prices, no contract.</h1>
+      <p>Your ad budget goes to Google directly, from an account in your name. What you pay us is set out below, plus GST.</p>
+    </div>
+  </section>
+
+  <section id="pricing" class="build" aria-labelledby="pricing-title">
+    <div class="wrap section">
+      <ul class="offers">
+        <li class="offer">
+          <p class="who">Everyone</p>
+          <h3>Free audit</h3>
+          <p class="amt">$0</p>
+          <p>The searches your customers run, who shows up, where you sit, and the three things we'd do first.</p>
+          <p class="note">No logins, no obligation. In your inbox by the end of the next business day.</p>
+        </li>
+        <li class="offer">
+          <p class="who">Already running Google Ads</p>
+          <h3>Account audit</h3>
+          <p class="amt">$<span data-price="price_audit">500</span> <small>one time</small></p>
+          <p>We look inside your account through our Google Ads manager account, without changing anything: which searches you pay for, what a call costs you, and where the budget goes. You get a written report and a call to walk through it.</p>
+          <p class="note">Comes off setup or management if you go ahead within <span data-price="credit_days">30</span> days.</p>
+        </li>
+        <li class="offer main">
+          <p class="who">Setup and management</p>
+          <h3>We run your ads</h3>
+          <p class="amt">From $<span data-price="min_fee">500</span> <small>a month</small></p>
+          <p>Search ads, Google Guaranteed if you qualify, your Business Profile, and call tracking, all in an account in your name. Setup costs the same as <span data-price="setup_months">one month</span>.</p>
+          <p class="note">Month to month. A short report every month.</p>
+        </li>
+      </ul>
+      <div class="fees">
+        <div>
+          <h3>How the monthly fee is set</h3>
+          <p>It follows your ad budget, so a bigger budget never means a surprise. Plans start at $<span data-price="min_budget">1,000</span> a month in ad budget, so there's enough to learn what works. <span data-price="cap_line">Our fee is never more than half of your ad budget.</span></p>
+        </div>
+        <table class="fee-table">
+          <thead><tr><th scope="col">Your monthly ad budget</th><th scope="col">Our monthly fee</th></tr></thead>
+          <tbody data-price="rows">
+            <tr><td>$1,000 to $1,999</td><td>$500</td></tr>
+            <tr><td>$2,000 to $3,999</td><td>$800</td></tr>
+            <tr><td>$4,000 to $7,999</td><td>$1,200</td></tr>
+            <tr><td>$8,000 and up</td><td>15% of the budget</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="addons-line">
+        <h3>Add-ons, only if your audit shows they'd help</h3>
+        <p><b>Page fixes on your current site, $<span data-price="price_page_fixes">500</span>:</b> a tap-to-call button near the top, a shorter form, a booking button, and call tracking, so more of your clicks turn into calls. <b>A landing page for your ads, $<span data-price="price_landing_page">1,000</span>:</b> one page built around the searches you pay for. Both one time.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="section wrap faq-wrap" aria-labelledby="pq-title">
+    <div class="intro">
+      <p class="kicker">Questions</p>
+      <h2 id="pq-title">About the prices</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Is my ad budget included?</summary>
+        <p>No. Your ad budget goes to Google directly, on your own card, in an account in your name. The prices on this page are what you pay us.</p>
+      </details>
+      <details>
+        <summary>Why does the monthly fee follow my ad budget?</summary>
+        <p>A bigger budget means more searches, ads, and calls to look after. The table keeps it predictable, so you always know the fee before you change the budget.</p>
+      </details>
+      <details>
+        <summary>What does the account audit cover?</summary>
+        <p>Which searches you pay for and which ones bring calls, why your ads miss some searches, whether calls and forms are counted, and the pages your ads send people to. You get a written report in plain words and a call to walk through it.</p>
+      </details>
+      <details>
+        <summary>What if I want to stop?</summary>
+        <p>Management is month to month. Tell us and it stops at the end of the month. The account, the ads, and their history stay with you.</p>
+      </details>
+    </div>
+  </section>
+
+  <section class="cta-band" aria-labelledby="pstart-title">
+    <div class="wrap">
+      <div>
+        <h2 id="pstart-title">Not sure where you'd start?</h2>
+        <p>The free audit shows what your customers see when they search, where you sit, and what we'd do first.</p>
+      </div>
+      <a class="btn" href="/#audit">Get a free audit</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot wrap">
+  <a class="foot-mark" href="/" aria-label="Ledge Communications, home">
+    <span class="foot-ledge" aria-hidden="true">LEDGE</span>
+    <span class="foot-sub" aria-hidden="true">COMMUNICATIONS</span>
+  </a>
+  <div class="foot-line">
+    <span>Ledge Communications &middot; Alberta, Canada &middot; ledgecommunications@gmail.com</span>
+    <span class="foot-links"><a href="/">Home</a><a href="/audit/sample/">Sample audit</a></span>
+    <span>&copy; 2026 Ledge Communications</span>
+  </div>
+</footer>
+</body>
+</html>

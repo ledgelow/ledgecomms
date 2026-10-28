@@ -11,6 +11,7 @@ const out = path.join(root, "site");
 // file in the repo -> path on the site
 const FILES = {
   "index.html": "index.html",
+  "pricing.html": "pricing/index.html",
   "sample-audit.html": "audit/sample/index.html",
   "sample-proposal.html": "proposal/sample/index.html",
   "favicon.svg": "favicon.svg",
@@ -32,7 +33,7 @@ for (const [from, to] of Object.entries(FILES)) {
 fs.mkdirSync(path.join(out, "assets"), { recursive: true });
 const photos = fs.readdirSync(root).filter((f) => f.toLowerCase().endsWith(".jpg"));
 for (const f of photos) fs.copyFileSync(path.join(root, f), path.join(out, "assets", f));
-for (const page of ["index.html", "sample-audit.html", "sample-proposal.html"]) {
+for (const page of ["index.html", "pricing.html", "sample-audit.html", "sample-proposal.html"]) {
   if (!fs.existsSync(path.join(root, page))) continue;
   const used = fs.readFileSync(path.join(root, page), "utf8").match(/assets\/[\w.-]+\.jpg/g) || [];
   for (const u of used) {

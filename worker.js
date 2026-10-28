@@ -5,7 +5,7 @@
 //   - handle the form endpoints under /api/
 //   - serve each shop's audit and proposal page, which the pipeline hub (Apps Script) renders
 //   - fill in the booking link and the Turnstile spam check on every HTML page
-//   - fill in the home page prices from the hub's Settings tab (cached; the built-in prices are the fallback)
+//   - fill in the prices on the home and pricing pages from the hub's Settings tab (cached; built-in prices are the fallback)
 //
 // Settings live in Cloudflare (Worker > Settings > Variables and Secrets), not in the code:
 //   HUB_URL             Apps Script web app URL (ends in /exec)
@@ -27,7 +27,7 @@ export default {
       if (res) return fillPageValues(res, env);
     }
 
-    const pricing = path === "/" && request.method === "GET" ? await livePricing(env, ctx) : null;
+    const pricing = (path === "/" || path === "/pricing") && request.method === "GET" ? await livePricing(env, ctx) : null;
     return fillPageValues(await env.ASSETS.fetch(request), env, pricing);
   },
 };
@@ -60,7 +60,9 @@ async function livePricing(env, ctx) {
 function validPricing(d) {
   const num = (v) => typeof v === "string" && /^[\d,]{1,9}$/.test(v);
   const short = (v, n) => typeof v === "string" && v.length <= n;
+  const optionalNum = (v) => v === undefined || num(v);
   return !!d && d.ok === true && num(d.price_audit) && num(d.credit_days) && num(d.min_fee) && num(d.min_budget) &&
+    optionalNum(d.price_page_fixes) && optionalNum(d.price_landing_page) &&
     short(d.cap_line, 140) && short(d.setup_months, 20) && Array.isArray(d.rows) && d.rows.length >= 1 && d.rows.length <= 10 &&
     d.rows.every((r) => Array.isArray(r) && r.length === 2 && short(r[0], 40) && short(r[1], 40));
 }
@@ -196,7 +198,8 @@ async function approve(request, env) {
   const id = String(form.get("id") || "").slice(0, 40);
   const t = String(form.get("t") || "").slice(0, 64);
   if (!id || !t || !env.HUB_URL || !env.HUB_KEY) return buttonReply(request, false, 400, APPROVE_MSG);
-  const out = await toHub(env, { type: "approve", id, t });
+  const addons = [...new Set(form.getAll("addons").map(String))].filter((a) => ["page_fixes", "landing_page"].includes(a)).join(",");
+  const out = await toHub(env, { type: "approve", id, t, addons });
   return buttonReply(request, out.ok, out.ok ? 200 : 502, APPROVE_MSG);
 }
 
