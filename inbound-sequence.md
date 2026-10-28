@@ -1,8 +1,11 @@
 # Site leads and proposals
 
-For people who ask for an audit on the site (CASL implied consent from the inquiry), and for anyone who asks for a fixed price.
+For people who ask for an audit on the site (CASL implied consent from the inquiry), and for anyone who asks for a price, from the audit page or by replying "yes".
 
-Placeholders: {first} first name, {business}, {audit_url}, {proposal_url}, {top_finding}, {fix_1} (from the audit), {sender} (SENDER_NAME), {sign} (the first name from it, for sign-offs), {next_day} (next business day), {booking_line} (only when BOOKING_URL is set). Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com, and a one-click unsubscribe link.
+Placeholders: {first} first name, {business}, {audit_url}, {proposal_url}, {top_finding} and {fix_1} (from the audit), {sender} (SENDER_NAME), {sign} (its first word, for sign-offs), {next_day} (next business day), {booking_line} (only when BOOKING_URL is set).
+Built from the audit's first search: {search_hook} ("who shows up for "furnace repair airdrie"", or "a quick look at how you show up on Google" when no search ran), {ads_hook}, {search_line} ("I searched "furnace repair airdrie" on a phone in Airdrie and put together a one-page look at what came up, and where {business} sits."), and {keyword_q}.
+Built from the segment or the offer: {offer_line}, {offer_noun}, {audit_price_line} (from PRICE_ACCOUNT_AUDIT and ACCOUNT_AUDIT_CREDIT_DAYS), {proposal_intro}, and {kickoff_steps} (from the offer, on the proposal page too).
+Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com, and a one-click unsubscribe link.
 
 The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your markup) and this file gets regenerated.
 
@@ -10,47 +13,47 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 ## Right away
 
-**Subject:** Your Lead Handling Audit for {business}
+**Subject:** Your Local Search Audit for {business}
 
 > Hi {first},
 >
 > Thanks for reaching out. I'm putting your audit together now and you'll have it by end of day {next_day}.
 >
-> If there's anything you'd like me to look at in particular, just reply to this email.
+> If there's anything you'd like me to look at in particular, like a service you want more calls for, just reply to this email.
 >
 > Talk soon,
 > {sign}
 
-## Next business day, once the audit is ready
+## When the audit is ready (after your OK for the first few)
 
-*Same thread (sent as a reply).*
+*Same thread, "Re:" the first subject.*
 
 > Hi {first},
 >
 > Here's your audit:
 > {audit_url}
 >
-> The top three fixes are in the order I'd tackle them. The biggest one: {top_finding}
+> It starts with what a customer sees when they search on a phone, then the three things I'd do first. The biggest finding: {top_finding}
 >
-> If you'd like a hand, there's a button at the bottom of the page to get a fixed price, or just reply "yes".{booking_line}
+> If you'd like a hand, there's a short form at the bottom of the page, or just reply "yes".{booking_line}
 >
 > {sign}
 
 ## 2 business days later
 
-*Same thread (sent as a reply).*
+*Same thread, "Re:" the first subject.*
 
 > Hi {first},
 >
 > Quick follow-up on your audit. If you only do one thing, I'd start here: {fix_1}.
 >
-> Reply "yes" and I'll send a fixed price for getting it done.
+> {offer_line}
 >
 > {sign}
 
-## 3 business days after that (last)
+## 3 business days later
 
-*Same thread (sent as a reply).*
+*Same thread, "Re:" the first subject.*
 
 > Hi {first},
 >
@@ -62,55 +65,62 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 ---
 
-# Fixed price
+# Asking for a price
 
-## They tap "Send me a fixed price" on the audit page
+## When they reply "yes"
 
-*Same thread (sent as a reply).*
+*Same thread, "Re:" the first subject.*
 
-> Hi {first},
+> Thanks {first}, appreciate you getting back to me.
 >
-> Got it. I'll send the fixed price and what's included by end of day {next_day}.
+> I'll put together {offer_noun} and send it over by end of day {next_day}.{booking_line}
 >
 > {sign}
 
-## Next business day, the proposal
+## When they use the form on the audit page
 
-*Same thread (sent as a reply).*
+*Same thread, "Re:" the first subject (or "Next steps from Ledge Communications" when there's no thread yet).*
 
 > Hi {first},
 >
-> Here's the fixed price for setting up those fixes:
+> Got it. I'll send {offer_noun} by end of day {next_day}.
+>
+> {sign}
+
+## The proposal (after your OK for the first few)
+
+*Same thread, "Re:" the first subject (or "Your plan from Ledge Communications" when there's no thread yet).*
+
+> Hi {first},
+>
+> {proposal_intro}
 > {proposal_url}
 >
-> It covers what I'll do, how long it takes, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
+> It covers what's included, the price, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
 >
 > {sign}
 
-## 3 business days later, if not approved
+## If they haven't approved
 
-*Same thread (sent as a reply).*
+*Same thread, "Re:" the first subject.*
 
 > Hi {first},
 >
-> Just checking whether you had any questions on the proposal. Happy to adjust the scope if something doesn't fit:
+> Just checking whether you had any questions. Happy to adjust the budget or the scope if something doesn't fit:
 > {proposal_url}
 >
 > {sign}
 
-## When they approve it online
+## When they approve
 
-*Same thread (sent as a reply).*
+*Same thread, "Re:" the first subject.*
 
 > Hi {first},
 >
 > Thanks, we're on. Here's what happens next:
 >
-> 1. {payment_step}
-> 2. I'll send the steps to add me as a user on the tools involved. It only takes a few minutes.
-> 3. The first fix will be live within a week, and all three within two to three weeks.
+> {kickoff_steps}
 >
-> I'll keep you posted as each one goes live.
+> I'll keep you posted along the way.
 >
 > {sign}
-

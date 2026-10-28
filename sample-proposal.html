@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Fixed price: Example Heating &amp; Plumbing (sample)</title>
+<title>Starting plan: Example Heating &amp; Plumbing (sample)</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -75,7 +75,8 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 .fine { font-size: 0.86rem; color: var(--muted); }
 .foot { padding-block: 24px 40px; border-top: 1px solid var(--rule); font-size: 0.86rem; color: var(--muted); display: grid; gap: 6px; }
 
-/* Layout: a one-page quote. What we'll do, what's included, timing, what we need, the price, one button. */
+/* Layout: a one-page offer. What we'll do, what you get, what's not included, timing, the price (with the fee table
+   for monthly work), one button. */
 .strip { background-image: url("/assets/tower-1200.jpg"); background-position: 70% 100%; }
 .plain { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
 .plain li { padding-block: 13px; border-bottom: 1px solid var(--rule); display: grid; gap: 2px; }
@@ -84,13 +85,21 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 .ticks { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
 .price { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: clamp(20px, 4vw, 30px); display: grid; gap: 16px; }
 .price-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 24px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
-.price-row:last-of-type { border-bottom: 0; padding-bottom: 0; }
 .price-row b { font-weight: 600; font-size: 1.05rem; }
 .price-row .amt { font-family: var(--display); font-weight: var(--display-weight); font-size: 1.7rem; font-variant-numeric: tabular-nums; }
 .price-row .amt small { font-family: var(--body); font-weight: 500; font-size: 0.85rem; color: var(--muted); }
+.price-row.quiet .amt { font-size: 1.3rem; color: var(--muted); }
+.price-row.credit .amt { font-size: 1.3rem; color: var(--good); }
 .price-row p { flex-basis: 100%; color: var(--muted); font-size: 0.95rem; }
+.tiers { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.97rem; }
+.tiers caption { text-align: left; font-weight: 600; padding-bottom: 8px; }
+.tiers th, .tiers td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+.tiers th { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tiers td:last-child, .tiers th:last-child { text-align: right; }
+.tiers tr.yours td { background: var(--ice); font-weight: 600; }
+.tiers-note { color: var(--muted); font-size: 0.92rem; margin-top: 8px; }
 .approve { display: grid; gap: 10px; justify-items: start; }
-.approved { border-left: 4px solid var(--good); padding: 10px 16px; background: var(--surface); border-radius: 4px; }
+.approved { border-left: 4px solid var(--good); padding: 10px 16px; background: var(--snow); border-radius: 4px; }
 .err { color: var(--leak); font-weight: 500; }
 .plain-list { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; color: var(--muted); }
 .plain-list + .fine { margin-top: 12px; }
@@ -99,42 +108,44 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 <body>
 <header class="wrap top">
   <a class="wm" href="/" aria-label="Ledge Communications"><span class="wm-top" aria-hidden="true">LEDGE</span><span class="wm-sub" aria-hidden="true">COMMUNICATIONS</span></a>
-  <span class="doc-label">Fixed price</span>
+  <span class="doc-label">Starting plan</span>
 </header>
 <main class="wrap">
   <div class="strip" role="img" aria-label="Looking up at a glass tower against a blue sky"></div>
   <div class="hero">
     <p class="label">Prepared for</p>
     <h1>Example Heating &amp; Plumbing (sample)</h1>
-    <p class="meta"><span>Prepared Oct 25, 2026</span><span>Price good until Nov 24, 2026</span></p>
-    <p class="lede">Here's what we'd set up for you, based on your audit. Happy to walk through any of it on a call.</p>
+    <p class="meta"><span>Prepared Oct 28, 2026</span><span>Price good until Nov 27, 2026</span></p>
+    <p class="lede">A Google Ads setup aimed at the searches in your free audit, with a budget you set. The account is yours and you pay Google directly.</p>
   </div>
 
   <section aria-labelledby="what-title">
-    <h2 id="what-title">What we'll set up</h2>
+    <h2 id="what-title">What we&#39;ll set up</h2>
     <ol class="plain">
-      <li><b>Put tap-to-call and online booking at the top of every page</b><span>A booking button from the scheduling tool you already use, about an afternoon.</span></li>
-      <li><b>Cut the form to four fields and reply within a minute</b><span>A form change plus an automatic reply, a couple of hours.</span></li>
-      <li><b>Ask for a Google review after every paid job</b><span>An automatic text after each paid invoice, set up once.</span></li>
+      <li><b>A Google Ads account in your name</b><span>You own it and pay Google directly. We work in it as your manager, and you can remove us at any time.</span></li>
+      <li><b>Search ads for “furnace repair airdrie” and related searches</b><span>Aimed at the people most likely to call: the right services, the right areas around Airdrie, and the hours you can answer.</span></li>
+      <li><b>Call and form tracking</b><span>So you and Google both see which searches bring calls.</span></li>
+      <li><b>Google Guaranteed</b><span>If your business qualifies, we take you through Google&#39;s application and screening.</span></li>
+      <li><b>Your Google Business Profile</b><span>Categories, services, and hours checked, so the map and the ads tell the same story.</span></li>
     </ol>
   </section>
 
   <section aria-labelledby="inc-title">
-    <h2 id="inc-title">What's included</h2>
+    <h2 id="inc-title">What you get</h2>
     <ul class="ticks">
-      <li>Each fix set up and tested in the tools you already use</li>
-      <li>A short note showing what changed and anything you or your team need to know</li>
-      <li>30 days of tweaks after everything is live</li>
+      <li>Everything set up and tested before anything goes live</li>
+      <li>Weekly checks in the first month</li>
+      <li>A short report each month: calls, what they cost, and what we changed</li>
+      <li>Month to month once it&#39;s live. No contract.</li>
     </ul>
   </section>
 
   <section aria-labelledby="out-title">
     <h2 id="out-title">Not included</h2>
     <ul class="plain-list">
-      <li>Website rebuilds or redesigns</li>
-      <li>Switching phone systems or job software</li>
-      <li>Cleaning up old customer data</li>
-      <li>Running your Google Ads or Local Services Ads (quoted separately if you want it)</li>
+      <li>Your ad budget, paid to Google directly</li>
+      <li>Google Guaranteed leads, also paid to Google directly</li>
+      <li>Website rebuilds. We&#39;ll tell you if a page needs work</li>
     </ul>
     <p class="fine">If something turns out bigger once we're in, you'll hear about it before any extra work, and you can say no.</p>
   </section>
@@ -142,23 +153,36 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
   <section aria-labelledby="time-title">
     <h2 id="time-title">Timing and what we need from you</h2>
     <ul class="ticks">
-      <li>Before we start, we take a quick look inside your tools. If a fix won't work as planned, we swap in another fix from your audit or take it off the price.</li>
-      <li>The first fix is usually live within a week of your go-ahead, and all three within two to three weeks.</li>
-      <li>You add us as a user on the tools involved. You'll get the exact steps; it takes a few minutes.</li>
-      <li>You answer a few setup questions by email so everything matches how you work.</li>
+      <li>Ads usually go live two to three weeks after your go-ahead.</li>
+      <li>You add a card to the Google Ads account in your name. We&#39;ll walk you through it.</li>
+      <li>You answer a few questions by email: your main services, the areas you cover, your hours, and who answers the phone.</li>
     </ul>
   </section>
 
   <section aria-labelledby="price-title">
     <h2 id="price-title">Price</h2>
     <div class="price">
-      <div class="price-row"><b>Setting up the three fixes</b><span class="amt">$1,000 <small>+ GST</small></span><p>One fixed price. No hourly billing, no surprises.</p></div>
-      <div class="price-row"><b>Optional care plan once it's live</b><span class="amt">$250 <small>/month + GST</small></span><p>Each month we check that everything still runs, fix anything that breaks, and adjust messages as your season changes. Month to month. Not required.</p></div>
+      <div class="price-row"><b>Setup</b><span class="amt">$500 <small>one time + GST</small></span><p>Setup costs the same as one month of management.</p></div>
+      <div class="price-row"><b>Monthly management</b><span class="amt">$500 <small>/month + GST</small></span><p>Starts the month your ads go live. Month to month.</p></div>
+      <div class="price-row quiet"><b>Your ad budget</b><span class="amt">$1,500 <small>/month</small></span><p>Paid to Google directly, not to us. You can change it at any time, and the fee follows the table below.</p></div>
+      <div >
+        <table class="tiers">
+          <caption>How the monthly fee is set</caption>
+          <thead><tr><th scope="col">Your monthly ad budget</th><th scope="col">Our monthly fee</th></tr></thead>
+          <tbody>
+            <tr class="yours"><td>$1,000 to $1,999</td><td>$500</td></tr>
+            <tr><td>$2,000 to $3,999</td><td>$800</td></tr>
+            <tr><td>$4,000 to $7,999</td><td>$1,200</td></tr>
+            <tr><td>$8,000 and up</td><td>15% of the budget</td></tr>
+          </tbody>
+        </table>
+        <p class="tiers-note">Plans start at $1,000 a month in ad budget, so there&#39;s enough to learn what works. Our fee is never more than half of your ad budget.</p>
+      </div>
       <div class="approve" id="approve-box" >
         <form id="approve-form" method="post" action="/api/approve">
           <input type="hidden" name="id" value="sample">
           <input type="hidden" name="t" value="sample">
-          <button class="btn" id="a-btn" type="submit">Approve and get started</button>
+          <button class="btn" id="a-btn" type="submit">Approve the starting plan</button>
         </form>
         <p class="fine">Approving tells us to go ahead. The invoice follows the same day.</p>
         <p class="err" id="a-err" role="alert" hidden></p>
@@ -168,7 +192,7 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
   </section>
 
   <section>
-    <p>Questions or want to change the scope? Just reply to the email.</p>
+    <p>Questions, or want to change the budget or the scope? Just reply to the email.</p>
   </section>
 </main>
 <footer class="wrap foot">
@@ -178,6 +202,7 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 (function () {
   var form = document.getElementById('approve-form');
   if (!form) return;
+  var label = document.getElementById('a-btn').textContent;
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var btn = document.getElementById('a-btn'), err = document.getElementById('a-err');
@@ -186,7 +211,7 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || !j.ok) throw new Error(); }); })
       .then(function () { document.getElementById('approve-box').hidden = true; document.getElementById('approved-box').hidden = false; })
       .catch(function () {
-        btn.disabled = false; btn.textContent = 'Approve and get started';
+        btn.disabled = false; btn.textContent = label;
         err.textContent = "That didn't go through. Reply to the email with \"approved\" and we'll take it from there.";
         err.hidden = false;
       });

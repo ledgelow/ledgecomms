@@ -1,28 +1,63 @@
 # Ledge lead system: setup
 
 Everything here is one-time, about two hours in total. After it, leads move from first touch to an approved
-fixed price without you.
+offer without you: a free Local Search Audit, then a $500 Google Ads account audit for shops already running ads, or a
+starting plan (setup plus monthly management) for shops that aren't.
 
 Two rules while you set up:
 - Passwords and API keys go straight into the tool that needs them (Cloudflare or Script Properties), never into chat.
 - Do the steps in order. Step 4 gives you two values that step 2 needs, so you'll come back to Cloudflare once.
 
-What it costs: $0 a month in fixed tools. The Claude API is the only usage cost, about US$0.10 to $0.20 per audit,
-and the hub pauses itself at US$20 a month.
+What it costs: $0 a month in fixed tools. Usage costs are the Claude API (roughly 50 cents to a dollar per audit on
+Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both and pauses itself at
+`MONTHLY_ENGINE_BUDGET_USD` (US$60 to start).
 
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 27)
+## Where you are (Oct 28): switching to Google Ads
 
-- **Done:** steps 1 to 7. The first trial lead went through: the spam check showed, the form succeeded, and the
-  confirmation email went out (it landed in spam at Kulin; see step 9.4 for the main fix).
-- **Now:** upload the latest files, paste the new `Code.gs` into Apps Script (then **Deploy** > **Manage deployments** >
-  edit > **New version**), and go live (step 9).
-- **Then:** finish the trial runs in step 8 as the test audit comes back, then step 10 (check the first real audits,
-  then switch on cold email).
+ledgecommunications.com is live, DataForSEO is paid for and its login is in Script Properties. This update switches the
+whole system from lead handling to Google Ads: the site, the free audit, the proposals, and the cold emails.
 
-About 20 minutes of setup is left, plus waiting for the first audits to come back.
+**Ship it (about 20 minutes)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs` with the new ones and save. Then **Deploy** > **Manage
+   deployments** > edit > Version **New version** > **Deploy**. On its next run the Sheet adds its new columns, an
+   **Evidence** tab, and the new pricing rows on the Settings tab by itself. Nothing to re-run.
+2. **GitHub:** **Add file** > **Upload files**, drag in every file from the new zip (same names replace the old ones),
+   **Commit changes**. Cloudflare rebuilds in about a minute. Check the home page, `/audit/sample/`, and
+   `/proposal/sample/` on your phone.
+3. **Settings tab:** look over the new pricing rows: `PRICE_ACCOUNT_AUDIT` (500), `ACCOUNT_AUDIT_CREDIT_DAYS` (30),
+   `MGMT_TIERS`, `MGMT_MIN_FEE` (500), `MIN_AD_BUDGET` (1000), and `SETUP_MONTHS` (1). Proposals use whatever is there,
+   and the home page's pricing section follows the same cells within about an hour. Raising prices later is just an edit
+   here.
+4. Reload the Sheet, then **Ledge** > **Check one shop** on two or three real shops (for example
+   bigspringsplumbing.ca, plumbing, Airdrie). It shows exactly what a customer sees and costs about 2 cents a shop.
+   If a line says "couldn't check", send me a screenshot.
+
+**Then (this week)**
+5. **Trial run** from a personal Gmail: request an audit on the site and answer "Running Google Ads now?". Approve the
+   audit, use the form at the bottom of the audit page, approve the proposal, and approve it again on the proposal page.
+   Check the kickoff email and your "Approved" note.
+6. **Prospects:** put one area back in `AREAS` (for example `Airdrie`) and **Ledge** > **Find prospects now**. New shops
+   come straight from Google Maps and their audits come to you for review. Read the first 5 properly.
+7. When the audits read right: `COLD_EMAIL_ON` = yes. Shops running ads get the account audit emails; everyone else gets
+   the starting plan emails.
+
+**Later**
+8. A Google Ads manager account for Ledge (ads.google.com/home/tools/manager-accounts, signed in as
+   ledgecommunications@gmail.com), so clients can give you access from their own account. Needed before the first paid
+   account audit.
+9. Next builds: a page per industry, the account audit report (a Google Ads script exports the account, Claude writes
+   the report), and monthly reports for clients.
+10. Optional: move the domain registration from Squarespace to Cloudflare Registrar before Mar 31, 2027. FreshBooks
+    invoice automation once sales are moving.
+
+**New on the Ledge menu**
+- **Check one shop**: runs the audit searches on any website and shows the results. Nothing is saved to Leads.
+- **Make a management proposal**: after an account audit (or for anyone already running ads). Asks for their email and
+  monthly ad budget, then the proposal goes through the usual review and send. An approved account audit inside the
+  credit window comes off setup automatically.
 
 ---
 
@@ -108,7 +143,8 @@ Do this signed in as **ledgecommunications@gmail.com**, because every email goes
 6. The **Execution log** opens at the bottom of the editor. One line reads
    `HUB_KEY (paste into Cloudflare as HUB_KEY): ` followed by a long string of letters and numbers. Copy just that
    string. This is `HUB_KEY`. (Lost it? It's also under **Project Settings** > **Script Properties**.)
-7. **Project Settings** > **Script Properties** > add `ANTHROPIC_API_KEY` with the key from step 3.
+7. **Project Settings** > **Script Properties** > add `ANTHROPIC_API_KEY` with the key from step 3, plus
+   `DATAFORSEO_LOGIN` and `DATAFORSEO_PASSWORD` from dataforseo.com (API Access in your DataForSEO dashboard).
 8. **Deploy** > **New deployment** > gear > **Web app**. Execute as **Me**, Who has access **Anyone**. Deploy. The
    confirmation shows a Deployment ID and a **Web app** URL; copy the URL (it ends in `/exec`). This is `HUB_URL`.
 9. Add one more Script Property: `WEB_APP_URL` = that URL.
@@ -121,15 +157,16 @@ Do this signed in as **ledgecommunications@gmail.com**, because every email goes
     - `MAILING_ADDRESS`: your home address, on one line (step 7)
     - `BOOKING_URL`: the Superhuman link (step 6), optional
     - `GST_REGISTERED`: leave it at **yes** (Ledge is registered)
-    - `PRICE_SPRINT` and `PRICE_CARE`: the setup price ($1,000) and the optional monthly care plan ($250), before GST.
-      Change them any time; you can also edit the price on a single proposal before approving it
+    - Pricing, all CAD before GST: `PRICE_ACCOUNT_AUDIT` (500), `ACCOUNT_AUDIT_CREDIT_DAYS` (30), `MGMT_TIERS`
+      (`1000:500, 2000:800, 4000:1200, 8000:15%`: budget-from:fee), `MGMT_MIN_FEE` (500), `MIN_AD_BUDGET` (1000), and
+      `SETUP_MONTHS` (1). You can also edit the prices on a single proposal before approving it. `PRICE_SPRINT` and
+      `PRICE_CARE` only matter for proposals made before the switch
     - Leave `COLD_EMAIL_ON` at **no** for now
     - `MODEL`: `claude-opus-5-5`, the stronger model for research and writing. `claude-sonnet-5-5` costs about half
     - `MONTHLY_ENGINE_BUDGET_USD`: `60` to start. Raise it any time
     - `TRADES`: `heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair`.
-      They share the same gaps: urgent calls while the crew is on a job, and quotes that need chasing. Roofing adds hail
-      season, when quotes pile up and follow-up decides who gets the job
-    If you ran `setup` before these defaults changed, those three cells still hold the old values; type the new ones in.
+      Each one gets its own Google Maps search when the hub looks for prospects
+    If you ran `setup` before these defaults changed, those cells still hold the old values; type the new ones in.
 12. In the **Sheet** (not the script editor), reload the page. A **Ledge** menu appears at the top, to the right of
     **Help**. **Ledge** > **Check settings** should say the settings look complete. The first time, Google asks you to
     allow the script again; that's expected. (Running `showSettingsCheck` from the script editor writes the same
@@ -205,30 +242,34 @@ change the setting and every email after that uses the new address.
 
 Use a personal address that isn't ledgecommunications@gmail.com.
 
-1. **Site lead.** Fill in the form on `https://ledgecomms.ledgelow.workers.dev`, including the two optional questions.
+1. **Site lead.** Fill in the form on ledgecommunications.com, including the optional town, Google Ads, and budget questions.
    Expect a confirmation email within a minute and a row on the Leads tab, with your answers in the `owner_says`
    column. Within a few hours (batches usually finish inside the hour, occasionally longer) you get a
    "Check this audit" email. Open the preview, then approve it. The audit email lands in the same thread.
-2. **Fixed price.** On the audit page, tap **Send me a fixed price**. You get "Check this proposal"; approve it.
-   The proposal email arrives. Open the page and tap **Approve and get started**. Expect the kickoff email and a
-   "won" note to you.
+2. **The offer.** At the bottom of the audit page, use the form (**Book the account audit** if you said you run ads,
+   **Send me a starting plan** if not). You get "Check this proposal"; approve it. The proposal email arrives. Open the
+   page and approve it there. Expect the kickoff email and an "Approved" note to you.
 3. **Opt-out.** From a second test address, reply "unsubscribe" to any email. It stops and lands on the Do not contact tab.
    Also try the unsubscribe link at the bottom of an email.
-4. **Cold prospects.** **Ledge** > **Find prospects now**. Over the next few hours, new shops appear on the Leads tab
-   and the first audits come to you for review. Nothing goes to a shop while `COLD_EMAIL_ON` is no.
+4. **Cold prospects.** **Ledge** > **Find prospects now**. New shops from Google Maps appear on the Leads tab right
+   away, and their audits come to you for review over the next few hours. Nothing goes to a shop while
+   `COLD_EMAIL_ON` is no.
 
 If anything looks off, the **Events** tab shows what happened and when. Send me a screenshot of it.
 
 **Invoicing (FreshBooks):** when a client approves, the "Approved" email to you ends with everything the invoice needs:
-client, line item (the three fixes by name), amount, 5% GST, and total. Make the invoice in FreshBooks from that. Turn on
+client, line item (the offer), any account audit credit, amount, 5% GST, total, and the monthly fee if there is one. Make the invoice in FreshBooks from that. Turn on
 online payments in FreshBooks so the client can pay by card straight from the invoice email.
 
 ## 9. Go live on ledgecommunications.com (10 minutes, once the copy reads right)
 
 1. Worker > **Settings** > **Domains & Routes** > **Add** > **Custom domain** > `ledgecommunications.com`.
    Then add `www.ledgecommunications.com` the same way.
-2. If Cloudflare says a DNS record already exists: **DNS** > **Records**, delete the Squarespace records (the A records
-   on `ledgecommunications.com` and the `www` CNAME), then add the custom domain again. Leave any other records alone.
+2. If Cloudflare says the hostname "already has externally managed DNS records": those records live in **Cloudflare**,
+   not Squarespace (Cloudflare has run the domain's DNS since the move). Cloudflare left menu > **Domains** >
+   `ledgecommunications.com` > **DNS** > **Records**. Delete the A records on `ledgecommunications.com` (Squarespace's
+   use addresses starting 198.) and the `www` CNAME (pointing to `ext-sq.squarespace.com`). Leave everything else,
+   especially TXT and MX records. Then add the custom domain again. The old site goes dark for the minute in between.
 3. Open ledgecommunications.com on your phone. It can take a few minutes to switch over.
 4. In the Sheet's **Settings** tab, change `SITE_URL` back to `https://ledgecommunications.com`. Do this as soon as the
    domain works: until then, every email links to the workers.dev address, and spam filters distrust workers.dev links
@@ -249,9 +290,9 @@ online payments in FreshBooks so the client can pay by card straight from the in
 
 | When | What |
 | --- | --- |
-| Every hour | Replies, bounces, and bookings checked; Claude batches sent and collected; audits, proposals, and emails sent |
+| Every hour | Replies, bounces, and bookings checked; searches run for up to 6 new audits; Claude batches sent and collected; audits, proposals, and emails sent |
 | Daily, 5 pm | One email to you, only if there are replies it couldn't sort |
-| Monday 5 am | Claude looks for new shops in the next area |
+| Monday 5 am | New shops from Google Maps for the next area in `AREAS` |
 | Monday 7 am | Weekly digest to you |
 
 Emails to shops only go out on weekdays during working hours, Mountain time.

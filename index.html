@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Ledge Communications helps Alberta heating, cooling, and plumbing shops and other local service businesses answer and follow up on every call, form, and quote. Start with a free one-page audit.">
+<meta name="description" content="Ledge Communications sets up and runs Google Ads, Google Guaranteed, and Google Business Profiles for Alberta service businesses. Start with a free audit of what your customers see when they search.">
 <link rel="canonical" href="https://ledgecommunications.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ledgecommunications.com/">
 <meta property="og:title" content="Ledge Communications">
-<meta property="og:description" content="Ledge Communications helps Alberta heating, cooling, and plumbing shops and other local service businesses answer and follow up on every call, form, and quote. Start with a free one-page audit.">
+<meta property="og:description" content="Ledge Communications sets up and runs Google Ads, Google Guaranteed, and Google Business Profiles for Alberta service businesses. Start with a free audit of what your customers see when they search.">
 <meta property="og:image" content="https://ledgecommunications.com/assets/sunset-1200.jpg">
 <meta name="theme-color" content="#0C1630">
 <title>Ledge Communications</title>
@@ -55,8 +55,8 @@
   color-scheme: light;
 }
 
-/* Layout, top to bottom: hero with a proof line, what changes (owner's words vs after setup), one photo,
-   how it works, a peek at the sample audit, About in its own band, questions, the form, then a footer
+/* Layout, top to bottom: hero with a proof line, the four places to show up on a phone search (the thesis), one photo,
+   how it works, pricing, a peek at the sample audit, who it's for, About in its own band, questions, the form, then a footer
    whose big LEDGE wordmark is filled with Logan's tower photo (the original logo's idea).
    Light only. Photos sit behind or between sections as atmosphere, never captioned. */
 *, *::before, *::after { box-sizing: border-box; }
@@ -122,29 +122,60 @@ p { margin: 0; }
 .proof b { color: #FFFFFF; font-weight: 700; }
 @media (max-width: 640px) { .proof { flex-direction: column; gap: 4px; } .proof li + li::before { display: none; } }
 
-/* The usual gaps: the owner's words on the left, what changes on the right */
+/* Four places to show up: a phone's search page on the left, what each place is and what we do on the right */
 .build { background: var(--surface); }
-.ba-head, .ba li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 32px; }
-.ba-head { padding-bottom: 12px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-.ba-head span:last-child { color: var(--deep); }
-.ba { list-style: none; margin: 0; padding: 0; display: grid; }
-.ba li { align-items: center; padding-block: 14px; border-top: 1px solid var(--rule); }
-.ba li:first-child { border-top: 2px solid var(--ink); }
-.ba-cell { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; margin: 0; }
-.ba-cell::before { content: ""; width: 22px; height: 22px; margin-top: 2px; border-radius: 50%; }
-.ba-said { font-family: var(--display); font-weight: 700; font-size: 1.1rem; line-height: 1.35; letter-spacing: -0.01em; color: var(--ink); }
-.ba-said::before { background: color-mix(in srgb, var(--muted) 18%, transparent)
-  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 5l6 6M11 5l-6 6' fill='none' stroke='%234D5870' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
-.ba-after { background: var(--snow); border-radius: 8px; padding: 12px 14px; color: var(--ink); box-shadow: 0 1px 0 var(--rule); }
-.ba-after::before { background: var(--accent)
-  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%230F1A2E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px no-repeat; }
-.ba-foot { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 28px; }
-.ba-foot p { color: var(--muted); max-width: 44rem; }
-.ba-foot b { color: var(--ink); font-weight: 600; }
-@media (max-width: 760px) {
-  .ba-head { display: none; }
-  .ba li { grid-template-columns: minmax(0, 1fr); gap: 10px; padding-block: 18px; }
-}
+.places-grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 36px clamp(32px, 6vw, 80px); align-items: start; }
+.phone { background: var(--snow); border: 1px solid var(--rule); border-radius: 28px; padding: 18px 14px 22px; box-shadow: 0 18px 40px rgb(15 26 46 / 0.12); display: grid; gap: 10px; position: sticky; top: 24px; }
+.phone-q { display: flex; align-items: center; gap: 8px; border: 1px solid var(--rule); border-radius: 99px; padding: 8px 14px; font-size: 0.88rem; color: var(--ink); background: var(--surface); }
+.phone-q::before { content: ""; width: 12px; height: 12px; border: 2px solid var(--muted); border-radius: 50%; flex: none; }
+.blk { border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; background: var(--surface); }
+.blk b { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.blk b i { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--deep); color: var(--deep-ink); font-size: 0.68rem; letter-spacing: 0; }
+.blk span { display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 22%, transparent); }
+.blk span:nth-child(odd) { width: 78%; } .blk span:nth-child(even) { width: 62%; }
+.blk.map { background: color-mix(in srgb, var(--ice) 70%, var(--surface)); }
+.blk.map em { display: block; height: 54px; border-radius: 6px; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--deep) 10%, transparent) 0 6px, transparent 6px 14px); }
+.places { list-style: none; margin: 0; padding: 0; display: grid; }
+.places li { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 4px 14px; padding-block: 18px; border-top: 1px solid var(--rule); counter-increment: place; }
+.places li:first-child { border-top: 2px solid var(--ink); }
+.places { counter-reset: place; }
+.places li::before { content: counter(place); grid-row: span 3; font-family: var(--display); font-weight: var(--display-weight); font-size: 1.7rem; line-height: 1; color: var(--accent-text); }
+.places p { color: var(--muted); }
+.places .we { color: var(--ink); }
+.places .we b { font-weight: 600; }
+.places-foot { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 28px; }
+.places-foot p { color: var(--muted); max-width: 40rem; }
+.places-foot b { color: var(--ink); font-weight: 600; }
+@media (max-width: 820px) { .places-grid { grid-template-columns: minmax(0, 1fr); } .phone { position: static; max-width: 300px; } }
+
+/* Pricing: three offers, then the fee table */
+.offers { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.offer { background: var(--snow); border: 1px solid var(--rule); border-radius: 10px; padding: clamp(20px, 3vw, 28px); display: grid; gap: 12px; align-content: start; min-width: 0; }
+.offer.main { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.offer .who { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--deep); }
+.offer .amt { font-family: var(--display); font-weight: var(--display-weight); font-size: 2.4rem; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.offer .amt small { font-family: var(--body); font-weight: 500; font-size: 0.95rem; letter-spacing: 0; color: var(--muted); }
+.offer p { color: var(--muted); }
+.offer .note { color: var(--ink); font-size: 0.95rem; border-top: 1px solid var(--rule); padding-top: 12px; }
+.fees { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 20px clamp(32px, 6vw, 80px); align-items: start; }
+.fees h3 { margin-bottom: 8px; }
+.fees p { color: var(--muted); }
+.fee-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.fee-table th, .fee-table td { text-align: left; padding: 11px 4px; border-bottom: 1px solid var(--rule); }
+.fee-table thead th { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--ink); }
+.fee-table td:last-child, .fee-table th:last-child { text-align: right; font-weight: 600; }
+@media (max-width: 900px) { .offers { grid-template-columns: minmax(0, 1fr); } .fees { grid-template-columns: minmax(0, 1fr); } }
+
+/* Who it's for: one card per kind of business, each with the searches that matter */
+.trades { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.trade { border: 1px solid var(--rule); border-radius: 10px; padding: 20px 22px; display: grid; gap: 10px; align-content: start; background: var(--snow); min-width: 0; }
+.trade .qs { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.trade .qs li { font-size: 0.86rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 99px; padding: 3px 10px; color: var(--ink); }
+.trade p { color: var(--muted); font-size: 0.98rem; }
+.trade a { font-weight: 600; color: var(--deep); justify-self: start; }
+.trade.wide > div { display: grid; gap: 10px; min-width: 0; }
+.trade.wide { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; align-items: center; gap: 10px 28px; }
+@media (max-width: 900px) { .trade.wide { grid-template-columns: minmax(0, 1fr); } }
 
 /* One photo between sections: Calgary homes with the Rockies behind */
 .band { margin: 0; height: clamp(240px, 36vw, 480px); overflow: hidden; background: var(--spruce); }
@@ -171,7 +202,7 @@ p { margin: 0; }
 .mock .meta { font-size: 0.82rem; color: #4D5870; margin-bottom: 14px; }
 .mock-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding-block: 10px; border-top: 1px solid #E6E8EE; font-size: 0.92rem; font-weight: 600; }
 .pill { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
-.pill.leak { color: var(--leak); } .pill.good { color: var(--good); } .pill.unknown { color: var(--unknown); }
+.pill.leak, .pill.gap { color: var(--leak); } .pill.good { color: var(--good); } .pill.unknown { color: var(--unknown); }
 .mock-fix { margin-top: 16px; padding: 14px 16px; background: #F3F4F7; border-radius: 6px; font-size: 0.9rem; }
 .mock-fix b { display: block; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: #4D5870; margin-bottom: 4px; }
 @media (max-width: 860px) { .peek { grid-template-columns: minmax(0, 1fr); } }
@@ -256,7 +287,8 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
   </a>
   <nav aria-label="Sections">
     <a href="#how">How it works</a>
-    <a href="#setup">What we build</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#who">Who it's for</a>
     <a href="#about">About</a>
     <a href="#faq">Questions</a>
   </nav>
@@ -268,52 +300,48 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
   <section class="hero" aria-labelledby="hero-title">
     <img src="assets/sunset-1200.jpg" srcset="assets/sunset-1200.jpg 1200w, assets/sunset-2000.jpg 2000w" sizes="100vw" alt="" fetchpriority="high">
     <div class="wrap hero-inner">
-      <h1 id="hero-title">Don't lose the leads that already found you.</h1>
-      <p class="hero-sub">We help heating, cooling, and plumbing shops and other local service businesses answer and follow up on every call, form, and quote.</p>
+      <h1 id="hero-title">Show up where your customers are searching.</h1>
+      <p class="hero-sub">We set up and run Google Ads, Google Guaranteed, and your Google Business Profile for Alberta service businesses. Start with a free look at what your customers see when they search.</p>
       <div class="actions">
         <a class="btn" href="#audit">Get a free audit</a>
         <a class="btn btn-line" href="audit/sample/">See a sample audit</a>
       </div>
       <ul class="proof" aria-label="About Ledge Communications">
-        <li><span><b>10+ years</b> helping businesses grow online</span></li>
-        <li><span>Local shops to global brands</span></li>
+        <li><span><b>10+ years</b> in digital marketing</span></li>
+        <li><span>Your own ad account, month to month</span></li>
         <li><span>Based in Alberta</span></li>
       </ul>
     </div>
   </section>
 
-  <section id="setup" class="build" aria-labelledby="setup-title">
+  <section id="search" class="build" aria-labelledby="search-title">
     <div class="wrap section">
       <div class="intro">
-        <p class="kicker">What we build</p>
-        <h2 id="setup-title">The usual gaps, and how we close them.</h2>
-        <p>Most missed jobs never show up as missed. They just look like a quiet week.</p>
+        <p class="kicker">What we do</p>
+        <h2 id="search-title">Four places to show up on one search.</h2>
+        <p>Search for a furnace repair on your phone and you'll pass four kinds of results before most websites. Each one works differently, and we set up all four.</p>
       </div>
-      <div class="ba-head" aria-hidden="true"><span>Sound familiar?</span><span>After setup</span></div>
-      <ol class="ba">
-        <li>
-          <p class="ba-cell ba-said"><span>&ldquo;By the time I called back, they'd booked someone else.&rdquo;</span></p>
-          <p class="ba-cell ba-after"><span>Missed calls get a text back in seconds, so you're the first to reply.</span></p>
-        </li>
-        <li>
-          <p class="ba-cell ba-said"><span>&ldquo;Web requests sit until I'm home and through dinner.&rdquo;</span></p>
-          <p class="ba-cell ba-after"><span>Every form gets an instant reply, and the request lands where you'll see it.</span></p>
-        </li>
-        <li>
-          <p class="ba-cell ba-said"><span>&ldquo;Booking a visit takes three rounds of phone tag.&rdquo;</span></p>
-          <p class="ba-cell ba-after"><span>Customers pick a time online, straight into the calendar you already use.</span></p>
-        </li>
-        <li>
-          <p class="ba-cell ba-said"><span>&ldquo;Quotes go out, and I rarely hear back.&rdquo;</span></p>
-          <p class="ba-cell ba-after"><span>Quiet quotes get a friendly follow-up, twice, without anyone having to remember.</span></p>
-        </li>
-        <li>
-          <p class="ba-cell ba-said"><span>&ldquo;Our newest Google review is from months ago.&rdquo;</span></p>
-          <p class="ba-cell ba-after"><span>Every paid job gets a review request while it's still fresh.</span></p>
-        </li>
-      </ol>
-      <div class="ba-foot">
-        <p><b>Works with what you already run:</b> your phone, your scheduling software, your Google listing, and your website. Then it runs on its own.</p>
+      <div class="places-grid">
+        <div class="phone" aria-hidden="true">
+          <div class="phone-q">furnace repair near me</div>
+          <div class="blk"><b><i>1</i>Google Guaranteed</b><span></span><span></span><span></span></div>
+          <div class="blk"><b><i>2</i>Sponsored</b><span></span><span></span></div>
+          <div class="blk map"><b><i>3</i>Map</b><em></em><span></span><span></span><span></span></div>
+          <div class="blk"><b><i>4</i>Websites</b><span></span><span></span><span></span><span></span></div>
+        </div>
+        <ol class="places">
+          <li><h3>Google Guaranteed</h3><p>The box at the very top, with a green check. You pay for each lead instead of each click, and Google screens your business first.</p>
+            <p class="we"><b>What we do:</b> take you through Google's application and keep your budget and profile in shape.</p></li>
+          <li><h3>Sponsored results</h3><p>Search ads. You choose the searches, the areas, and the hours you want calls.</p>
+            <p class="we"><b>What we do:</b> build and run campaigns aimed at the jobs you want, in an account that's yours.</p></li>
+          <li><h3>The map</h3><p>Three businesses next to a map, picked mostly from Google Business Profiles and reviews.</p>
+            <p class="we"><b>What we do:</b> line your profile up with your ads: categories, services, hours, and a steady stream of reviews.</p></li>
+          <li><h3>Websites</h3><p>Where most taps end up, on your site or a directory.</p>
+            <p class="we"><b>What we do:</b> make sure the page people land on makes it easy to call, and that every call gets counted.</p></li>
+        </ol>
+      </div>
+      <div class="places-foot">
+        <p><b>Your free audit shows all four for your business:</b> who's there when your customers search, where you sit, and what we'd do first.</p>
         <a class="btn" href="#audit">Get a free audit</a>
       </div>
     </div>
@@ -329,34 +357,122 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
       <h2 id="how-title">Start with a free audit. Decide from there.</h2>
     </div>
     <ol class="steps">
-      <li><h3>A free audit</h3><p>We look at your website, Google listing, reviews, and ads, and send you one page on what's working, what needs work, and what we'd fix first. No logins or access needed.</p></li>
-      <li><h3>A fixed price</h3><p>If you want help, you get one price with exactly what's included, including anything new it would take. Approve it online, or talk it through first.</p></li>
-      <li><h3>Set up and handed over</h3><p>Most setups are done in two to three weeks, with a short note on what changed. After that it runs on its own.</p></li>
+      <li><h3>A free audit</h3><p>We run the searches your customers do, on a phone in your town, and send you one page: who shows up, where you sit, and what we'd do first. No logins or access needed.</p></li>
+      <li><h3>A plan with a price</h3><p>Already running Google Ads? We start with a look inside the account. Not yet? You get a starting plan built on a budget you choose. Either way, you see the full price before anything starts.</p></li>
+      <li><h3>We run it, you see it</h3><p>Ads go live in your own account, with every call and form tracked from day one. You get a short report each month, and it's month to month.</p></li>
     </ol>
   </section>
 
-  <section class="build" aria-labelledby="peek-title">
-    <div class="wrap section peek">
+  <section id="pricing" class="build" aria-labelledby="pricing-title">
+    <div class="wrap section">
+      <div class="intro">
+        <p class="kicker">Pricing</p>
+        <h2 id="pricing-title">Plain prices, no contract.</h2>
+        <p>Your ad budget goes to Google directly, from your own account. What you pay us is set out below, plus GST.</p>
+      </div>
+      <ul class="offers">
+        <li class="offer">
+          <p class="who">Everyone</p>
+          <h3>Free audit</h3>
+          <p class="amt">$0</p>
+          <p>The searches your customers run, who shows up, where you sit, and the three things we'd do first.</p>
+          <p class="note">No logins, no obligation. In your inbox by the end of the next business day.</p>
+        </li>
+        <li class="offer">
+          <p class="who">Already running Google Ads</p>
+          <h3>Account audit</h3>
+          <p class="amt">$<span data-price="price_audit">500</span> <small>one time</small></p>
+          <p>We look inside your account with read-only access: which searches you pay for, what a call costs you, and where the budget goes. You get a written report and a call to walk through it.</p>
+          <p class="note">Comes off setup or management if you go ahead within <span data-price="credit_days">30</span> days.</p>
+        </li>
+        <li class="offer main">
+          <p class="who">Setup and management</p>
+          <h3>We run your ads</h3>
+          <p class="amt">From $<span data-price="min_fee">500</span> <small>a month</small></p>
+          <p>Search ads, Google Guaranteed if you qualify, your Business Profile, and call tracking, all in an account in your name. Setup costs the same as <span data-price="setup_months">one month</span>.</p>
+          <p class="note">Month to month. A short report every month.</p>
+        </li>
+      </ul>
+      <div class="fees">
+        <div>
+          <h3>How the monthly fee is set</h3>
+          <p>It follows your ad budget, so a bigger budget never means a surprise. Plans start at $<span data-price="min_budget">1,000</span> a month in ad budget, so there's enough to learn what works. <span data-price="cap_line">Our fee is never more than half of your ad budget.</span></p>
+        </div>
+        <table class="fee-table">
+          <thead><tr><th scope="col">Your monthly ad budget</th><th scope="col">Our monthly fee</th></tr></thead>
+          <tbody data-price="rows">
+            <tr><td>$1,000 to $1,999</td><td>$500</td></tr>
+            <tr><td>$2,000 to $3,999</td><td>$800</td></tr>
+            <tr><td>$4,000 to $7,999</td><td>$1,200</td></tr>
+            <tr><td>$8,000 and up</td><td>15% of the budget</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="peek-title">
+    <div class="wrap peek">
       <div class="intro">
         <p class="kicker">See what you'd get</p>
         <h2 id="peek-title">One page, in plain English</h2>
-        <p>Here's the audit for a made-up shop: where leads get missed, what we'd fix first, and what each fix takes.</p>
+        <p>Here's the audit for a made-up shop: who shows up when its customers search, where it sits, and what we'd do first.</p>
         <div class="peek-actions">
           <a class="btn btn-ghost" href="audit/sample/">See the full sample</a>
           <a class="text-link" href="#audit">Get yours free</a>
         </div>
       </div>
       <a class="mock" href="audit/sample/" aria-label="Open the sample audit">
-        <div class="mock-top"><span class="mock-wm">LEDGE</span><span class="mock-label">Lead Handling Audit</span></div>
+        <div class="mock-top"><span class="mock-wm">LEDGE</span><span class="mock-label">Local Search Audit</span></div>
         <h3>Example Heating &amp; Plumbing</h3>
-        <p class="meta">Public information only</p>
-        <div class="mock-row"><span>Lead comes in</span><span class="pill leak">Needs work</span></div>
-        <div class="mock-row"><span>First response</span><span class="pill leak">Needs work</span></div>
-        <div class="mock-row"><span>Visit booked</span><span class="pill leak">Needs work</span></div>
-        <div class="mock-row"><span>Quote sent</span><span class="pill unknown">Couldn't check</span></div>
-        <div class="mock-row"><span>Job done and paid</span><span class="pill good">Looks good</span></div>
-        <div class="mock-fix"><b>What we'd fix first</b>Put tap-to-call and online booking at the top of every page</div>
+        <p class="meta">&ldquo;furnace repair airdrie&rdquo; on a phone in Airdrie</p>
+        <div class="mock-row"><span>Map results</span><span class="pill gap">Needs work</span></div>
+        <div class="mock-row"><span>Google Guaranteed</span><span class="pill gap">Needs work</span></div>
+        <div class="mock-row"><span>Search ads</span><span class="pill gap">Needs work</span></div>
+        <div class="mock-row"><span>Reviews</span><span class="pill good">Looks good</span></div>
+        <div class="mock-row"><span>Call and form tracking</span><span class="pill gap">Needs work</span></div>
+        <div class="mock-fix"><b>What we'd do first</b>Get into Google Guaranteed for furnace and plumbing calls</div>
       </a>
+    </div>
+  </section>
+
+  <section id="who" class="build" aria-labelledby="who-title">
+    <div class="wrap section">
+      <div class="intro">
+        <p class="kicker">Who it's for</p>
+        <h2 id="who-title">Local businesses people search for on their phones.</h2>
+        <p>Mostly owner-run trades shops around Calgary and across Alberta, though the same four places apply to any local business.</p>
+      </div>
+      <ul class="trades">
+        <li class="trade" id="heating-cooling"><h3>Heating and cooling</h3>
+          <ul class="qs" aria-label="Typical searches"><li>furnace repair</li><li>furnace replacement</li><li>AC installation</li></ul>
+          <p>No-heat calls in January and AC installs in June want different ads. We change them with the season.</p>
+          <a href="#audit" data-trade="Heating and cooling">Free audit for your shop</a></li>
+        <li class="trade" id="plumbing"><h3>Plumbing</h3>
+          <ul class="qs" aria-label="Typical searches"><li>plumber near me</li><li>drain cleaning</li><li>hot water tank</li></ul>
+          <p>Emergencies come at all hours. Ads run when someone can pick up, and urgent searches get the budget first.</p>
+          <a href="#audit" data-trade="Plumbing">Free audit for your shop</a></li>
+        <li class="trade" id="electrical"><h3>Electrical</h3>
+          <ul class="qs" aria-label="Typical searches"><li>electrician</li><li>panel upgrade</li><li>EV charger installation</li></ul>
+          <p>Service calls and bigger projects need different budgets, so one doesn't crowd out the other.</p>
+          <a href="#audit" data-trade="Electrical">Free audit for your shop</a></li>
+        <li class="trade" id="roofing"><h3>Roofing and eavestroughs</h3>
+          <ul class="qs" aria-label="Typical searches"><li>roof repair</li><li>roof replacement</li><li>eavestrough repair</li></ul>
+          <p>Big jobs and stormy seasons. We track which calls turn into quotes, not only which ads get clicks.</p>
+          <a href="#audit" data-trade="Roofing and eavestroughs">Free audit for your shop</a></li>
+        <li class="trade" id="garage-doors"><h3>Garage doors</h3>
+          <ul class="qs" aria-label="Typical searches"><li>garage door repair</li><li>garage door spring</li><li>new garage door</li></ul>
+          <p>Most calls are urgent and close to home, so the map and Google Guaranteed matter as much as the ads.</p>
+          <a href="#audit" data-trade="Garage doors">Free audit for your shop</a></li>
+        <li class="trade" id="appliance-repair"><h3>Appliance repair</h3>
+          <ul class="qs" aria-label="Typical searches"><li>appliance repair</li><li>dishwasher repair</li><li>fridge repair</li></ul>
+          <p>Lots of brands and appliances to cover. Ads stick to the ones you actually fix, in the areas you drive to.</p>
+          <a href="#audit" data-trade="Appliance repair">Free audit for your shop</a></li>
+        <li class="trade wide" id="other"><div><h3>Other local businesses</h3>
+          <ul class="qs" aria-label="Examples"><li>clinics</li><li>auto repair</li><li>cleaning</li><li>landscaping</li></ul></div>
+          <p>If people search for what you do near them, the same four places apply, and so does the free audit.</p>
+          <a href="#audit" data-trade="Another local business">Free audit for your business</a></li>
+      </ul>
     </div>
   </section>
 
@@ -368,13 +484,13 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
         <ul class="creds">
           <li><b>10+ years</b>Helping brands and businesses grow online</li>
           <li><b>Local presence, global experience</b>Big&#8209;brand experience, sized for your business</li>
-          <li><b>Big-picture perspective</b>Making your tech work (almost) as hard as you do</li>
+          <li><b>Plain answers</b>What you pay, what it brought in, and what we changed</li>
         </ul>
       </div>
       <div class="about-copy">
-        <p>I've spent more than ten years in digital marketing, across the whole funnel: ads, search, email, websites, and the tracking that ties them together. I started Ledge Communications in 2015, alongside agency work in Edmonton, my hometown.</p>
+        <p>I've spent more than ten years in digital marketing: ads, search, email, websites, and the tracking that ties them together. I started Ledge Communications in 2015, alongside agency work in Edmonton, my hometown.</p>
         <p>I've worked with local restaurants and retail shops, service providers and consultants, health and wellness brands, nonprofits, education, energy and utility companies, and global brands.</p>
-        <p>I'm not a tradesperson. What I know is the part between someone finding you and the job getting booked, and that works much the same whether you fix furnaces or run a clinic.</p>
+        <p>I'm not a tradesperson. What I know is the part between someone searching on their phone and your phone ringing, and that works much the same whether you fix furnaces or run a clinic.</p>
         <p>I keep my client list short on purpose, so you deal with me directly.</p>
       </div>
     </div>
@@ -387,24 +503,32 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
     </div>
     <div class="faq">
       <details>
-        <summary>Will I need new software?</summary>
-        <p>Ideally not. We work inside what you already have, whether that's a full setup in Jobber or Housecall Pro, or a phone, a calendar and a spreadsheet. If a new tool is truly needed, we'll explain why, what it costs, and your options before anything starts. No software company pays us to recommend them, so the advice fits your setup, not someone's sales target.</p>
-      </details>
-      <details>
         <summary>What does it cost?</summary>
-        <p>The first audit is free. If your setup is more involved, we can do a deeper dive inside your tools for a small fixed fee, agreed up front. If you want help with the fixes, you get one fixed price before anything starts. No hourly billing and no long contract.</p>
+        <p>The audit is free. If you already run Google Ads, the account audit is $<span data-price="price_audit">500</span>, and it comes off setup or management if you go ahead within <span data-price="credit_days">30</span> days. Running your ads is a monthly fee that follows your ad budget, starting at $<span data-price="min_fee">500</span> a month, and setup costs the same as <span data-price="setup_months">one month</span>. Your ad budget is paid to Google directly. Prices are plus GST.</p>
       </details>
       <details>
-        <summary>What happens after setup?</summary>
-        <p>It runs on its own, in your accounts. If you want ongoing support and check-ins, or help with Google Ads and bringing in more leads, we can quote that separately.</p>
+        <summary>How much should I spend on ads?</summary>
+        <p>Enough for Google to learn what works in your area. For most local service businesses that starts around $<span data-price="min_budget">1,000</span> a month. Your free audit shows roughly how many people search for what you do near you, and you can change the budget any time.</p>
       </details>
       <details>
-        <summary>Who owns the accounts?</summary>
-        <p>You do. Everything stays in your name and is billed to you. We're added as a user while we set things up, and nothing depends on us, so it all keeps working once our access is removed.</p>
+        <summary>Who owns the account?</summary>
+        <p>You do. The Google Ads account is in your name, with your card on it, and you pay Google directly. We work in it as your manager. If you stop, the account, the ads, and their history stay with you.</p>
+      </details>
+      <details>
+        <summary>What's Google Guaranteed?</summary>
+        <p>Google's Local Services Ads: the box at the top of many local searches, with a green check. You pay for each lead instead of each click, and Google screens your business first. Not every kind of business qualifies yet, and your audit shows whether it appears on your searches.</p>
+      </details>
+      <details>
+        <summary>Is there a contract?</summary>
+        <p>No. Management is month to month. If you want to stop, tell us and it stops at the end of the month.</p>
+      </details>
+      <details>
+        <summary>How will I know it's working?</summary>
+        <p>Calls and forms from your ads are tracked from the start, and you get a short report each month: how many calls came in, what they cost, and what we changed.</p>
       </details>
       <details>
         <summary>Do you only work with trades?</summary>
-        <p>No. Heating, cooling, and plumbing shops tend to have the same gaps, which is why they're named here, but any local business that loses leads the same way is a good fit. Have something different in mind? We're always open to interesting projects, big or small. Email <a class="text-link" href="mailto:ledgecommunications@gmail.com">ledgecommunications@gmail.com</a> and tell us about it.</p>
+        <p>No. Trades are named here because their searches look alike, but any local business people search for on their phones is a good fit. Have something different in mind? We're always open to interesting projects, big or small. Email <a class="text-link" href="mailto:ledgecommunications@gmail.com">ledgecommunications@gmail.com</a> and tell us about it.</p>
       </details>
     </div>
   </section>
@@ -415,7 +539,7 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
       <div class="cta-copy">
         <p class="kicker">Free</p>
         <h2 id="audit-title">Get your free audit</h2>
-        <p>Tell us which business is yours and we'll send one page on what's working, what needs work, and what we'd fix first. It'll be in your inbox by the end of the next business day.</p>
+        <p>Tell us which business is yours. We'll run the searches your customers do, on a phone in your town, and send one page on who shows up, where you sit, and what we'd do first. It'll be in your inbox by the end of the next business day.</p>
         <p>Want to see one first? <a href="audit/sample/">Here's a sample.</a></p>
       </div>
 
@@ -441,38 +565,43 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
             <label for="f-phone">Phone <small>(optional)</small></label>
             <input id="f-phone" name="phone" type="tel" autocomplete="tel">
           </div>
-          <div class="field full">
+          <div class="field">
             <label for="f-trade">Type of work</label>
             <select id="f-trade" name="trade">
               <option>Heating and cooling</option>
               <option>Plumbing</option>
-              <option>Heating, cooling, and plumbing</option>
               <option>Electrical</option>
+              <option>Roofing and eavestroughs</option>
+              <option>Garage doors</option>
+              <option>Appliance repair</option>
               <option>Another trade</option>
-              <option>Another local service business</option>
+              <option>Another local business</option>
             </select>
           </div>
-          <div class="field full">
-            <label for="f-missed">How are missed calls handled today? <small>(optional)</small></label>
-            <select id="f-missed" name="missed_calls">
+          <div class="field">
+            <label for="f-area">Town you work in <small>(optional)</small></label>
+            <input id="f-area" name="area" type="text" placeholder="Calgary, Airdrie, Okotoks…" autocomplete="address-level2">
+          </div>
+          <div class="field">
+            <label for="f-ads">Running Google Ads now? <small>(optional)</small></label>
+            <select id="f-ads" name="running_ads">
               <option value="">Choose one</option>
-              <option>They go to voicemail</option>
-              <option>Someone calls back when they can</option>
-              <option>An answering service picks up</option>
-              <option>Not sure</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+              <option value="not sure">Not sure</option>
             </select>
           </div>
-          <fieldset class="field full">
-            <legend>What do you use to schedule jobs? <small>(optional, pick any)</small></legend>
-            <div class="opts">
-              <label><input type="checkbox" name="tools" value="Jobber"> Jobber</label>
-              <label><input type="checkbox" name="tools" value="Housecall Pro"> Housecall Pro</label>
-              <label><input type="checkbox" name="tools" value="ServiceTitan"> ServiceTitan</label>
-              <label><input type="checkbox" name="tools" value="Google Calendar"> Google Calendar</label>
-              <label><input type="checkbox" name="tools" value="Spreadsheet or paper"> Spreadsheet or paper</label>
-            </div>
-            <input type="text" name="tools_other" aria-label="Something else" placeholder="Something else? Type it here">
-          </fieldset>
+          <div class="field">
+            <label for="f-budget">Monthly ad budget <small>(optional)</small></label>
+            <select id="f-budget" name="budget">
+              <option value="">Choose one</option>
+              <option value="not sure">Not sure yet</option>
+              <option value="under 1000">Under $1,000</option>
+              <option value="1000-2000">$1,000 to $2,000</option>
+              <option value="2000-4000">$2,000 to $4,000</option>
+              <option value="4000+">$4,000 or more</option>
+            </select>
+          </div>
           <div class="hp" aria-hidden="true">
             <label for="f-fax">Fax</label>
             <input id="f-fax" name="fax" type="text" tabindex="-1" autocomplete="off">
@@ -510,6 +639,9 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
 (function () {
   var form = document.getElementById('audit-form');
   if (!form) return;
+  [].forEach.call(document.querySelectorAll('a[data-trade]'), function (a) {
+    a.addEventListener('click', function () { form.elements.trade.value = a.getAttribute('data-trade'); });
+  });
   var preview = !/(^|\.)ledgecommunications\.com$|\.workers\.dev$|\.pages\.dev$/.test(location.hostname);
   var done = document.getElementById('form-done');
   var err = document.getElementById('form-error');

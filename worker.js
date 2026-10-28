@@ -5,6 +5,7 @@
 //   - handle the form endpoints under /api/
 //   - serve each shop's audit and proposal page, which the pipeline hub (Apps Script) renders
 //   - fill in the booking link and the Turnstile spam check on every HTML page
+//   - fill in the home page prices from the hub's Settings tab (cached; the built-in prices are the fallback)
 //
 // Settings live in Cloudflare (Worker > Settings > Variables and Secrets), not in the code:
 //   HUB_URL             Apps Script web app URL (ends in /exec)
@@ -14,7 +15,7 @@
 //   BOOKING_URL         booking page link (optional; booking links are hidden when it's empty)
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
 
@@ -26,9 +27,47 @@ export default {
       if (res) return fillPageValues(res, env);
     }
 
-    return fillPageValues(await env.ASSETS.fetch(request), env);
+    const pricing = path === "/" && request.method === "GET" ? await livePricing(env, ctx) : null;
+    return fillPageValues(await env.ASSETS.fetch(request), env, pricing);
   },
 };
+
+/* ───────────── live prices ───────────── */
+
+// The hub's Settings tab is the one place prices live. A copy is kept for a day and refreshed in the background once
+// it's an hour old, so a price change shows up within about an hour and no visitor waits on the hub.
+const PRICING_CACHE_KEY = "https://pricing.ledgecommunications.com/v1";
+
+async function livePricing(env, ctx) {
+  if (!env.HUB_URL || !env.HUB_KEY) return null;
+  const cache = caches.default;
+  const refresh = async () => {
+    const res = await fetch(`${env.HUB_URL}?page=pricing&key=${encodeURIComponent(env.HUB_KEY)}`, { redirect: "follow" }).catch(() => null);
+    const data = res && res.ok ? await res.json().catch(() => null) : null;
+    if (!validPricing(data)) return null;
+    await cache.put(PRICING_CACHE_KEY, new Response(JSON.stringify(data), {
+      headers: { "content-type": "application/json", "cache-control": "max-age=86400", "x-fetched": String(Date.now()) },
+    })).catch(() => {});
+    return data;
+  };
+  const hit = await cache.match(PRICING_CACHE_KEY).catch(() => null);
+  if (!hit) { ctx.waitUntil(refresh()); return null; }
+  if (Date.now() - Number(hit.headers.get("x-fetched") || 0) > 3600e3) ctx.waitUntil(refresh());
+  const data = await hit.json().catch(() => null);
+  return validPricing(data) ? data : null;
+}
+
+function validPricing(d) {
+  const num = (v) => typeof v === "string" && /^[\d,]{1,9}$/.test(v);
+  const short = (v, n) => typeof v === "string" && v.length <= n;
+  return !!d && d.ok === true && num(d.price_audit) && num(d.credit_days) && num(d.min_fee) && num(d.min_budget) &&
+    short(d.cap_line, 140) && short(d.setup_months, 20) && Array.isArray(d.rows) && d.rows.length >= 1 && d.rows.length <= 10 &&
+    d.rows.every((r) => Array.isArray(r) && r.length === 2 && short(r[0], 40) && short(r[1], 40));
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 /* ───────────── /api/ routes ───────────── */
 
@@ -71,7 +110,7 @@ async function toHub(env, payload) {
 
 // POST /api/audit-request: the site form. Checks it's a real person (Turnstile + honeypot),
 // then hands the lead to the hub, which records it, sends the confirmation and queues the audit.
-const LIMITS = { name: 120, business: 160, website: 300, email: 200, phone: 40, trade: 60, missed_calls: 60, tools: 300, tools_other: 120 };
+const LIMITS = { name: 120, business: 160, website: 300, email: 200, phone: 40, trade: 60, area: 80, running_ads: 20, budget: 30, missed_calls: 60, tools: 300, tools_other: 120 };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function clean(value, max) {
@@ -134,15 +173,19 @@ async function auditRequest(request, env) {
   return json({ ok: true });
 }
 
-// POST /api/quote-request: the "Send me a fixed price" button on an audit page.
+// POST /api/quote-request: the ask at the bottom of an audit page (account audit, starting plan, or details).
 async function quoteRequest(request, env) {
   const form = await request.formData().catch(() => null);
   if (!form) return buttonReply(request, false, 400, QUOTE_MSG);
   const id = String(form.get("id") || "").slice(0, 40);
   const t = String(form.get("t") || "").slice(0, 64);
   const notes = String(form.get("notes") || "").replace(/\s+/g, " ").trim().slice(0, 1000);
+  const pick = (name, allowed) => { const v = String(form.get(name) || ""); return allowed.includes(v) ? v : ""; };
+  const offer = pick("offer", ["account_audit", "starting_plan", "details"]);
+  const budget = pick("budget", ["not sure", "under 1000", "1000-2000", "2000-4000", "4000+"]);
+  const running_ads = pick("running_ads", ["yes", "no", "not sure"]);
   if (!id || !t || !env.HUB_URL || !env.HUB_KEY) return buttonReply(request, false, 400, QUOTE_MSG);
-  const out = await toHub(env, { type: "quote", id, t, notes });
+  const out = await toHub(env, { type: "quote", id, t, notes, offer, budget, running_ads });
   return buttonReply(request, out.ok, out.ok ? 200 : 502, QUOTE_MSG);
 }
 
@@ -158,7 +201,7 @@ async function approve(request, env) {
 }
 
 const QUOTE_MSG = {
-  ok: "<h1>Got it</h1><p>The fixed price and what's included will be in your inbox by end of day tomorrow.</p>",
+  ok: "<h1>Got it</h1><p>You'll hear back by the end of the next business day.</p>",
   fail: "<h1>That didn't go through</h1><p>Reply to the email with \"yes\" and we'll take it from there.</p>",
 };
 const APPROVE_MSG = {
@@ -241,14 +284,23 @@ main{max-width:34rem;margin:0 auto;padding:72px max(16px,env(safe-area-inset-lef
 
 // Fills in values that live in Cloudflare settings, so changing the booking link or adding the
 // spam check never needs a code change.
-function fillPageValues(res, env) {
+function fillPageValues(res, env, pricing) {
   const type = res.headers.get("content-type") || "";
   if (!type.includes("text/html")) return res;
 
   const booking = (env.BOOKING_URL || "").trim();
   const siteKey = (env.TURNSTILE_SITE_KEY || "").trim();
+  const rows = pricing ? pricing.rows.map((r) => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td></tr>`).join("") : "";
 
   return new HTMLRewriter()
+    .on("[data-price]", {
+      element(el) {
+        if (!pricing) return;
+        const key = el.getAttribute("data-price");
+        if (key === "rows") el.setInnerContent(rows, { html: true });
+        else if (typeof pricing[key] === "string") el.setInnerContent(pricing[key]);
+      },
+    })
     .on("a[data-booking]", {
       element(el) {
         if (booking) {
