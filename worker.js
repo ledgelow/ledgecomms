@@ -21,7 +21,7 @@ export default {
 
     if (path.startsWith("/api/")) return handleApi(request, env, path);
 
-    const page = path.match(/^\/(audit|proposal)\/([^/]+)$/);
+    const page = path.match(/^\/(audit|proposal|report)\/([^/]+)$/);
     if (page && page[2] !== "sample" && request.method === "GET") {
       const res = await hubPage(env, page[1], page[2]);
       if (res) return fillPageValues(res, env);
@@ -253,8 +253,8 @@ async function unsubscribePost(request, env) {
 /* ───────────── /audit/<slug> and /proposal/<slug> ───────────── */
 
 // Each shop's audit and fixed-price pages live in the hub, which renders the HTML.
-// /audit/sample and /proposal/sample are static files and never reach here.
-const PAGE_CACHE = { audit: "public, max-age=300", proposal: "no-store" };
+// /audit/sample, /proposal/sample, and /report/sample are static files and never reach here.
+const PAGE_CACHE = { audit: "public, max-age=300", proposal: "no-store", report: "no-store" };
 
 async function hubPage(env, page, slug) {
   if (!/^[a-z0-9-]{4,80}$/.test(slug)) return null; // not a real slug: fall through to static files

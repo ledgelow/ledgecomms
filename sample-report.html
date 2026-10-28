@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Google Ads account audit: Example Plumbing &amp; Drains (sample)</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,900&family=Inter+Tight:wght@700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Ledge theme: the one place colour and type are set, shared by the site, audit pages, and proposal pages.
+   Current picks: round 3 Amber 2 (royal blue and orange, a quiet vintage Oilers nod), on warm paper with deep navy
+   header and bands; type C (Inter Tight + Inter). Light only: no automatic dark version.
+   --accent is the orange used for buttons; --deep is royal blue for kickers and links; --spruce is the dark bands. */
+:root {
+  --snow: #F8F6F2;
+  --surface: #EFEAE2;
+  --ink: #0F1A2E;
+  --muted: #4D5870;
+  --rule: #E0D9CE;
+  --sky: #2A4FA0;
+  --deep: #2A4FA0;
+  --deep-ink: #FFFFFF;
+  --accent: #F08A24;
+  --accent-ink: #0F1A2E;
+  --accent-text: #A04F0A;
+  --ice: #DDE4F2;
+  --spruce: #0C1630;
+  --head-bg: #0C1630;
+  --head-ink: #FFFFFF;
+  --head-muted: #B9C3D8;
+  --on-dark: #FFFFFF;
+  --on-dark-muted: #B9C3D8;
+  --scrim: rgb(12 22 48 / 0.62);
+  --bad: #B23A26;
+  --good: #2D7A4F;
+  --leak: #A84B0C;
+  --unknown: #5F6B75;
+  --display: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
+  --display-weight: 800;
+  --display-track: -0.02em;
+  --h3-weight: 700;
+  --body-size: 17px;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mark: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+/* Shared layout for audit and proposal pages. Colour and type come from theme.css. */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--snow); color: var(--ink); font: var(--body-size)/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-underline-offset: 3px; }
+h1, h2, h3 { font-family: var(--display); font-weight: var(--display-weight); margin: 0; line-height: 1.08; text-wrap: balance; letter-spacing: calc(var(--display-track) * 0.8); }
+h3 { font-weight: var(--h3-weight); letter-spacing: -0.01em; }
+p { margin: 0; }
+:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; border-radius: 2px; }
+.wrap { max-width: 820px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 18px; }
+.wm { display: inline-grid; text-decoration: none; line-height: 1; color: var(--ink); }
+.wm-top { font-family: var(--mark); font-weight: 900; font-stretch: 125%; font-size: 1.45rem; letter-spacing: 0.03em; }
+.wm-sub { font-family: var(--body); font-weight: 600; font-size: 0.52rem; letter-spacing: 0.37em; margin-top: 0.35em; color: var(--muted); }
+.doc-label { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.strip { height: clamp(120px, 22vw, 200px); background: var(--spruce) center 62% / cover no-repeat; border-radius: 6px; }
+.hero { display: grid; gap: 12px; padding-block: 32px 12px; }
+.label { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-size: clamp(2.2rem, 6.4vw, 3.2rem); }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.9rem; color: var(--muted); }
+.lede { font-size: 1.12rem; max-width: 40rem; margin-top: 4px; }
+section { padding-block: 26px; }
+h2 { font-size: 1.7rem; margin-bottom: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; font: 600 1.02rem/1.2 var(--body); text-decoration: none; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px; padding: 0.85em 1.3em; cursor: pointer; }
+.btn[disabled] { opacity: 0.6; cursor: progress; }
+.fine { font-size: 0.86rem; color: var(--muted); }
+.foot { padding-block: 24px 40px; border-top: 1px solid var(--rule); font-size: 0.86rem; color: var(--muted); display: grid; gap: 6px; }
+
+/* Layout: the paid account audit, read on a phone. The numbers first, then the searches that cost money and brought
+   nothing, seven checks, the campaigns, what to change (each with who'd do it), the first month, and the plan link. */
+.strip { background-image: url("/assets/sunset-1200.jpg"); background-position: 50% 62%; }
+
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tile:first-child { grid-column: 1 / -1; } }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tile-label { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tile-value { font-family: var(--display); font-weight: var(--display-weight); font-size: 1.6rem; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile-note { font-size: 0.84rem; color: var(--muted); }
+.fine.under { margin-top: 10px; }
+
+.intro { color: var(--muted); max-width: 40rem; margin-bottom: 14px; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.data { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.95rem; }
+.data th, .data td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+.data thead th { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--ink); white-space: nowrap; }
+.data td + td, .data th + th { text-align: right; white-space: nowrap; }
+.data td:first-child { overflow-wrap: anywhere; min-width: 9rem; }
+.data small { display: block; color: var(--muted); font-size: 0.82rem; }
+.data th, .data td { padding-inline: 8px; }
+@media (max-width: 560px) { .campaigns .clicks, .campaigns .conv { display: none; } .data td:first-child { min-width: 6.5rem; } .data { font-size: 0.9rem; } .data thead th { letter-spacing: 0.03em; } }
+
+.checks { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
+.checks li { display: grid; grid-template-columns: minmax(0, 11rem) auto minmax(0, 1fr); gap: 6px 16px; align-items: baseline; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+.checks b { font-weight: 600; }
+.pill { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 99px; padding: 1px 9px; white-space: nowrap; justify-self: start; }
+.pill.good { color: var(--good); } .pill.gap { color: var(--leak); } .pill.unknown { color: var(--unknown); }
+.checks .note { color: var(--muted); font-size: 0.97rem; line-height: 1.5; min-width: 0; }
+@media (max-width: 640px) { .checks li { grid-template-columns: minmax(0, 1fr) auto; } .checks .note { grid-column: 1 / -1; } }
+
+.moves { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: move; }
+.moves li { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 18px 20px; display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 4px 12px; counter-increment: move; }
+.moves li::before { content: counter(move); font-family: var(--display); font-weight: var(--display-weight); font-size: 1.6rem; line-height: 1; color: var(--accent-text); grid-row: span 3; }
+.moves h3 { font-family: var(--body); font-weight: 600; font-size: 1.08rem; line-height: 1.35; }
+.moves p { color: var(--muted); font-size: 0.97rem; }
+.moves .offer { justify-self: start; margin-top: 4px; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--deep); display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.moves .offer.free { color: var(--good); }
+.moves .when { color: var(--muted); font-weight: 600; }
+
+.month { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; max-width: 40rem; }
+
+.ask { background: var(--spruce); color: var(--on-dark); border-radius: 8px; padding: clamp(22px, 4vw, 34px); display: grid; gap: 14px; margin-block: 18px; justify-items: start; }
+.ask h2 { margin: 0; }
+.ask p { max-width: 36rem; }
+.ask .btn { background: var(--accent); color: var(--accent-ink); }
+.method { max-width: 40rem; }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="wm" href="/" aria-label="Ledge Communications"><span class="wm-top" aria-hidden="true">LEDGE</span><span class="wm-sub" aria-hidden="true">COMMUNICATIONS</span></a>
+  <span class="doc-label">Account audit</span>
+</header>
+<main class="wrap">
+  <div class="strip" role="img" aria-label="Calgary skyline at sunset"></div>
+  <div class="hero">
+    <p class="label">Google Ads account audit for</p>
+    <h1>Example Plumbing &amp; Drains (sample)</h1>
+    <p class="meta"><span>Jul 29, 2026 to Oct 26, 2026</span><span>Prepared Oct 27, 2026</span></p>
+    <p class="lede">Over 90 days your account spent about $8,351 and counted 109 conversions, but 64 of those were visits to your contact page. The biggest opportunity is counting the calls and forms that are real jobs, then moving money from searches that bring nothing to &quot;plumber calgary&quot;, where your budget runs out most days.</p>
+  </div>
+
+  <section aria-labelledby="numbers-title">
+    <h2 id="numbers-title">The numbers</h2>
+    <div class="tiles">
+      <div class="tile"><span class="tile-label">Spent</span><span class="tile-value">$8,351</span><span class="tile-note">90 days</span></div>
+      <div class="tile"><span class="tile-label">Clicks</span><span class="tile-value">2,332</span></div>
+      <div class="tile"><span class="tile-label">Conversions</span><span class="tile-value">109</span><span class="tile-note">as the account counts them</span></div>
+      <div class="tile"><span class="tile-label">Each conversion cost</span><span class="tile-value">$76.62</span></div>
+      <div class="tile"><span class="tile-label">Last 30 days</span><span class="tile-value">$2,890</span><span class="tile-note">spent</span></div>
+    </div>
+    <p class="fine under">A conversion is whatever your account counts as one (a call, a form, a page view). The tracking check below says what yours counts. </p>
+  </section>
+
+  <section aria-labelledby="wasted-title" >
+    <h2 id="wasted-title">Searches you paid for with no conversions</h2>
+    <p class="intro">$757, or 15% of what the listed searches cost, went to searches with no conversions in these 90 days. Some are worth keeping and some aren't; the checks below say which. The biggest ones:</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col">What they searched</th><th scope="col">Cost</th><th scope="col">Clicks</th></tr></thead>
+        <tbody>
+          <tr><td>plumbing company calgary</td><td>$150</td><td>44</td></tr>
+          <tr><td>plumber salary calgary</td><td>$86.40</td><td>29</td></tr>
+          <tr><td>plumber edmonton</td><td>$77.90</td><td>31</td></tr>
+          <tr><td>plumbing apprenticeship alberta</td><td>$64.10</td><td>22</td></tr>
+          <tr><td>how to unclog a drain</td><td>$58.75</td><td>41</td></tr>
+          <tr><td>hot tub repair calgary</td><td>$52.30</td><td>17</td></tr>
+          <tr><td>home depot plumbing supplies</td><td>$41.20</td><td>23</td></tr>
+          <tr><td>plumbing parts near me</td><td>$38.60</td><td>19</td></tr>
+          <tr><td>drain snake rental</td><td>$36.90</td><td>21</td></tr>
+          <tr><td>plumber jobs</td><td>$33.15</td><td>14</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="checks-title">
+    <h2 id="checks-title">What we checked</h2>
+    <ol class="checks">
+      <li><b>Budget and bidding</b><span class="pill gap">Needs work</span><span class="note">Search - Plumbing runs out of its $45 a day budget often enough to miss about 41% of the searches it could show on. It&#39;s set to get as many conversions as possible, but most of what it counts are page visits, so it&#39;s partly aiming for the wrong thing.</span></li>
+      <li><b>Searches you pay for</b><span class="pill gap">Needs work</span><span class="note">About $757 went to searches with nothing the account counts, including &quot;plumber salary calgary&quot; ($86), &quot;plumber edmonton&quot; ($78), and &quot;how to unclog a drain&quot; ($59). There are only 6 negative keywords, and 75% of keyword spend is on broad match, which lets Google match loosely.</span></li>
+      <li><b>Call and form tracking</b><span class="pill gap">Needs work</span><span class="note">Calls from your ads are counted, 45 in 90 days, and 11 of 58 calls were missed. Form fills are tracked but not counted: 38 came in, and Google doesn&#39;t see them when it decides what to bid. Visits to your contact page are counted as conversions, which makes the numbers look better than they are.</span></li>
+      <li><b>Location and schedule</b><span class="pill gap">Needs work</span><span class="note">Search - Plumbing and Performance Max show ads to people outside your area who search about it, and about $425 went to Edmonton, Red Deer, and Vancouver with no conversions. Ads run around the clock: 9 pm to 6 am cost $1,119 for 4 conversions, which may be worth it if you take night calls.</span></li>
+      <li><b>Ads and extras</b><span class="pill gap">Needs work</span><span class="note">4 of your 6 ads are rated poor or average by Google. You have sitelinks and a call button on the ads, but no callouts and no location, which shows your address and distance from the searcher.</span></li>
+      <li><b>Where clicks land</b><span class="pill gap">Needs work</span><span class="note">1,650 clicks went to your home page, which scores 3 out of 10 for speed, and 29% of those clicks weren&#39;t on a mobile-friendly page. Your drain cleaning page does better, at 6 out of 10 and fully mobile-friendly.</span></li>
+      <li><b>Google Guaranteed and the map</b><span class="pill gap">Needs work</span><span class="note">When we searched, three shops sat in the Google Guaranteed box at the top of &quot;plumber calgary&quot; and two on &quot;drain cleaning near me&quot;. You&#39;re in neither. You&#39;re second on the map for &quot;drain cleaning near me&quot; but #11 in Google Maps for &quot;plumber calgary&quot;.</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="campaigns-title" >
+    <h2 id="campaigns-title">Your campaigns</h2>
+    <div class="table-wrap">
+      <table class="data campaigns">
+        <thead><tr><th scope="col">Campaign</th><th scope="col">Cost</th><th scope="col" class="clicks">Clicks</th><th scope="col" class="conv">Conv.</th><th scope="col">Per conv.</th><th scope="col">Missed</th></tr></thead>
+        <tbody>
+          <tr><td>Search - Plumbing</td><td>$4,620</td><td class="clicks">1,210</td><td class="conv">61</td><td>$75.74</td><td>41%</td></tr>
+          <tr><td>Search - Drains</td><td>$2,180</td><td class="clicks">640</td><td class="conv">27</td><td>$80.74</td><td>18%</td></tr>
+          <tr><td>Performance Max</td><td>$1,241</td><td class="clicks">410</td><td class="conv">19</td><td>$65.29</td><td></td></tr>
+          <tr><td>Water heaters<small>search, paused</small></td><td>$310</td><td class="clicks">72</td><td class="conv">2</td><td>$155</td><td>5%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine under">Missed: the share of searches a campaign could have shown on but didn't, because its daily budget ran out.</p>
+  </section>
+
+  <section aria-labelledby="moves-title">
+    <h2 id="moves-title">What I'd change, in order</h2>
+    <ol class="moves">
+      <li><h3>Count calls and form fills, not contact page visits</h3><p>64 of the 109 conversions are page visits, and 38 form fills aren&#39;t counted. Counting the real enquiries gives Google the right thing to aim for.</p><p class="offer management">Part of monthly management<span class="when">Week 1</span></p></li>
+      <li><h3>Block the searches that never turn into work</h3><p>About $757 went to searches like job hunting, do-it-yourself questions, and other cities. Adding them as negative keywords stops paying for them.</p><p class="offer management">Part of monthly management<span class="when">Week 1</span></p></li>
+      <li><h3>Show the ads only to people in your service area</h3><p>Switching both campaigns to people in your area, and turning off search partners, keeps the about $425 that went to Edmonton, Red Deer, and Vancouver.</p><p class="offer management">Part of monthly management<span class="when">Week 1</span></p></li>
+      <li><h3>Move the saved budget to Search - Plumbing</h3><p>It misses about 41% of the searches it could show on because the budget runs out, and it&#39;s where &quot;plumber calgary&quot; and &quot;emergency plumber calgary&quot; bring most of your calls.</p><p class="offer management">Part of monthly management<span class="when">First two weeks</span></p></li>
+      <li><h3>Put a tap-to-call button at the top of your home page</h3><p>Most clicks land on the home page, which loads slowly on phones. A call button near the top and a lighter page would turn more of those visits into calls.</p><p class="offer page_fixes">Page fixes add-on, $500. Or your web person can do it<span class="when">First two weeks</span></p></li>
+      <li><h3>Apply for Google Guaranteed</h3><p>Five spots on your two main searches go to shops in the Google Guaranteed box, above the ads. If you qualify, you pay for each enquiry rather than each click.</p><p class="offer management">Part of monthly management<span class="when">First month</span></p></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="month-title" >
+    <h2 id="month-title">If we ran it: the first month</h2>
+    <ul class="month">
+        <li>Week 1: fix what&#39;s counted as a conversion, add the negative keywords, and tighten locations and search partners.</li>
+        <li>Week 2: move budget to the searches that bring calls, and add callouts and your location to the ads.</li>
+        <li>Weeks 2 to 4: new ads for your main services, and the Google Guaranteed application if you&#39;d like it.</li>
+        <li>End of the month: a short report on calls, what they cost, and what changed.</li>
+    </ul>
+  </section>
+
+  <div class="ask" >
+    <h2>Want us to take it from here?</h2>
+    <p>You can make these changes yourself, or have us do them and keep improving the account month to month. The plan is priced on what you spend now, and the $500 for this audit comes off setup.</p>
+    <a class="btn" href="/pricing/">See the plan</a>
+  </div>
+
+  <section aria-labelledby="method-title">
+    <h2 id="method-title">How we did this</h2>
+    <p class="fine method">We read your Google Ads account through our manager account for the dates above, along with the public searches in your free audit. Nothing in your account was changed. You can remove our access at any time under Admin &gt; Access and security &gt; Managers.</p>
+  </section>
+</main>
+<footer class="wrap foot">
+  <p>Prepared by Logan, Ledge Communications, Alberta, Canada.</p>
+</footer>
+</body>
+</html>

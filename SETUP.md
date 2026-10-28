@@ -15,19 +15,29 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 28, evening): first Google Ads audits on the way
+## Where you are (Oct 28, late): the paid account audit runs itself
 
 The Google Ads version is live: site, pricing page, hub, DataForSEO, and the manager account (871-805-0188).
 **Find prospects now** ran for Airdrie and found 15 shops, and the 10 Calgary shops from Oct 27 are being redone.
 The hub runs searches for 6 shops an hour, then Claude writes the audits.
 
-**Ship this update (5 minutes)**
+New in this update: the $500 account audit, end to end. See "Account audits" below for how it flows.
+
+**Ship this update (15 minutes)**
 1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, **Deploy** > **Manage deployments** > edit > **New
-   version** > **Deploy**. On its next run the hub moves the old default prices on by itself: the new fee tiers
-   (`0:450, 1000:650, 2000:950, 4000:1450, 8000:20%`), `MIN_AD_BUDGET` 750, page fixes $500, and landing page $1,000.
-   Cells you changed yourself are left alone.
-2. **GitHub:** upload all 24 files from the new zip. The site then picks up price changes from the Settings tab within
-   about 10 minutes.
+   version** > **Deploy**. On its next run the hub adds two tabs, **Ads exports** and **Account reports**.
+2. **GitHub:** upload all 25 files from the new zip (one new: `sample-report.html`, the sample report the pricing page
+   and the free audits now link to).
+3. **The export script, in the manager account (once):**
+   1. In Google Ads, switch to the manager account (871-805-0188). **Tools** > **Bulk actions** > **Scripts** > the
+      blue **+** > **New script**.
+   2. Name it `Ledge account export`. Delete what's in the editor and paste all of `ledge-ads-export.js`.
+   3. Near the top, replace the two placeholders: `HUB_URL` is the hub's web app address (Script Properties >
+      `WEB_APP_URL`, it ends in `/exec`) and `HUB_KEY` is the `HUB_KEY` value from the same place. These go straight
+      into the script, never into chat.
+   4. Click **Authorize** and allow it. Then **Preview**: the log at the bottom should say `0 account(s) to export`.
+      Anything else, send me the log.
+   5. **Save** and **Close**. In the scripts list, set its **Frequency** to **Hourly**.
 
 **Prices from here on** are just the Settings tab: edit a cell and proposals use it right away; the site follows
 within about 10 minutes.
@@ -37,13 +47,24 @@ within about 10 minutes.
    **Looks right**, **Rebuild**, or **Skip** link. Approving sends nothing while `COLD_EMAIL_ON` is no.
 5. Send me anything that reads off. When they read right, `COLD_EMAIL_ON` = yes.
 
-**Google Ads manager account: done (871-805-0188).** Clients link to it. After an approval, the kickoff email asks
-for their 10-digit customer ID; your "Approved" email says what to send: a link request for an account audit or
-management, or a new account under the manager account for a starting plan.
+**Account audits ($500)**
+1. They approve the account audit. The kickoff email asks for their 10-digit Google Ads customer ID.
+2. They reply with it. The hub reads the ID from the reply (ignoring their phone number), tells them a link request is
+   coming, and sends you a "Send a link request" email with the one manual step: manager account > **Accounts** >
+   **+** > **Link existing account** > their ID > **Send request**. If the hub can't find an ID in the reply, it flags
+   the reply for you instead. For anyone who sends it some other way, use **Ledge** > **Run an account audit**.
+3. They accept the link. Within the hour the export script reads 90 days of their account (it only reads) and sends
+   it to the hub, which works out the numbers itself: spend, searches that brought nothing, what's counted as a
+   conversion, locations, budget limits, and the rest. Claude writes the report around those numbers.
+4. You get a "Check this account audit" email with the report link, the biggest finding, and the management price
+   it would lead to. **Looks right, send both** sends them the report and a management plan priced on what they
+   spend now, with the $500 off setup. **Write the report again** reruns Claude on the same data.
+5. If they approve the plan, the kickoff skips the access step (you're already linked). If a link isn't accepted
+   within three weeks, the hub stops asking and emails you.
 
 **Later**
-7. Next builds: the account audit report (a Google Ads script exports the account, Claude writes the report, including
-   page and conversion recommendations), a page per industry, and monthly reports for clients.
+7. Next builds: monthly reports for clients (the same export script, a short report each month), and a page per
+   industry.
 8. Optional: move the domain registration to Cloudflare Registrar before Mar 31, 2027. FreshBooks automation later.
 
 **Add-ons.** Audits can tag one move as a page fix or a landing page, with its price. Proposals then show it as an
@@ -52,7 +73,8 @@ The pricing section on the site lists both. Prices live on the Settings tab like
 
 **New on the Ledge menu**
 - **Check one shop**: runs the audit searches on any website and shows the results. Nothing is saved to Leads.
-- **Make a management proposal**: after an account audit (or for anyone already running ads). Asks for their email and
+- **Run an account audit**: starts one by hand from an email address and customer ID (adds the lead if it's new).
+- **Make a management proposal**: for anyone already running ads, outside the account audit flow. Asks for their email and
   monthly ad budget, then the proposal goes through the usual review and send. An approved account audit inside the
   credit window comes off setup automatically.
 
@@ -291,5 +313,6 @@ online payments in FreshBooks so the client can pay by card straight from the in
 | Daily, 5 pm | One email to you, only if there are replies it couldn't sort |
 | Monday 5 am | New shops from Google Maps for the next area in `AREAS` |
 | Monday 7 am | Weekly digest to you |
+| Every hour (Google Ads) | The export script in the manager account reads any newly linked accounts and sends the data to the hub |
 
 Emails to shops only go out on weekdays during working hours, Mountain time.

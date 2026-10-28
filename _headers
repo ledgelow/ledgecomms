@@ -2,5 +2,7 @@
   X-Robots-Tag: noindex, nofollow
 /proposal/*
   X-Robots-Tag: noindex, nofollow
+/report/*
+  X-Robots-Tag: noindex, nofollow
 /assets/*
   Cache-Control: public, max-age=604800

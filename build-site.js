@@ -14,6 +14,7 @@ const FILES = {
   "pricing.html": "pricing/index.html",
   "sample-audit.html": "audit/sample/index.html",
   "sample-proposal.html": "proposal/sample/index.html",
+  "sample-report.html": "report/sample/index.html",
   "favicon.svg": "favicon.svg",
   "robots.txt": "robots.txt",
   "_headers": "_headers",
@@ -33,7 +34,7 @@ for (const [from, to] of Object.entries(FILES)) {
 fs.mkdirSync(path.join(out, "assets"), { recursive: true });
 const photos = fs.readdirSync(root).filter((f) => f.toLowerCase().endsWith(".jpg"));
 for (const f of photos) fs.copyFileSync(path.join(root, f), path.join(out, "assets", f));
-for (const page of ["index.html", "pricing.html", "sample-audit.html", "sample-proposal.html"]) {
+for (const page of ["index.html", "pricing.html", "sample-audit.html", "sample-proposal.html", "sample-report.html"]) {
   if (!fs.existsSync(path.join(root, page))) continue;
   const used = fs.readFileSync(path.join(root, page), "utf8").match(/assets\/[\w.-]+\.jpg/g) || [];
   for (const u of used) {
