@@ -29,6 +29,11 @@ review), the manager account (871-805-0188), and the export script (authorized t
    `0 account(s) to export`.
 3. **GitHub:** upload `Code.gs`, `Templates.gs`, and `SETUP.md` (nothing else changed).
 
+**Google Verified (Oct 28, late night):** Google retired "Google Guaranteed" (and "Google Screened") in late 2025 for
+one "Google Verified" badge on Local Services Ads, and ended the money-back guarantee. The site, audits, reports,
+proposals, and prompts now say Local Services Ads, with Google Verified only for the badge, and never promise a
+guarantee. Audits built before this update still say Google Guaranteed: Rebuild any that haven't gone out.
+
 **Monthly reports and billing**
 - **Clients tab.** Every approved management plan or starting plan adds a row. It's yours to edit: `status` (active,
   paused, or ended), `monthly_fee`, `bill_from` (the first month to invoice, as 2026-12), and `notes_for_report` (what you

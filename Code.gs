@@ -9,7 +9,7 @@
  *                                          "find shops" job when search data isn't set up)
  *   Every hour ────────> runHourly:
  *       evidence:   for each queued audit, the searches a customer would run on a phone in the
- *                   shop's town (ads, Google Guaranteed, map, and websites), the shop's ads history
+ *                   shop's town (Local Services Ads, search ads, map, and websites), the shop's ads history
  *                   from Google's Ads Transparency Center, and a scan of its home page
  *       engine:     queued jobs go to the Claude API as one batch; finished batches become
  *                   Local Search Audits (and, for find jobs, new cold leads with their own audit jobs)
@@ -112,7 +112,7 @@ var SETTINGS_DEFAULTS = [
 // Legacy (Lead Handling Audit) rows, still used to show audits built before the switch.
 var STAGE_NAMES = ['Lead comes in', 'First response', 'Visit booked', 'Quote sent', 'Job done and paid', 'Customer comes back'];
 // Local Search Audit: the six checks, always in this order.
-var CHECK_NAMES = ['Map results', 'Google Guaranteed', 'Search ads', 'Reviews', 'Call and form tracking', 'Where clicks land'];
+var CHECK_NAMES = ['Map results', 'Local Services Ads', 'Search ads', 'Reviews', 'Call and form tracking', 'Where clicks land'];
 var PILL = { good: 'Looks good', gap: 'Needs work', leak: 'Needs work', unknown: 'Couldn\'t check' };
 var OFFERS = {
   free: 'Quick win, included in any Ledge plan',
@@ -886,7 +886,7 @@ function checkCalendar_() {
 /*
  * Before an audit is written, the hub runs the searches a customer would run on a phone in the shop's town,
  * through DataForSEO (pay as you go, about 1 to 2 cents a shop):
- *   - two Google searches, mobile: Google Guaranteed (Local Services Ads), sponsored results, the map pack, websites
+ *   - two Google searches, mobile: Local Services Ads (Google Verified), sponsored results, the map pack, websites
  *   - the same two searches in Google Maps, to find the shop's map position past the top 3
  *   - Google's monthly search estimate for both
  *   - the shop's ads in Google's Ads Transparency Center over the last 30 days (this sets the segment)
@@ -1485,7 +1485,7 @@ function evidenceText_(ev) {
       (q.volume != null ? '. Google estimates about ' + q.volume + ' searches a month for this in ' + (q.volume_where || q.where) : '') +
       (q.bid_low_usd != null ? ', with top-of-page bids around US$' + Number(q.bid_low_usd).toFixed(2) + ' to US$' + Number(q.bid_high_usd || q.bid_low_usd).toFixed(2) + ' a click' : '') + '.');
     if (!q.ran) { L.push('  This search did not run.'); return; }
-    L.push('  Google Guaranteed: ' + list(q.lsa));
+    L.push('  Local Services Ads (Google Verified badge): ' + list(q.lsa));
     L.push('  Sponsored: ' + list(q.ads));
     L.push('  Map pack: ' + list(q.map_pack));
     L.push('  Google Maps: ' + (q.you.maps ? 'this shop is #' + q.you.maps + ' of ' + q.maps_total : 'this shop is not in the first ' + q.maps_total) +
@@ -2137,7 +2137,7 @@ function sendMonthlyInvoices_() {
  *      with the $500 coming off setup.
  */
 var REPORT_SECTIONS = ['Budget and bidding', 'Searches you pay for', 'Call and form tracking', 'Location and schedule', 'Ads and extras',
-  'Where clicks land', 'Google Guaranteed and the map'];
+  'Where clicks land', 'Local Services Ads and the map'];
 var REPORT_OFFERS = ['management', 'page_fixes', 'landing_page', 'site_support', 'free'];
 
 // Their customer ID from a reply: a 10-digit number that isn't their phone number, preferring one on a line about the account.
@@ -2545,7 +2545,7 @@ function freeAuditText_(aspec) {
   var L = ['', 'FROM THE FREE AUDIT (public searches, ' + (aspec.checked || aspec.date || '') + '):'];
   (aspec.searches || []).forEach(function (s) {
     var y = s.you || {};
-    L.push('"' + s.keyword + '": Google Guaranteed ' + (y.lsa ? '#' + y.lsa : (s.lsa || []).length ? 'not in it' : 'none shown') +
+    L.push('"' + s.keyword + '": Local Services Ads ' + (y.lsa ? '#' + y.lsa : (s.lsa || []).length ? 'not in it' : 'none shown') +
       ', ads ' + (y.ads ? '#' + y.ads : 'not shown') + ', map ' + (y.map_pack ? '#' + y.map_pack : y.maps ? '#' + y.maps + ' in Maps' : 'not in the top results') + '.');
   });
   aspec.checks.forEach(function (c, i) { L.push(CHECK_NAMES[i] + ': ' + c.note); });
@@ -2853,7 +2853,7 @@ function searchCard_(s) {
       (more > 0 ? '<span class="more">and ' + more + ' more</span>' : '') : '<span class="none">' + empty + '</span>') + '</dd></div>';
   };
   var hits = [], miss = [];
-  if (y.lsa) hits.push('#' + y.lsa + ' in Google Guaranteed'); else if ((s.lsa || []).length) miss.push('Google Guaranteed');
+  if (y.lsa) hits.push('#' + y.lsa + ' in Local Services Ads'); else if ((s.lsa || []).length) miss.push('Local Services Ads');
   if (y.ads) hits.push('#' + y.ads + ' in the ads'); else miss.push('the ads');
   if (y.map_pack) hits.push('#' + y.map_pack + ' on the map');
   else if (y.maps) hits.push('#' + y.maps + ' in Google Maps');
@@ -2865,7 +2865,7 @@ function searchCard_(s) {
   return '    <li class="search">\n' +
     '      <p class="q"><span class="q-text">“' + esc_(s.keyword) + '”</span><span class="q-meta">' + meta.replace(/^On a phone in [^<]*/, function (t) { return esc_(t); }) + '</span></p>\n' +
     '      <dl class="serp">\n' +
-    slot('Google Guaranteed', s.lsa, 'None on this search') + '\n' +
+    slot('Local Services Ads', s.lsa, 'None on this search') + '\n' +
     slot('Sponsored', s.ads, 'No ads on this search') + '\n' +
     slot('Map', s.map_pack, 'No map on this search') + '\n' +
     slot('Websites', s.organic, 'None') + '\n' +
@@ -2904,7 +2904,7 @@ var OFFER_COPY = {
       ['Why your ads miss some searches', 'Budget, bids, schedule, and locations, checked against the searches in your free audit.'],
       ['Call and form tracking', 'Whether calls and forms from your ads are counted, so Google can aim for more of them.'],
       ['Where clicks land', 'The pages your ads send people to, as a phone sees them.'],
-      ['Google Guaranteed', 'Whether your business qualifies, and how it would sit next to your ads.']
+      ['Local Services Ads', 'Whether your business qualifies for the Google Verified listings at the top, and how they\'d sit next to your search ads.']
     ],
     included: ['A written report in plain words, with what to change first', 'A 30-minute call to walk through it', '{credit_line}'],
     excluded: ['Changes to the account. We only look, and nothing changes without your OK', 'Website changes', 'Your ad spend, which you keep paying Google directly'],
@@ -2921,12 +2921,12 @@ var OFFER_COPY = {
       ['A Google Ads account in your name', 'You own it and pay Google directly. We work in it as your manager, and you can remove us at any time.'],
       ['Search ads for {keyword} and related searches', 'Aimed at the people most likely to call: the right services, the right areas around {town}, and the hours you can answer.'],
       ['Call and form tracking', 'So you and Google both see which searches bring calls.'],
-      ['Google Guaranteed', 'If your business qualifies, we take you through Google\'s application and screening.'],
+      ['Local Services Ads', 'If your business qualifies, we take you through Google\'s screening and verification for the Google Verified listings at the top.'],
       ['Your Google Business Profile', 'Categories, services, and hours checked, so the map and the ads tell the same story.']
     ],
     included: ['Everything set up and tested before anything goes live', 'Weekly checks in the first month', 'A short report each month: calls, what they cost, and what we changed',
       'Month to month once it\'s live. No contract.'],
-    excluded: ['Your ad budget, paid to Google directly', 'Google Guaranteed leads, also paid to Google directly', 'Website rebuilds. We\'ll tell you if a page needs work'],
+    excluded: ['Your ad budget, paid to Google directly', 'Local Services Ads leads, also paid to Google directly', 'Website rebuilds. We\'ll tell you if a page needs work'],
     timing: ['Ads usually go live two to three weeks after your go-ahead.', 'You add a card to the Google Ads account in your name. We\'ll walk you through it.',
       'You answer a few questions by email: your main services, the areas you cover, your hours, and who answers the phone.'],
     kickoff: '1. {payment_step}\n2. I\'ll set up your Google Ads account through our manager account ({manager_id}) and invite you as its admin, so it\'s yours. ' +
@@ -2940,7 +2940,7 @@ var OFFER_COPY = {
       ['Clean up the account', 'Stop paying for searches that don\'t bring work, and tighten locations, hours, and budgets.'],
       ['Call and form tracking', 'Count every call and form from your ads, so Google can aim for more of them.'],
       ['Ads and pages', 'Ads written for your main services, sending people to a page that makes it easy to call.'],
-      ['Google Guaranteed', 'If your business qualifies and isn\'t in it yet, we take you through Google\'s application.'],
+      ['Local Services Ads', 'If your business qualifies and isn\'t running them yet, we take you through Google\'s screening and verification.'],
       ['A monthly report', 'Calls, what they cost, and what we changed, in plain words.']
     ],
     included: ['The cleanup and tracking in the first two weeks', 'Ongoing changes as the season and your schedule change', 'A short report each month',
