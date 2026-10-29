@@ -44,17 +44,18 @@ var HEAD = {
     'booked_at', 'notes', 'owner_says', 'segment', 'budget', 'ads_customer_id', 'report_slug'],
   audits: ['slug', 'lead_id', 'created', 'business', 'spec_json'],
   // price_sprint is the one-time amount and price_care the monthly fee, whatever the offer.
-  proposals: ['slug', 'lead_id', 'created', 'price_sprint', 'price_care', 'gst', 'status', 'sent_at', 'approved_at', 'kind', 'ad_spend', 'credit', 'addons'],
+  proposals: ['slug', 'lead_id', 'created', 'price_sprint', 'price_care', 'gst', 'status', 'sent_at', 'approved_at', 'kind', 'ad_spend', 'credit', 'addons',
+    'invoice_id', 'invoice_number', 'paid_at'],
   jobs: ['job_id', 'kind', 'lead_id', 'area', 'status', 'batch_id', 'attempts', 'created', 'updated', 'est_cost_usd', 'detail'],
   events: ['timestamp', 'lead_id', 'email', 'event', 'detail'],
   dnc: ['email_or_domain', 'added', 'reason'],
   evidence: ['lead_id', 'created', 'segment', 'town', 'cost_usd', 'evidence_json'],
-  volumes: ['keyword', 'location', 'volume', 'bid_low_usd', 'bid_high_usd', 'fetched'],
+  volumes: ['keyword', 'location', 'volume', 'bid_low_usd', 'bid_high_usd', 'fetched', 'detail'],
   // One row per account audit export. The data itself is split across d1 to d8 (a cell holds 50,000 characters).
-  exports: ['id', 'lead_id', 'customer_id', 'requested', 'status', 'updated', 'detail', 'report_slug', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8'],
+  exports: ['id', 'lead_id', 'customer_id', 'requested', 'status', 'updated', 'detail', 'report_slug', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'site', 'site_json'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '6';
+var SCHEMA_VERSION = '7';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -92,7 +93,14 @@ var SETTINGS_DEFAULTS = [
   ['SETUP_MONTHS', '1', 'Setup fee, as months of the monthly fee (1 = setup costs the same as one month).'],
   ['ADS_MANAGER_ID', '871-805-0188', 'Ledge\'s Google Ads manager account. Clients link their accounts to it; the kickoff emails tell them how.'],
   ['PRICE_PAGE_FIXES', '500', 'Add-on: page fixes on their current site (tap-to-call near the top, a shorter form, a booking button, call tracking). CAD before GST, one time.'],
-  ['PRICE_LANDING_PAGE', '1000', 'Add-on: a landing page built for their ads. CAD before GST, one time.']
+  ['PRICE_LANDING_PAGE', '1000', 'Add-on: a landing page built for their ads. CAD before GST, one time.'],
+  ['PRICE_FULL_AUDIT', '1000', 'Account and site audit together, CAD before GST. Offered when a free audit finds things to fix in both the ads and the website. The site part costs this minus PRICE_ACCOUNT_AUDIT.'],
+  ['INVOICE_DUE_DAYS', '7', 'Once FreshBooks is connected: days until an invoice is due.'],
+  ['PRICE_SITE_SUPPORT', '100', 'Site support, CAD per hour before GST: changes and fixes on their website beyond the page fixes add-on.'],
+  ['VALUE_CLICK_RATE', '6', 'For the dollar estimate in audits: percent of searches that click an ad. Used for kinds of business without their own benchmark (most trades have one in the code).'],
+  ['VALUE_LEAD_RATE', '7', 'For the dollar estimate: percent of ad clicks that call or send a form. Used for kinds of business without their own benchmark.'],
+  ['VALUE_CPC', '12', 'For the dollar estimate: typical cost per click in CAD, for kinds of business without their own benchmark.'],
+  ['VALUE_BOOK_RATE', '35', 'For the dollar estimate: percent of calls and forms that turn into booked jobs (trade surveys put it around 25 to 45). Change it to your own number once you know it.']
 ];
 // Legacy (Lead Handling Audit) rows, still used to show audits built before the switch.
 var STAGE_NAMES = ['Lead comes in', 'First response', 'Visit booked', 'Quote sent', 'Job done and paid', 'Customer comes back'];
@@ -100,21 +108,36 @@ var STAGE_NAMES = ['Lead comes in', 'First response', 'Visit booked', 'Quote sen
 var CHECK_NAMES = ['Map results', 'Google Guaranteed', 'Search ads', 'Reviews', 'Call and form tracking', 'Where clicks land'];
 var PILL = { good: 'Looks good', gap: 'Needs work', leak: 'Needs work', unknown: 'Couldn\'t check' };
 var OFFERS = {
-  free: 'You can do this yourself',
+  free: 'Quick win, included in any Ledge plan',
   paid_audit: 'Part of the account audit',
   setup: 'Part of the starting plan',
   management: 'Part of monthly management',
   page_fixes: 'Page fixes add-on',
-  landing_page: 'Landing page add-on'
+  landing_page: 'Landing page add-on',
+  site_support: 'Site support'
 };
 // One-time add-ons a proposal can carry. The audit suggests them; the owner ticks them when approving.
 var ADDONS = {
   page_fixes: { setting: 'PRICE_PAGE_FIXES', item: 'Page fixes on your website',
     blurb: 'A tap-to-call button near the top, a shorter form, a booking button if you use one, and call tracking, so more clicks turn into calls.' },
   landing_page: { setting: 'PRICE_LANDING_PAGE', item: 'A landing page for your ads',
-    blurb: 'One page built around the searches you pay for, with your number, reviews, and service area up front.' }
+    blurb: 'One page built around the searches you pay for, with your number, reviews, and service area up front.' },
+  site_audit: { setting: 'PRICE_FULL_AUDIT', minus: 'PRICE_ACCOUNT_AUDIT', item: 'Site audit', only: 'account_audit',
+    blurb: 'Your website, checked the way a customer on a phone sees it: speed, tap-to-call, forms, booking, service pages, and tracking. ' +
+      'It comes in the same report, with each change priced, and we can make the changes or walk whoever runs your site through them.' }
 };
-function addonPrice_(key) { return Number(setting_(ADDONS[key].setting) || 0); }
+// Add-ons a proposal of this kind always offers, whatever the audit suggested.
+function standingAddons_(kind) { return Object.keys(ADDONS).filter(function (a) { return ADDONS[a].only === kind; }); }
+// Every add-on price, plus site support (hourly), for the pages.
+function addonPrices_() {
+  var out = { site_support: Number(setting_('PRICE_SITE_SUPPORT') || 0) };
+  Object.keys(ADDONS).forEach(function (k) { out[k] = addonPrice_(k); });
+  return out;
+}
+function addonPrice_(key) {
+  var a = ADDONS[key];
+  return Math.max(0, Number(setting_(a.setting) || 0) - (a.minus ? Number(setting_(a.minus) || 0) : 0));
+}
 // The add-ons an audit suggested, in order.
 function suggestedAddons_(aspec) {
   var out = [];
@@ -162,6 +185,8 @@ function onOpen() {
     .addItem('Check one shop', 'checkOneShop')
     .addItem('Make a management proposal', 'makeManagementProposal')
     .addItem('Run an account audit', 'runAccountAudit')
+    .addItem('Connect FreshBooks', 'connectFreshBooks')
+    .addItem('Send a test invoice to myself', 'testFreshBooksInvoice')
     .addItem('Send me the weekly digest now', 'sendDigest')
     .addItem('Check settings', 'showSettingsCheck')
     .addToUi();
@@ -263,7 +288,7 @@ function doPost(e) {
     try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) { body = {}; }
     if (body.key !== prop_('HUB_KEY')) return json_({ ok: false, error: 'forbidden' });
     if (body.type === 'inbound') return json_(handleInbound_(body.lead || {}));
-    if (body.type === 'quote') return json_(handleQuoteRequest_(body.id, body.t, body.notes, body.offer, body.budget, body.running_ads));
+    if (body.type === 'quote') return json_(handleQuoteRequest_(body.id, body.t, body.notes, body.offer, body.budget, body.running_ads, body.addons));
     if (body.type === 'approve') return json_(handleApprove_(body.id, body.t, body.addons));
     if (body.type === 'unsubscribe') return json_(handleUnsubscribe_(body.id, body.t));
     if (body.type === 'ads_queue') return json_(adsQueue_());
@@ -278,6 +303,7 @@ function doPost(e) {
 function doGet(e) {
   ensureSchema_();
   var p = (e && e.parameter) || {};
+  if (p.code && p.state) return freshbooksCallback_(p);
   if (p.page) {
     if (p.key !== prop_('HUB_KEY')) return text_('forbidden');
     if (p.page === 'pricing') return json_(pricingSummary_());
@@ -345,14 +371,15 @@ function ownerSays_(f) {
 
 var ASK_LABEL = { account_audit: 'the account audit', starting_plan: 'a starting plan', details: 'the details' };
 
-function handleQuoteRequest_(id, t, notes, offer, budget, runningAds) {
+function handleQuoteRequest_(id, t, notes, offer, budget, runningAds, addons) {
   if (!id || t !== token_(id)) return { ok: false, error: 'bad_token' };
   var lead = findLead_('id', id);
   if (!lead) return { ok: false, error: 'not_found' };
   notes = String(notes || '').trim().slice(0, 1000);
   budget = String(budget || '').trim().slice(0, 40);
   runningAds = String(runningAds || '').trim().slice(0, 20);
-  var asked = 'Asked for ' + (ASK_LABEL[offer] || 'a price') + (budget ? ', budget ' + budget : '') + (runningAds ? ', running Google Ads: ' + runningAds : '') + (notes ? ': ' + notes : '');
+  var wantSite = offer === 'account_audit' && /\bsite_audit\b/.test(String(addons || ''));
+  var asked = 'Asked for ' + (wantSite ? 'the account and site audit' : ASK_LABEL[offer] || 'a price') + (budget ? ', budget ' + budget : '') + (runningAds ? ', running Google Ads: ' + runningAds : '') + (notes ? ': ' + notes : '');
   var fields = { notes: appendNote_(lead.notes, asked) };
   if (budget) fields.budget = budget;
   if (/^yes/i.test(runningAds) && lead.segment !== 'running_ads') fields.segment = 'running_ads';
@@ -361,7 +388,7 @@ function handleQuoteRequest_(id, t, notes, offer, budget, runningAds) {
   if (lead.proposal_slug || ['quote_requested', 'awaiting_proposal_review', 'proposal_sent', 'won'].indexOf(lead.status) > -1) {
     return { ok: true, duplicate: true };
   }
-  queueProposal_(lead, 'audit page', offer);
+  queueProposal_(lead, 'audit page', offer, false, wantSite ? ['site_audit'] : []);
   safeSend_(findLead_('id', id), 'quote_ack');
   return { ok: true };
 }
@@ -384,12 +411,12 @@ function handleApprove_(id, t, addons) {
     'Contact: ' + (lead.name || lead.first_name) + ' <' + lead.email + '>' + (lead.phone ? ', ' + lead.phone : '') + '\n' +
     'Proposal: ' + siteUrl_() + '/proposal/' + lead.proposal_slug + '\n' +
     'Audit: ' + auditUrl_(lead) + '\n\n' +
-    'They were told: ' + paymentLine_() + ' Next from you: ' + (setting_('PAYMENT_URL') ? '' : 'the invoice, then ') +
+    'They were told: ' + paymentLine_() + ' Next from you: ' + (setting_('PAYMENT_URL') || fbConnected_() ? '' : 'the invoice, then ') +
     ({ account_audit: 'a link request from the manager account (' + (setting_('ADS_MANAGER_ID') || '') + ') once they reply with their customer ID.',
       starting_plan: 'their new account under the manager account (Accounts > + > Create new account), an admin invite to them, then your setup questions.',
       management: lead.ads_customer_id ? 'nothing for access, the account (' + lead.ads_customer_id + ') is already linked from the audit. Start the cleanup.'
         : 'a link request from the manager account (' + (setting_('ADS_MANAGER_ID') || '') + ') once they reply with their customer ID.' }[prop.kind] || 'the steps to add you as a user on their tools.') +
-    '\n\n' + invoiceBlock_(lead, prop) +
+    '\n\n' + (fbConnected_() ? 'FreshBooks sends the invoice within the hour (you\'ll get a copy of what went out):\n' : '') + invoiceBlock_(lead, prop) +
     (lead.notes ? '\n\nNotes: ' + lead.notes : ''));
   return { ok: true };
 }
@@ -415,9 +442,12 @@ function runHourly() {
     step_('checkCalendar', checkCalendar_);
     step_('pollBatches', pollBatches_);
     step_('gatherEvidence', gatherEvidence_);
+    step_('gatherSiteChecks', gatherSiteChecks_);
     step_('submitJobs', submitJobs_);
     step_('deliverAudits', deliverAudits_);
     step_('deliverProposals', deliverProposals_);
+    step_('sendInvoices', sendInvoices_);
+    step_('checkPayments', checkPayments_);
     step_('sendColdEmails', sendColdEmails_);
     step_('sendFollowUps', sendFollowUps_);
     step_('sendNeedsYou', sendNeedsYou_);
@@ -530,7 +560,7 @@ function proposalKind_(lead, offer) {
   return lead.segment === 'running_ads' ? 'account_audit' : 'starting_plan';
 }
 
-function queueProposal_(lead, via, offer, force) {
+function queueProposal_(lead, via, offer, force, wanted) {
   if (lead.proposal_slug && !force) return;
   var kind = proposalKind_(lead, offer);
   var slug = slugify_(lead.business || 'proposal') + '-' + rand_(6);
@@ -538,6 +568,8 @@ function queueProposal_(lead, via, offer, force) {
   if (kind === 'account_audit') {
     row.price_sprint = Number(setting_('PRICE_ACCOUNT_AUDIT') || 500);
     row.price_care = 0;
+    // What they picked on the audit page, ticked for them on the proposal (they can still untick it).
+    row.addons = (wanted || []).filter(function (a) { return ADDONS[a] && ADDONS[a].only === 'account_audit'; }).join(',');
   } else {
     var spend = plannedBudget_(lead.budget), fee = feeFor_(spend);
     row.ad_spend = spend;
@@ -891,6 +923,137 @@ var SEARCH_TERMS = [
 // Chains and directories are never prospects.
 var NOT_PROSPECTS = /reliance|enercare|directenergy|mrrooter|mr-rooter|mrelectric|mrappliance|onehour|benjaminfranklin|aireserv|servicemaster|homedepot|lowes|costco|sears|canadiantire|bestbuy|facebook\.com|instagram\.com|yelp\.|homestars|houzz|google\.|yellowpages|kijiji/;
 
+/* ── what the searches are worth ── */
+// Typical Calgary-area prices in CAD: the everyday job most of these searches turn into, and the big job that comes up,
+// plus the trade's own Google Ads rates where there's a published benchmark: [percent who click an ad, percent of clicks
+// that call or send a form, cost per click in CAD] (LocaliQ/WordStream 2025-2026, US home services, converted at 1.40).
+// Middle of the market on purpose.
+// Sources: engine/value-sources.md. The first row that matches the trade wins.
+var JOB_VALUES = [
+  [/furnace|heat|hvac|cool|air con|a\/c|mechanical/, 'heating and cooling', ['a furnace repair', 250, 700], ['a furnace replacement', 5000, 8000], [6, 7, 13]],
+  [/plumb|water heater/, 'plumbing', ['a plumbing repair', 300, 700], ['a water heater replacement', 2000, 3000], [5, 8, 15]],
+  [/drain|sewer/, 'drain work', ['a drain clearing', 250, 500], ['a sewer line repair', 2000, 7500], [5, 8, 15]],
+  [/electric/, 'electrical work', ['an electrical repair', 200, 500], ['a panel upgrade', 2500, 5000], [5, 9, 17]],
+  [/eavestrough|gutter/, 'eavestrough work', ['an eavestrough repair', 200, 500], ['new eavestroughs', 1500, 3000], [6, 4, 15]],
+  [/roof/, 'roofing', ['a roof repair', 500, 1500], ['a roof replacement', 10000, 16000], [6, 4, 15]],
+  [/garage door/, 'garage door work', ['a garage door repair', 380, 580], ['a new garage door', 2400, 3300], [7, 6, 8]],
+  [/appliance/, 'appliance repair', ['an appliance repair', 200, 450], null, null],
+  [/pest|extermin/, 'pest control', ['a pest control treatment', 150, 400], ['an annual pest control plan', 500, 1200], null],
+  [/carpet/, 'carpet cleaning', ['a carpet cleaning', 250, 400], null, [9, 18, 12]],
+  [/clean|maid/, 'house cleaning', ['a house cleaning', 230, 300], ['a deep or move-out clean', 400, 550], [9, 18, 12]],
+  [/paint/, 'painting', ['painting a room', 400, 800], ['a full interior or exterior repaint', 3000, 6000], [6, 11, 19]],
+  [/window|door/, 'window and door work', ['a foggy window glass replacement', 700, 1200], ['new windows for a whole house', 10000, 16000], [6, 4, 12]],
+  [/concrete/, 'concrete work', ['a concrete repair', 1000, 3000], ['a new driveway', 6000, 10000], [6, 3, 7]],
+  [/fence|deck/, 'fence and deck work', ['a fence repair', 430, 1300], ['a new fence', 4000, 8000], [6, 3, 7]],
+  [/snow/, 'snow removal', ['a season of snow removal', 500, 1000], null, [5, 6, 12]],
+  [/landscap|lawn|yard/, 'yard work', ['a season of lawn care', 700, 1100], ['a yard update', 5000, 12000], [5, 6, 12]]
+];
+function jobValueFor_(trade, siteHint) {
+  var t = String(trade || '').toLowerCase();
+  var text = !t || /^(another|other)\b/.test(t) ? String(siteHint || '').toLowerCase() : t;
+  for (var i = 0; i < JOB_VALUES.length; i++) if (JOB_VALUES[i][0].test(text)) return JOB_VALUES[i];
+  return null;
+}
+function valueRates_() {
+  var r = function (k) { return Number(String(setting_(k) || '').replace(/[^\d.]/g, '')) || 0; };
+  return { click: r('VALUE_CLICK_RATE'), lead: r('VALUE_LEAD_RATE'), cpc: r('VALUE_CPC'), book: r('VALUE_BOOK_RATE') };
+}
+// "6 in 100", "1 in 10", "4 in 10"
+function inN_(pct) {
+  pct = Math.round(pct);
+  if (pct === 25) return '1 in 4';
+  if (pct === 50) return '1 in 2';
+  if (pct >= 32 && pct <= 35) return 'about 1 in 3';
+  return pct % 10 === 0 ? pct / 10 + ' in 10' : pct + ' in 100';
+}
+// Small counts as words: "two jobs", "three months".
+function word_(n) { return ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n] || money_(n); }
+
+// Searches a month → booked jobs → dollars, at typical rates. Only arithmetic: no number here is a promise.
+// In a big market a starting budget can't show up on every search, so the estimate stops at what that budget buys.
+function valueEstimate_(trade, searches, where, siteHint, budget) {
+  var jv = jobValueFor_(trade, siteHint), r = valueRates_();
+  if (jv && jv[4]) { r.click = jv[4][0]; r.lead = jv[4][1]; r.cpc = jv[4][2]; }
+  if (!jv || !searches || !(r.click && r.lead && r.book)) return null;
+  budget = budget || plannedBudget_('1000-2000');
+  var market = searches * r.click / 100 * r.lead / 100 * r.book / 100;
+  var bought = r.cpc ? budget / r.cpc * r.lead / 100 * r.book / 100 : market;
+  var exact = Math.min(market, bought);
+  var jobs = exact >= 0.75 ? Math.max(1, Math.round(exact)) : 0;
+  var planCost = budget + feeFor_(budget);
+  var big = jv[3] || null;
+  return {
+    searches: searches, where: where, work: jv[1], job: jv[2][0], job_low: jv[2][1], job_high: jv[2][2],
+    big: big ? big[0] : '', big_low: big ? big[1] : 0, big_high: big ? big[2] : 0,
+    click: r.click, lead: r.lead, cpc: r.cpc, book: r.book, jobs: jobs, by_budget: bought < market,
+    low: jobs * jv[2][1], high: jobs * jv[2][2], year_low: jobs * jv[2][1] * 12, year_high: jobs * jv[2][2] * 12,
+    plan_budget: budget, plan_cost: planCost, big_months: big ? Math.floor((big[1] + big[2]) / 2 / planCost) : 0
+  };
+}
+// The estimate in words, for the audit page, the emails, and the audit request. Empty strings when there's no estimate.
+function valueWords_(v) {
+  var out = { headline: '', line: '', big_line: '', email: '', footnote: '' };
+  if (!v) return out;
+  var jobsText = v.jobs === 1 ? 'one job' : word_(v.jobs) + ' jobs';
+  out.line = 'Google estimates about ' + money_(v.searches) + ' searches a month in ' + v.where + ' for ' + v.work + '. ' +
+    (!v.jobs ? 'That\'s a small number for ads alone.' : v.by_budget ?
+      'On a $' + money_(v.plan_budget) + ' a month ad budget, at typical rates for Google Ads, a business could book about ' + jobsText + ' a month from them, at $' +
+        money_(v.job_low) + ' to $' + money_(v.job_high) + ' for ' + v.job + '. Showing up on more of them takes a bigger budget.' :
+      'At typical rates for Google Ads, a business showing up on them could book about ' + jobsText + ' a month from them, at $' +
+        money_(v.job_low) + ' to $' + money_(v.job_high) + ' for ' + v.job + '.');
+  if (v.jobs) out.headline = '$' + money_(v.year_low) + ' to $' + money_(v.year_high) + ' a year';
+  if (v.big) out.big_line = 'One ' + v.big.replace(/^(a|an) /, '') + ' runs $' + money_(v.big_low) + ' to $' + money_(v.big_high) +
+    (v.big_months >= 2 ? ', which covers about ' + word_(v.big_months) + ' months of a $' + money_(v.plan_budget) + ' ad budget and our fee.' :
+      v.big_months === 1 ? ', which covers about a month of a $' + money_(v.plan_budget) + ' ad budget and our fee.' : '.');
+  if (v.jobs) out.email = 'Going by Google\'s search estimates and typical rates, those searches are worth roughly $' + money_(v.year_low) + ' to $' +
+    money_(v.year_high) + ' a year in work to a business that shows up on them' + (v.by_budget ? ' with a $' + money_(v.plan_budget) + ' a month ad budget.' : '.');
+  out.footnote = 'An estimate, not a promise: Google\'s monthly search estimates in ' + v.where + ', times typical Google Ads rates for ' + v.work + ' (' +
+    inN_(v.click) + ' searches click an ad' + (v.cpc ? ' at about $' + money_(v.cpc) + ' a click' : '') + ', and ' + inN_(v.lead) + ' clicks call or send a form), times ' + inN_(v.book) +
+    ' of those booked, at typical Calgary-area prices. ' + (v.by_budget ? 'It stops at what a $' + money_(v.plan_budget) + ' a month budget buys. '
+      : 'It assumes your ads show on these searches. ') +
+    'Your prices, service area, and how fast you answer the phone will change it.';
+  return out;
+}
+
+// The whole search market for a kind of business in a town: Google's related searches with their monthly estimates,
+// keeping only ones about the work (not jobs, how-tos, stores, or other towns). One call per town and trade, kept 60 days.
+var MARKET_SKIP = /\b(jobs?|hiring|salary|salaries|wages?|careers?|courses?|schools?|training|apprentic\w*|certificat\w*|union|how to|how do|diy|do it yourself|youtube|reddit|wiki\w*|meaning|definition|parts?|supply|supplies|store|depot|rona|lowes|canadian tire|costco|walmart|amazon|kijiji|marketplace|used|for sale|rentals?|rent|manual|reviews?|complaints?|login|portal|tool|tools)\b/;
+var MARKET_PLACES = ['calgary', 'edmonton', 'red deer', 'lethbridge', 'medicine hat', 'grande prairie', 'fort mcmurray', 'st albert', 'st. albert',
+  'sherwood park', 'spruce grove', 'leduc', 'camrose', 'brooks', 'lloydminster', 'vancouver', 'victoria', 'kelowna', 'kamloops', 'regina',
+  'saskatoon', 'winnipeg', 'toronto', 'ottawa', 'montreal', 'halifax'];
+function marketFor_(trade, siteHint, townName) {
+  var row = tradeRow_(trade, siteHint);
+  if (row < 0) return null;
+  var seeds = SEARCH_TERMS[row][1].concat(SEARCH_TERMS[row][2] || []).filter(function (k, i, all) { return all.indexOf(k) === i; });
+  var loc = townName + ',Alberta,Canada', key = 'market: ' + seeds.join(' + ');
+  var hit = readRows_(TAB.volumes, HEAD.volumes).filter(function (r) {
+    return r.keyword === key && r.location === loc && Date.now() - new Date(r.fetched).getTime() < 60 * 864e5;
+  }).pop();
+  if (hit) {
+    var dt = {};
+    try { dt = JSON.parse(hit.detail || '{}'); } catch (err) {}
+    return { total: Number(hit.volume || 0), count: dt.count || 0, top: dt.top || [], where: townName, cost: 0 };
+  }
+  var d = dfsRead_(UrlFetchApp.fetch('https://api.dataforseo.com/v3/keywords_data/google_ads/keywords_for_keywords/live',
+    dfsReq_('keywords_data/google_ads/keywords_for_keywords/live', { keywords: seeds, location_name: loc, language_code: 'en', sort_by: 'search_volume' })));
+  if (!d.ok) return { error: d.error, cost: d.cost };
+  var town = townName.toLowerCase();
+  var places = MARKET_PLACES.concat(Object.keys(TOWNS).map(function (k) { return TOWNS[k][2].toLowerCase(); }))
+    .filter(function (p, i, all) { return p !== town && all.indexOf(p) === i; });
+  var other = new RegExp('\\b(' + places.map(function (p) { return p.replace('.', '\\.'); }).join('|') + ')\\b');
+  var seen = {};
+  var hits = d.result.filter(function (v) {
+    var k = String(v && v.keyword || '').toLowerCase();
+    if (!k || seen[k] || !(Number(v.search_volume) > 0)) return false;
+    seen[k] = true;
+    return SEARCH_TERMS[row][0].test(k) && !MARKET_SKIP.test(k) && !other.test(k);
+  }).sort(function (a, b) { return b.search_volume - a.search_volume; }).slice(0, 60);
+  var total = hits.reduce(function (n, v) { return n + Number(v.search_volume); }, 0);
+  var top = hits.slice(0, 6).map(function (v) { return [String(v.keyword).toLowerCase(), Number(v.search_volume)]; });
+  appendRow_(TAB.volumes, HEAD.volumes, { keyword: key, location: loc, volume: total, fetched: new Date(), detail: JSON.stringify({ count: hits.length, top: top }) });
+  return { total: total, count: hits.length, top: top, where: townName, cost: d.cost };
+}
+
 function dfsConfigured_() { return !!(prop_('DATAFORSEO_LOGIN') && prop_('DATAFORSEO_PASSWORD')); }
 
 function dfsReq_(path, task) {
@@ -941,18 +1104,20 @@ function town_(key, label) { var t = TOWNS[key]; return { key: key, lat: t[0], l
 
 // The two searches for a kind of business. When the form says "Another trade" or "Another local business", the shop's
 // own page title and wording pick the searches instead; if nothing fits, there are no searches (the audit still builds).
+// Which SEARCH_TERMS row fits the business: its trade, or for "Another..." its own home page. -1 when nothing fits.
+function tradeRow_(trade, siteHint) {
+  var t = String(trade || '').toLowerCase();
+  var text = !t || /^(another|other)\b/.test(t) ? String(siteHint || '').toLowerCase() : t;
+  for (var i = 0; i < SEARCH_TERMS.length; i++) if (SEARCH_TERMS[i][0].test(text)) return i;
+  return -1;
+}
 function keywordsFor_(trade, townName, siteHint) {
   var t = String(trade || '').toLowerCase();
   var generic = !t || /^(another|other)\b/.test(t);
   var month = Number(Utilities.formatDate(new Date(), tz_(), 'M'));
   var winter = month >= 10 || month <= 3;
-  var pick = function (text) {
-    for (var i = 0; i < SEARCH_TERMS.length; i++) {
-      if (SEARCH_TERMS[i][0].test(text)) return !winter && SEARCH_TERMS[i][2] ? SEARCH_TERMS[i][2] : SEARCH_TERMS[i][1];
-    }
-    return null;
-  };
-  var terms = generic ? pick(String(siteHint || '').toLowerCase()) : pick(t);
+  var row = tradeRow_(trade, siteHint);
+  var terms = row > -1 ? (!winter && SEARCH_TERMS[row][2] ? SEARCH_TERMS[row][2] : SEARCH_TERMS[row][1]) : null;
   if (!terms && generic) return [];
   if (!terms) { var plain = t.split(/,| and | or /)[0].trim(); terms = [plain, plain]; }
   return [terms[0] + ' ' + String(townName).toLowerCase(), terms[1] + ' near me'];
@@ -1044,6 +1209,18 @@ function buildEvidence_(lead) {
   ev.estimates = est.filter(function (e) { return e.where === where; });
   ev.estimate_where = where;
   ev.estimate_total = ev.estimates.reduce(function (n, e) { return n + e.volume; }, 0);
+  // The fuller market (all the related searches about the work), and what it's worth at typical rates.
+  var hint = (ev.site.title || '') + ' ' + text.slice(0, 3000);
+  var mk = null;
+  try { mk = kws.length ? marketFor_(lead.trade, hint, town.name) : null; } catch (err) { mk = { error: String(err && err.message || err).slice(0, 120), cost: 0 }; }
+  if (mk) {
+    ev.cost += mk.cost || 0;
+    if (mk.error) ev.errors.push('search market: ' + mk.error);
+    else if (mk.total) ev.market = { total: mk.total, count: mk.count, top: mk.top, where: mk.where };
+  }
+  var local = where === town.name ? ev.estimate_total : 0;
+  var base = Math.max(ev.market ? ev.market.total : 0, local);
+  ev.value = base ? valueEstimate_(lead.trade, base, town.name, hint) : null;
   ev.searches = searches;
   var seenInAds = searches.some(function (s) { return s.you.ads; });
   if (ev.ads) ev.segment = ev.ads.count > 0 || seenInAds ? 'running_ads' : 'no_ads';
@@ -1237,6 +1414,14 @@ function evidenceText_(ev) {
   else L.push('Google Ads Transparency Center: not checked.');
   if ((ev.estimates || []).length) L.push('Google\'s monthly search estimates in ' + ev.estimate_where + ': ' +
     ev.estimates.map(function (e) { return '"' + e.keyword + '" about ' + e.volume; }).join(', ') + '. Together about ' + ev.estimate_total + ' a month.');
+  if (ev.market) L.push('The wider market in ' + ev.market.where + ': about ' + ev.market.total + ' searches a month across ' + ev.market.count +
+    ' related searches about this work (biggest: ' + ev.market.top.map(function (t) { return '"' + t[0] + '" ' + t[1]; }).join(', ') + ').');
+  if (ev.value) {
+    var vw = valueWords_(ev.value);
+    L.push('VALUE ESTIMATE, worked out by our tools. Use these figures exactly as written, always as an estimate, never as a promise or as money they are losing: ' +
+      vw.line + (vw.headline ? ' That is about $' + money_(ev.value.low) + ' to $' + money_(ev.value.high) + ' a month, or ' + vw.headline + '.' : '') +
+      (vw.big_line ? ' ' + vw.big_line : '') + ' (How it\'s worked out, shown on the page as a footnote: ' + vw.footnote + ')');
+  } else L.push('VALUE ESTIMATE: none (no search estimate for the town, or no typical price for this kind of business). Don\'t give dollar figures.');
   ev.searches.forEach(function (q, i) {
     L.push('');
     L.push('Search ' + (i + 1) + ': "' + q.keyword + '", on a phone in ' + q.where +
@@ -1344,8 +1529,12 @@ function submitJobs_() {
   // Audits wait for their evidence (gatherEvidence_ runs just before this).
   var withEvidence = {};
   readRows_(TAB.evidence, HEAD.evidence).forEach(function (r) { withEvidence[r.lead_id] = true; });
+  // Account reports with a site audit wait for the site checks (gatherSiteChecks_ runs just before this too).
+  var siteWaiting = {};
+  readRows_(TAB.exports, HEAD.exports).forEach(function (e) { if (e.status === 'report_queued' && yes_(e.site) && !e.site_json) siteWaiting[e.lead_id] = true; });
   var jobs = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) {
-    return j.status === 'queued' && (j.kind !== 'audit' || withEvidence[j.lead_id] || !findLead_('id', j.lead_id));
+    return j.status === 'queued' && (j.kind !== 'audit' || withEvidence[j.lead_id] || !findLead_('id', j.lead_id)) &&
+      (j.kind !== 'account_report' || !siteWaiting[j.lead_id]);
   }).slice(0, 25);
   if (!jobs.length) return;
   var requests = [];
@@ -1503,6 +1692,7 @@ function applyAudit_(job, a) {
         maps_total: s.maps_total, you: s.you };
     }),
     estimates: ev.estimates || [], estimate_where: ev.estimate_where || '', estimate_total: ev.estimate_total || 0,
+    market: ev.market || null, value: ev.value || null,
     checks: a.checks.map(function (c) { return { status: c.status, note: String(c.note) }; }),
     moves: a.moves.map(function (m) { return { title: String(m.title), why: String(m.why), offer: fitOffer_(m.offer, segment), effort: String(m.effort || '') }; }),
     later: (Array.isArray(a.later) ? a.later : []).map(String).filter(String).slice(0, 2),
@@ -1607,7 +1797,7 @@ function knownDomains_() {
  */
 var REPORT_SECTIONS = ['Budget and bidding', 'Searches you pay for', 'Call and form tracking', 'Location and schedule', 'Ads and extras',
   'Where clicks land', 'Google Guaranteed and the map'];
-var REPORT_OFFERS = ['management', 'page_fixes', 'landing_page', 'free'];
+var REPORT_OFFERS = ['management', 'page_fixes', 'landing_page', 'site_support', 'free'];
 
 // Their customer ID from a reply: a 10-digit number that isn't their phone number, preferring one on a line about the account.
 function customerIdFrom_(text, lead) {
@@ -1638,14 +1828,21 @@ function formatCid_(cid) {
   return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : '';
 }
 
-function startAccountAudit_(l, cid, via) {
+// They approved the account audit with the site audit added.
+function wantsSiteAudit_(l) {
+  return readRows_(TAB.proposals, HEAD.proposals).some(function (p) {
+    return p.lead_id === l.id && p.kind === 'account_audit' && p.status === 'approved' && /\bsite_audit\b/.test(String(p.addons || ''));
+  });
+}
+
+function startAccountAudit_(l, cid, via, siteAudit) {
   cid = formatCid_(cid);
   if (!cid) return false;
   updateLead_(l, { ads_customer_id: cid, attention: '' });
   var open = readRows_(TAB.exports, HEAD.exports).filter(function (e) { return e.lead_id === l.id && e.status === 'requested'; })[0];
   if (open) updateRow_(TAB.exports, HEAD.exports, open, { customer_id: cid, updated: new Date() });
   else appendRow_(TAB.exports, HEAD.exports, { id: newId_('X'), lead_id: l.id, customer_id: cid, requested: new Date(), status: 'requested',
-    updated: new Date(), detail: 'Waiting for them to accept the link' });
+    updated: new Date(), detail: 'Waiting for them to accept the link', site: siteAudit === undefined ? (wantsSiteAudit_(l) ? 'yes' : 'no') : siteAudit ? 'yes' : 'no' });
   logEvent_(l.id, l.email, 'account_audit_requested', cid + ' (' + via + ')');
   var mgr = setting_('ADS_MANAGER_ID') || 'your manager account';
   ownerMail_('Send a link request: ' + l.business + ' (' + cid + ')',
@@ -1667,6 +1864,8 @@ function runAccountAudit() {
   if (!email) return;
   var cid = formatCid_(ask('Their 10-digit Google Ads customer ID, for example 123-456-7890') || '');
   if (!cid) { ui.alert('That doesn\'t look like a 10-digit customer ID.'); return; }
+  var site = ask('Include the site audit? yes or no');
+  if (site === null) return;
   var lead = findLead_('email', email.toLowerCase());
   if (!lead) {
     var business = ask('Business name');
@@ -1678,8 +1877,73 @@ function runAccountAudit() {
   } else if (['won', 'audit_access'].indexOf(lead.status) === -1) {
     updateLead_(lead, { status: 'audit_access' });
   }
-  startAccountAudit_(lead, cid, 'menu');
+  startAccountAudit_(lead, cid, 'menu', yes_(site) || wantsSiteAudit_(lead));
   ui.alert('Started. Check your email for the link request step.');
+}
+
+/* ── the site audit: the same report, plus the website ── */
+var SITE_SECTIONS = ['First look on a phone', 'Speed', 'Calls, forms, and booking', 'Service and area pages', 'Reasons to trust you', 'Tracking on the site'];
+
+// Before a report with a site audit is written: the home page scan, and Google's PageSpeed test (phone) on the home page
+// and the page ads send the most clicks to. Two reports a run; PageSpeed takes 10 to 30 seconds a page.
+function gatherSiteChecks_() {
+  var started = Date.now(), done = 0;
+  readRows_(TAB.exports, HEAD.exports).filter(function (e) { return e.status === 'report_queued' && yes_(e.site) && !e.site_json; }).forEach(function (e) {
+    if (done >= 2 || Date.now() - started > 150000) return;
+    var l = findLead_('id', e.lead_id) || {}, data = readExport_(e) || {};
+    var home = siteUrlOf_(l.website) || '', site = { home: home, errors: [], pages: [] };
+    if (home) {
+      try {
+        var scan = scanSite_(UrlFetchApp.fetch(home, { muteHttpExceptions: true, followRedirects: true }));
+        delete scan.text;
+        site.scan = scan;
+      } catch (err) { site.errors.push('home page: ' + String(err && err.message || err).slice(0, 120)); }
+    }
+    var top = ((data.landing_pages || [])[0] || {}).url || '';
+    [home, top].filter(function (u, i, all) { return u && all.indexOf(u) === i; }).forEach(function (u) {
+      var ps = pagespeed_(u);
+      if (ps.error) site.errors.push('PageSpeed for ' + u + ': ' + ps.error);
+      else site.pages.push(ps);
+    });
+    updateRow_(TAB.exports, HEAD.exports, e, { site_json: JSON.stringify(site), updated: new Date() });
+    done++;
+  });
+}
+
+function pagespeed_(url) {
+  var key = prop_('PAGESPEED_API_KEY');
+  try {
+    var r = UrlFetchApp.fetch('https://www.googleapis.com/pagespeedonline/v5/runPagespeed?strategy=mobile&category=performance&url=' + encodeURIComponent(url) +
+      (key ? '&key=' + encodeURIComponent(key) : ''), { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return { error: 'HTTP ' + r.getResponseCode() + (r.getResponseCode() === 429 ? ' (add a PAGESPEED_API_KEY)' : '') };
+    var j = JSON.parse(r.getContentText()), lh = j.lighthouseResult || {}, au = lh.audits || {};
+    var shown = function (k) { return (au[k] || {}).displayValue || ''; };
+    var field = (j.loadingExperience || {}).metrics || {};
+    var lcpField = field.LARGEST_CONTENTFUL_PAINT_MS || null;
+    return {
+      url: url, score: lh.categories && lh.categories.performance && lh.categories.performance.score != null ? Math.round(lh.categories.performance.score * 100) : null,
+      lcp: shown('largest-contentful-paint'), fcp: shown('first-contentful-paint'), tbt: shown('total-blocking-time'), cls: shown('cumulative-layout-shift'),
+      field_lcp: lcpField ? (lcpField.percentile / 1000).toFixed(1) + ' s (' + String(lcpField.category || '').toLowerCase() + ')' : ''
+    };
+  } catch (err) { return { error: String(err && err.message || err).slice(0, 120) }; }
+}
+
+function siteText_(site) {
+  if (!site) return '';
+  var L = ['', 'SITE AUDIT: included. They paid for the site audit too, so the report also covers their website (see the instructions for site_sections).'];
+  var s = site.scan;
+  if (!site.home) L.push('Website: none on file. Use the landing pages from the account data.');
+  else if (!s || !s.ok) L.push('Home page ' + site.home + ' did not load' + (s && s.status ? ' (HTTP ' + s.status + ')' : '') + '.');
+  else L.push('Home page ' + site.home + ': built on ' + (s.platform || 'a platform we could not identify') + '. Google Ads tag: ' + (s.ads_tag || 'none visible') +
+    '. Google Tag Manager: ' + (s.gtm || 'no') + '. Google Analytics 4: ' + (s.ga4 ? 'yes' : 'none visible') + '. Call tracking: ' + (s.call_tracking || 'none seen') +
+    '. Tap-to-call links: ' + s.tel_links + '. Forms: ' + s.forms + '. Online booking: ' + (s.booking || 'none seen') + '. Mentions 24/7 or emergency: ' + (s.emergency ? 'yes' : 'no') + '.');
+  (site.pages || []).forEach(function (p) {
+    L.push('Google PageSpeed on a phone, ' + p.url + ': performance ' + (p.score != null ? p.score + '/100' : 'unknown') + ', largest content shows at ' + (p.lcp || '?') +
+      ', first content at ' + (p.fcp || '?') + ', blocking time ' + (p.tbt || '?') + ', layout shift ' + (p.cls || '?') +
+      (p.field_lcp ? '. Real visitors (Chrome data): largest content at ' + p.field_lcp : '') + '.');
+  });
+  if ((site.errors || []).length) L.push('Site checks that could not run: ' + site.errors.join('; ') + '.');
+  return L.join('\n');
 }
 
 function adsQueue_() {
@@ -1740,7 +2004,7 @@ function readExport_(e) {
 function latestExport_(leadId) { return findRow_(TAB.exports, HEAD.exports, 'lead_id', leadId); }
 
 // The numbers the report stands on, worked out here so Claude never has to do arithmetic.
-function accountFacts_(d) {
+function accountFacts_(d, trade, siteHint) {
   d = d || {};
   var sum = function (rows, k) { return (rows || []).reduce(function (s, r) { return s + Number(r[k] || 0); }, 0); };
   var r2 = function (x) { return Math.round(x * 100) / 100; };
@@ -1808,6 +2072,25 @@ function accountFacts_(d) {
   var devCost = sum(dev, 'cost');
   f.mobile_share = devCost ? Math.round(sum(dev.filter(function (x) { return x.device === 'MOBILE'; }), 'cost') / devCost * 100) : null;
   f.calls = d.calls || { total: 0, missed: 0, average_seconds: 0 };
+  // Real enquiries: calls and forms the account recorded, counted in "conversions" or not. Page views aren't enquiries.
+  var byName = {};
+  acts.forEach(function (a) { byName[a.name] = a; });
+  var leads = (d.conversions_by_action || []).reduce(function (n, c) {
+    var a = byName[c.name];
+    return a && (isCall(a) || isForm(a)) ? n + Number(c.all_conversions || 0) : n;
+  }, 0);
+  f.leads = r2(leads);
+  f.leads_month = Math.round(leads * 30 / (f.days || 90));
+  f.cost_per_lead = leads ? r2(f.cost / leads) : null;
+  var jv = jobValueFor_(trade, siteHint), rates = valueRates_();
+  if (jv && f.leads_month && rates.book) {
+    var jobs = Math.round(f.leads_month * rates.book / 100);
+    var wastedMonth = f.wasted * 30 / (f.days || 90);
+    var extra = f.cost_per_lead ? Math.round(wastedMonth / f.cost_per_lead) : 0;
+    f.value = { work: jv[1], job: jv[2][0], job_low: jv[2][1], job_high: jv[2][2], big: jv[3] ? jv[3][0] : '', big_low: jv[3] ? jv[3][1] : 0,
+      big_high: jv[3] ? jv[3][2] : 0, book: rates.book, leads_month: f.leads_month, jobs: jobs, low: jobs * jv[2][1], high: jobs * jv[2][2],
+      spend: f.monthly, wasted_month: Math.round(wastedMonth / 10) * 10, extra_leads: extra };
+  } else f.value = null;
   f.campaigns = camps.slice(0, 12).map(function (c) {
     return { name: c.name, type: String(c.type || '').toLowerCase().replace(/_/g, ' '), status: c.status, bidding: String(c.bidding || '').toLowerCase().replace(/_/g, ' '),
       daily_budget: c.daily_budget, cost: c.cost, clicks: c.clicks, conversions: c.conversions, cpa: c.conversions ? r2(c.cost / c.conversions) : null,
@@ -1853,8 +2136,37 @@ function factsText_(f) {
     return p.url + ' (' + p.clicks + ' clicks, ' + p.conversions + ' conversions' + (p.speed != null ? ', speed score ' + p.speed + '/10' : '') +
       (p.mobile != null ? ', ' + p.mobile + '% mobile-friendly clicks' : '') + ')';
   })) + '.');
+  L.push('Calls and forms recorded (real enquiries, counted in conversions or not): ' + f.leads + ' in ' + f.days + ' days, about ' + f.leads_month + ' a month' +
+    (f.cost_per_lead != null ? ', about ' + dollars_(f.cost_per_lead) + ' each.' : '.'));
+  if (f.value) {
+    var rv = reportValueWords_(f.value);
+    L.push('VALUE ESTIMATE, worked out by our tools. Use these figures exactly as written, always as an estimate, never as a promise: ' + rv.line + ' ' + rv.extra +
+      ' (Footnote shown on the page: ' + rv.footnote + ')');
+  } else L.push('VALUE ESTIMATE: none (no calls or forms recorded, or no typical price for this kind of business). Don\'t give dollar figures for what the ads bring in.');
   if (f.errors.length) L.push('Parts that could not be read: ' + f.errors.join('; ') + '.');
   return L.join('\n');
+}
+
+// The account report's estimate in words. Empty strings when there isn't one.
+function reportValueWords_(v) {
+  var out = { headline: '', line: '', extra: '', footnote: '' };
+  if (!v) return out;
+  out.headline = '$' + money_(v.low) + ' to $' + money_(v.high) + ' a month';
+  out.line = 'Your ads bring in about ' + v.leads_month + ' calls and forms a month. If ' + inN_(v.book) + ' turn into booked jobs at $' + money_(v.job_low) +
+    ' to $' + money_(v.job_high) + ' for ' + v.job + ', that\'s about ' + (v.jobs === 1 ? 'one job' : word_(v.jobs) + ' jobs') + ', or ' + out.headline + ' in work, for ' +
+    dollars_(v.spend) + ' in ad spend over the last 30 days.' +
+    (v.big ? ' Each ' + v.big.replace(/^(a|an) /, '') + ' on top of that is $' + money_(v.big_low) + ' to $' + money_(v.big_high) + '.' : '');
+  if (v.extra_leads >= 1) out.extra = 'Moving the roughly $' + money_(v.wasted_month) + ' a month that goes to searches with no conversions onto searches that work could bring about ' +
+    (v.extra_leads === 1 ? 'one more call or form' : word_(v.extra_leads) + ' more calls and forms') + ' a month, at what each one costs you now.';
+  out.footnote = 'An estimate, not a promise: the calls and forms your account recorded, times ' + inN_(v.book) +
+    ' booked, at typical Calgary-area prices for this work. Your own booking rate and prices will change it.';
+  return out;
+}
+
+// For businesses whose trade doesn't say what they do: the website and the free audit's kind of work.
+function reportHint_(lead) {
+  var spec = auditSpecOf_(lead) || {};
+  return (lead.website || '') + ' ' + ((spec.value || {}).work || '');
 }
 
 function freeAuditText_(aspec) {
@@ -1874,14 +2186,17 @@ function reportParams_(job) {
   var ex = lead ? latestExport_(lead.id) : null;
   var data = ex ? readExport_(ex) : null;
   if (!lead || !data) return null;
+  var site = null;
+  if (yes_(ex.site)) { try { site = JSON.parse(ex.site_json || '{}'); } catch (err) { site = {}; } }
   return {
-    model: setting_('MODEL') || 'claude-opus-5-5', max_tokens: 6000, system: PROMPT_ACCOUNT_REPORT,
-    tools: [{ type: 'web_fetch_20250910', name: 'web_fetch', max_uses: 3, max_content_tokens: 12000 }],
+    model: setting_('MODEL') || 'claude-opus-5-5', max_tokens: site ? 10000 : 6000, system: PROMPT_ACCOUNT_REPORT,
+    tools: [{ type: 'web_fetch_20250910', name: 'web_fetch', max_uses: site ? 8 : 3, max_content_tokens: 12000 }],
     messages: [{ role: 'user', content:
       'Today is ' + Utilities.formatDate(new Date(), tz_(), 'EEEE, MMMM d, yyyy') + '. Write the Google Ads account audit report for this business.\n\n' +
       'Business: ' + (lead.business || 'unknown') + '\nWebsite: ' + (siteUrlOf_(lead.website) || 'not given') + '\nKind of business: ' + (lead.trade || 'local service business') +
       '\nTown: ' + (lead.area || 'Alberta') + '\n' + (lead.owner_says ? 'What the owner told us: ' + lead.owner_says + '\n' : '') +
-      (lead.notes ? 'Notes: ' + String(lead.notes).slice(-600) + '\n' : '') + '\n' + factsText_(accountFacts_(data)) + freeAuditText_(auditSpecOf_(lead)) }]
+      (lead.notes ? 'Notes: ' + String(lead.notes).slice(-600) + '\n' : '') + '\n' + factsText_(accountFacts_(data, lead.trade, reportHint_(lead))) +
+      freeAuditText_(auditSpecOf_(lead)) + siteText_(site) + (site ? '' : '\n\nSITE AUDIT: not included. Leave site_sections out.') }]
   };
 }
 
@@ -1892,10 +2207,14 @@ function applyAccountReport_(job, a) {
   if (!data) return 'no export';
   var okSections = Array.isArray(a.sections) && a.sections.length === REPORT_SECTIONS.length &&
     a.sections.every(function (c) { return c && ['good', 'gap', 'unknown'].indexOf(c.status) > -1 && c.note; });
-  var okActions = Array.isArray(a.actions) && a.actions.length >= 3 && a.actions.length <= 6 &&
+  var site = null;
+  if (yes_(ex.site)) { try { site = JSON.parse(ex.site_json || '{}'); } catch (err) { site = {}; } }
+  var okActions = Array.isArray(a.actions) && a.actions.length >= 3 && a.actions.length <= (site ? 8 : 6) &&
     a.actions.every(function (m) { return m && m.title && m.why && REPORT_OFFERS.indexOf(m.offer) > -1; });
-  if (!okSections || !okActions || !a.summary || !a.top_finding) return 'retry';
-  var spec = reportSpec_(l.business, data, a, new Date());
+  var okSite = !site || (Array.isArray(a.site_sections) && a.site_sections.length === SITE_SECTIONS.length &&
+    a.site_sections.every(function (c) { return c && ['good', 'gap', 'unknown'].indexOf(c.status) > -1 && c.note; }) && a.site_note);
+  if (!okSections || !okActions || !okSite || !a.summary || !a.top_finding) return 'retry';
+  var spec = reportSpec_(l.business, data, a, new Date(), { trade: l.trade, website: reportHint_(l), site: site });
   var slug = slugify_(l.business) + '-ads-audit-' + rand_(6);
   appendRow_(TAB.reports, HEAD.reports, { slug: slug, lead_id: l.id, export_id: ex.id, created: new Date(), status: 'draft', spec_json: JSON.stringify(spec) });
   updateRow_(TAB.exports, HEAD.exports, ex, { status: 'report_ready', report_slug: slug, updated: new Date() });
@@ -1906,13 +2225,19 @@ function applyAccountReport_(job, a) {
 
 // What the management proposal would be, from what they spend now.
 // The stored report: the numbers from the export (worked out here) and the words from Claude. No Sheet access, so build.py renders the sample through it.
-function reportSpec_(business, data, a, now) {
-  var f = accountFacts_(data);
+function reportSpec_(business, data, a, now, o) {
+  o = o || {};
+  var f = accountFacts_(data, o.trade, o.website);
+  var site = o.site ? {
+    platform: (o.site.scan || {}).platform || '', note: String(a.site_note || ''),
+    sections: (a.site_sections || []).map(function (c) { return { status: c.status, note: String(c.note) }; }),
+    speed: (o.site.pages || []).map(function (p) { return { url: p.url, score: p.score, lcp: p.lcp }; })
+  } : null;
   var day = function (s) { return s ? Utilities.formatDate(new Date(s + 'T12:00:00'), tz_(), 'MMM d, yyyy') : ''; };
   return {
     v: 1, business: business, date: Utilities.formatDate(now, tz_(), 'MMM d, yyyy'), period: day(f.start) + ' to ' + day(f.end), days: f.days,
     currency: f.currency, totals: { cost: f.cost, clicks: f.clicks, conversions: f.conversions, cpa: f.cpa, monthly: f.monthly },
-    wasted: { total: f.wasted, share: f.wasted_share, top: f.wasted_top.slice(0, 10) }, campaigns: f.campaigns,
+    wasted: { total: f.wasted, share: f.wasted_share, top: f.wasted_top.slice(0, 10) }, campaigns: f.campaigns, value: f.value, site: site,
     summary: String(a.summary), top_finding: String(a.top_finding).replace(/\.$/, '') + '.',
     sections: a.sections.map(function (c) { return { status: c.status, note: String(c.note) }; }),
     actions: a.actions.map(function (m) { return { title: String(m.title), why: String(m.why), offer: m.offer, when: String(m.when || '') }; }),
@@ -1980,7 +2305,7 @@ function renderReport_(slug) {
       var prop = row.status === 'sent' && lead.proposal_slug ? findRow_(TAB.proposals, HEAD.proposals, 'slug', lead.proposal_slug) : null;
       return prop ? Number(prop.credit || 0) : 0;
     })(),
-    addon_prices: { page_fixes: addonPrice_('page_fixes'), landing_page: addonPrice_('landing_page') }
+    addon_prices: addonPrices_()
   });
 }
 
@@ -1993,14 +2318,20 @@ function renderReportSpec_(spec, o) {
   };
   var offerTag = function (offer) {
     if (offer === 'management') return 'Part of monthly management';
+    if (offer === 'free') return 'Quick win, included in monthly management';
     return offerTag_(offer, o);
   };
+  var rv = reportValueWords_(spec.value);
+  var site = spec.site;
+  var platformLine = site ? (site.platform ? 'Your site runs on ' + site.platform + '. ' : '') + site.note : '';
   return fill_(REPORT_TEMPLATE, {
     business: spec.business, period: spec.period, date: spec.date, summary: spec.summary, sender_name: o.sender_name,
     currency_note: spec.currency && spec.currency !== 'CAD' ? 'Amounts in ' + spec.currency + '.' : '',
     wasted_line: w.total ? dollars_(w.total) + (w.share != null ? ', or ' + w.share + '% of what the listed searches cost,' : '') +
       ' went to searches with no conversions in these ' + (spec.days || 90) + ' days.' : '',
     proposal_url: o.proposal_url || '#',
+    doc_label: site ? 'Account and site audit' : 'Account audit', hero_label: site ? 'Google Ads account and site audit for' : 'Google Ads account audit for',
+    value_headline: rv.headline, value_line: rv.line, value_extra: rv.extra, value_footnote: rv.footnote, site_note: platformLine,
     ask_line: 'The plan is priced on what you spend now' + (o.credit ? ', and the $' + money_(o.credit) + ' for this audit comes off setup.' : '.')
   }, {
     tiles: [tile('Spent', dollars_(t.cost), (spec.days || 90) + ' days'), tile('Clicks', money_(t.clicks)), tile('Conversions', String(t.conversions || 0), 'as the account counts them'),
@@ -2026,6 +2357,16 @@ function renderReportSpec_(spec, o) {
     }).join('\n'),
     first_month: (spec.first_month || []).map(function (x) { return '        <li>' + esc_(x) + '</li>'; }).join('\n'),
     first_month_hidden: (spec.first_month || []).length ? '' : 'hidden',
+    value_hidden: spec.value ? '' : 'hidden',
+    site_hidden: site ? '' : 'hidden',
+    site_checks: site ? site.sections.map(function (c, i) {
+      return '      <li><b>' + esc_(SITE_SECTIONS[i]) + '</b><span class="pill ' + esc_(c.status) + '">' + esc_(PILL[c.status] || PILL.unknown) +
+        '</span><span class="note">' + esc_(c.note) + '</span></li>';
+    }).join('\n') : '',
+    site_speed: site ? (site.speed || []).filter(function (p) { return p.score != null; }).map(function (p) {
+      return '        <li><span class="score ' + (p.score >= 90 ? 'good' : p.score >= 50 ? 'unknown' : 'gap') + '">' + esc_(String(p.score)) + '</span><span>' +
+        esc_(String(p.url).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') || 'Home page') + (p.lcp ? '<small>Main content shows at ' + esc_(p.lcp) + ' on a phone</small>' : '') + '</span></li>';
+    }).join('\n') : '',
     ask_hidden: o.proposal_url ? '' : 'hidden'
   });
 }
@@ -2039,9 +2380,16 @@ function renderAudit_(slug) {
   var lead = findLead_('id', row.lead_id) || { id: '' };
   return renderAuditSpec_(spec, {
     lead_id: lead.id, token: lead.id ? token_(lead.id) : '', sender_name: setting_('SENDER_NAME') || 'Logan',
-    price_audit: setting_('PRICE_ACCOUNT_AUDIT') || 500, credit_days: setting_('ACCOUNT_AUDIT_CREDIT_DAYS'), gst: yes_(setting_('GST_REGISTERED')),
-    addon_prices: { page_fixes: addonPrice_('page_fixes'), landing_page: addonPrice_('landing_page') }
+    price_audit: setting_('PRICE_ACCOUNT_AUDIT') || 500, price_full: setting_('PRICE_FULL_AUDIT') || 0, credit_days: setting_('ACCOUNT_AUDIT_CREDIT_DAYS'),
+    gst: yes_(setting_('GST_REGISTERED')), addon_prices: addonPrices_()
   });
+}
+
+// An audit that found things to fix on the website as well as in the ads: the account and site audit fits.
+function siteFindings_(spec) {
+  if (!spec || spec.stages) return false;
+  var c = spec.checks || [];
+  return (c[5] && c[5].status === 'gap') || (spec.moves || []).some(function (m) { return m.offer === 'page_fixes' || m.offer === 'landing_page'; });
 }
 
 // Spec and options in, HTML out, with no Sheet access. build.py renders the sample audits through this too (tools/render.js).
@@ -2054,6 +2402,8 @@ function renderAuditSpec_(spec, o) {
   var seg = legacy ? 'unknown' : spec.segment;
   var searches = spec.searches || [];
   var price = money_(o.price_audit), credit = Number(o.credit_days || 0);
+  var vw = valueWords_(spec.value);
+  var full = Number(o.price_full || 0) > Number(o.price_audit || 0) && siteFindings_(spec);
   return fill_(AUDIT_TEMPLATE, {
     business: spec.business, area: spec.area, date: spec.date, summary: spec.summary,
     lead_id: o.lead_id, token: o.token, sender_name: o.sender_name,
@@ -2061,15 +2411,23 @@ function renderAuditSpec_(spec, o) {
     moves_title: legacy ? 'What we\'d fix first' : 'What we\'d do first',
     keyword_1: searches[0] ? searches[0].keyword : 'your main service', town: spec.area,
     price_audit: price, gst_note: o.gst ? ' + GST' : '',
-    credit_line: credit ? 'If you go ahead with setup or monthly management within ' + credit + ' days, the $' + price + ' comes off.' : '',
-    estimates_line: (spec.estimates || []).length > 1 ? 'Google estimates about ' + money_(spec.estimate_total) + ' searches a month in ' + spec.estimate_where +
+    credit_line: !credit ? '' : full ? 'Either way, $' + price + ' comes off setup or monthly management if you go ahead within ' + credit + ' days.'
+      : 'If you go ahead with setup or monthly management within ' + credit + ' days, the $' + price + ' comes off.',
+    price_full: money_(o.price_full || 0),
+    estimates_line: spec.market && spec.market.total ? 'Google estimates about ' + money_(spec.market.total) + ' searches a month in ' + spec.market.where +
+      ' across ' + spec.market.count + ' searches about this work, including ' +
+      oxford_(spec.market.top.slice(0, 4).map(function (t) { return '\u201c' + t[0] + '\u201d (' + money_(t[1]) + ')'; })) + '.' :
+      (spec.estimates || []).length > 1 ? 'Google estimates about ' + money_(spec.estimate_total) + ' searches a month in ' + spec.estimate_where +
       ' across searches like these: ' + oxford_(spec.estimates.map(function (e) { return '\u201c' + e.keyword + '\u201d (' + money_(e.volume) + ')'; })) + '.' : '',
+    value_headline: vw.headline, value_line: vw.line, value_big: vw.big_line, value_footnote: vw.footnote,
     method_note: 'Searches were run ' + (spec.checked || spec.date) + ' the way a phone in ' + spec.area +
       ' would see them. Results shift through the day, so treat the positions as a snapshot.'
   }, {
     searches: searches.map(searchCard_).join('\n'),
     searches_hidden: searches.length ? '' : 'hidden',
-    estimates_hidden: (spec.estimates || []).length > 1 && spec.estimate_total ? '' : 'hidden',
+    estimates_hidden: (spec.market && spec.market.total) || ((spec.estimates || []).length > 1 && spec.estimate_total) ? '' : 'hidden',
+    value_hidden: spec.value ? '' : 'hidden',
+    value_headline_hidden: vw.headline ? '' : 'hidden',
     checks: rows.map(function (r) {
       return '      <li><b>' + esc_(r.name) + '</b><span class="pill ' + esc_(r.status) + '">' + esc_(PILL[r.status] || PILL.unknown) +
         '</span><span class="note">' + esc_(r.note) + '</span></li>';
@@ -2085,6 +2443,8 @@ function renderAuditSpec_(spec, o) {
     ask_setup_hidden: seg === 'no_ads' ? '' : 'hidden',
     ask_general_hidden: seg === 'running_ads' || seg === 'no_ads' ? 'hidden' : '',
     credit_hidden: credit ? '' : 'hidden',
+    pick_hidden: full ? '' : 'hidden',
+    single_price_hidden: full ? 'hidden' : '',
     method_hidden: searches.length ? '' : 'hidden',
     sources: (spec.sources || []).map(function (s) {
       return '      <li><a href="' + esc_(s.url) + '" rel="nofollow noopener" target="_blank">' + esc_(s.label || s.url) + '</a></li>';
@@ -2094,8 +2454,9 @@ function renderAuditSpec_(spec, o) {
 
 function offerTag_(offer, o) {
   var price = (o.addon_prices || {})[offer];
-  if (offer === 'page_fixes') return OFFERS.page_fixes + (price ? ', $' + money_(price) : '') + '. Or your web person can do it';
+  if (offer === 'page_fixes') return OFFERS.page_fixes + (price ? ', $' + money_(price) : '') + '. We make the changes, or guide whoever runs your site';
   if (offer === 'landing_page') return OFFERS.landing_page + (price ? ', $' + money_(price) : '');
+  if (offer === 'site_support') return OFFERS.site_support + (price ? ', $' + money_(price) + ' an hour' : '');
   return OFFERS[offer];
 }
 
@@ -2156,7 +2517,7 @@ function renderProposal_(slug) {
   return renderProposalSpec_(p, lead, audit ? JSON.parse(audit.spec_json) : {}, {
     token: token_(lead.id), sender_name: setting_('SENDER_NAME') || 'Logan', payment_line: paymentLine_(),
     tiers: tiers_(), min_fee: Number(setting_('MGMT_MIN_FEE') || 0), credit_days: Number(setting_('ACCOUNT_AUDIT_CREDIT_DAYS') || 0),
-    addon_prices: { page_fixes: addonPrice_('page_fixes'), landing_page: addonPrice_('landing_page') }
+    addon_prices: addonPrices_()
   });
 }
 
@@ -2237,6 +2598,7 @@ function pricingSummary_() {
     min_budget: money_(Math.max(Number(setting_('MIN_AD_BUDGET') || 0), t[0].from)),
     cap_line: feeCapLine_(t, min),
     price_page_fixes: money_(addonPrice_('page_fixes')), price_landing_page: money_(addonPrice_('landing_page')),
+    price_full: money_(setting_('PRICE_FULL_AUDIT') || 0), price_site_support: money_(setting_('PRICE_SITE_SUPPORT') || 0),
     setup_months: (function (n) { return n === 1 ? 'one month' : n === 2 ? 'two months' : n + ' months'; })(Number(setting_('SETUP_MONTHS') || 1)),
     rows: t.map(function (x, i) { return tierLabels_(x, i, t, min); })
   };
@@ -2298,13 +2660,21 @@ function renderProposalSpec_(p, lead, aspec, o) {
   });
   var lowest = tiers[0] || { from: 0, fee: 0 };
   var chosen = String(p.addons || '').split(',').filter(String);
-  var offered = kind === 'legacy' ? [] : suggestedAddons_(aspec).concat(chosen.filter(function (a) { return suggestedAddons_(aspec).indexOf(a) === -1 && ADDONS[a]; }));
+  var offered = kind === 'legacy' ? [] : standingAddons_(kind).concat(suggestedAddons_(aspec));
+  chosen.forEach(function (a) { if (ADDONS[a] && offered.indexOf(a) === -1) offered.push(a); });
+  offered = offered.filter(function (a, i) { return offered.indexOf(a) === i; });
+  var addonPriceText = function (a) {
+    var x = ADDONS[a], price = (o.addon_prices || {})[a];
+    return x.minus ? '$' + money_(price) + ' more ($' + money_(price + one) + ' with the account audit) ' + gst : '$' + money_(price) + ' one time ' + gst;
+  };
   var addonsHtml = offered.length && !approved ? '        <fieldset class="addons"><legend>Add to this <span>(optional)</span></legend>\n' + offered.map(function (a) {
-    return '          <label><input type="checkbox" name="addons" value="' + esc_(a) + '"> <span><b>' + esc_(ADDONS[a].item) + ', $' + money_((o.addon_prices || {})[a]) +
-      ' one time ' + gst + '</b> ' + esc_(ADDONS[a].blurb) + '</span></label>';
+    return '          <label><input type="checkbox" name="addons" value="' + esc_(a) + '"' + (chosen.indexOf(a) > -1 ? ' checked' : '') + '> <span><b>' +
+      esc_(ADDONS[a].item) + ', ' + esc_(addonPriceText(a)) + '</b> ' + esc_(ADDONS[a].blurb) + '</span></label>';
   }).join('\n') + '\n        </fieldset>' : '';
+  var withSite = kind === 'account_audit' && chosen.indexOf('site_audit') > -1;
   return fill_(PROPOSAL_TEMPLATE, {
-    business: lead.business, doc_label: c.label, lede: c.lede, scope_title: c.scope_title, approve_label: c.approve,
+    business: lead.business, doc_label: withSite ? 'Account and site audit' : c.label, lede: c.lede, scope_title: c.scope_title,
+    approve_label: withSite ? 'Approve and book the audits' : c.approve,
     date: Utilities.formatDate(new Date(p.created), tz_(), 'MMM d, yyyy'),
     valid_until: Utilities.formatDate(new Date(new Date(p.created).getTime() + 30 * 864e5), tz_(), 'MMM d, yyyy'),
     payment_line: o.payment_line, lead_id: lead.id, token: o.token, sender_name: o.sender_name,
@@ -2342,7 +2712,7 @@ var EMAILS = {
   },
   inbound_audit: {
     body: 'Hi {first},\n\nHere\'s your audit:\n{audit_url}\n\nIt starts with what a customer sees when they search on a phone, then the three things I\'d do first. ' +
-      'The biggest finding: {top_finding}\n\nIf you\'d like a hand, there\'s a short form at the bottom of the page, or just reply "yes".{booking_line}\n\n{sign}'
+      'The biggest finding: {top_finding}\n\n{value_para}If you\'d like a hand, there\'s a short form at the bottom of the page, or just reply "yes".{booking_line}\n\n{sign}'
   },
   inbound_nudge1: {
     body: 'Hi {first},\n\nQuick follow-up on your audit. If you only do one thing, I\'d start here: {fix_1}.\n\n{offer_line}\n\n{sign}'
@@ -2355,7 +2725,7 @@ var EMAILS = {
     body: 'Hi {first},\n\nHope you\'re keeping busy. I\'m {sender}, and I run Ledge Communications here in Alberta. ' +
       'I help local businesses show up when people search for them on Google.\n\n' +
       '{search_line} No cost and nothing to sign up for:\n{audit_url}\n\n' +
-      'The short version: {top_finding}\n\n' +
+      '{value_para}The short version: {top_finding}\n\n' +
       'If you\'d like to see what a small Google Ads budget aimed at those searches would look like, reply "yes" and I\'ll put together a starting plan.{booking_line}\n\nThanks,\n{sign}'
   },
   cold_2: {
@@ -2373,7 +2743,7 @@ var EMAILS = {
     subject: '{business}: {ads_hook}',
     body: 'Hi {first},\n\nHope you\'re keeping busy. I\'m {sender}, and I run Ledge Communications here in Alberta. I manage Google Ads for local businesses.\n\n' +
       '{search_line} It includes where your ads showed up. No cost and nothing to sign up for:\n{audit_url}\n\n' +
-      'The biggest thing that stood out: {top_finding}\n\n' +
+      '{value_para}The biggest thing that stood out: {top_finding}\n\n' +
       'If you\'d like me to look inside the account and show you where the budget is going, reply "yes" and I\'ll send the details.{booking_line}\n\nThanks,\n{sign}'
   },
   cold_ads_2: {
@@ -2411,7 +2781,7 @@ var EMAILS = {
   },
   account_report: {
     fallbackSubject: 'Your Google Ads account audit',
-    body: 'Hi {first},\n\nYour Google Ads account audit is ready:\n{report_url}\n\nThe short version: {report_finding}\n\n' +
+    body: 'Hi {first},\n\nYour Google Ads account audit is ready:\n{report_url}\n\nThe short version: {report_finding}\n\n{report_value_para}' +
       'It ends with what I\'d change first. I\'ve also put together a plan for running your ads month to month, priced on what you spend now:\n{proposal_url}\n\n' +
       'Happy to walk through both on a call.{booking_line}\n\n{sign}'
   }
@@ -2438,7 +2808,8 @@ function emailVars_(l) {
   var prop = l.proposal_slug ? findRow_(TAB.proposals, HEAD.proposals, 'slug', l.proposal_slug) : null;
   var kind = prop ? (OFFER_COPY[prop.kind] ? prop.kind : 'legacy') : proposalKind_(l, '');
   var price = money_(setting_('PRICE_ACCOUNT_AUDIT') || 500), credit = Number(setting_('ACCOUNT_AUDIT_CREDIT_DAYS') || 0);
-  var paymentStep = pay ? 'You can pay here whenever suits: ' + pay : 'I\'ll send the invoice today.';
+  var paymentStep = fbConnected_() ? 'The invoice comes from FreshBooks within the hour. You can pay it online by card or bank transfer.'
+    : pay ? 'You can pay here whenever suits: ' + pay : 'I\'ll send the invoice today.';
   var business = l.business || 'your business';
   return {
     first: l.first_name || 'there',
@@ -2467,17 +2838,31 @@ function emailVars_(l) {
       access_step: l.ads_customer_id ? 'We\'re already linked to your Google Ads account from the audit, so there\'s nothing to do for access.'
         : 'Reply with your 10-digit Google Ads customer ID (top right when you\'re signed in to Google Ads). I\'ll send a link request from ' +
           'our manager account (' + (setting_('ADS_MANAGER_ID') || 'Ledge Communications') + '), and you approve it under Admin > Access and security > Managers.' }) +
-      (prop && String(prop.addons || '').split(',').some(function (a) { return ADDONS[a]; }) ?
-        '\n4. For the ' + oxford_(String(prop.addons).split(',').filter(function (a) { return ADDONS[a]; }).map(function (a) { return ADDONS[a].item.toLowerCase(); })) +
-        ', I\'ll ask for access to your website (or a quick intro to whoever looks after it).' : ''),
+      (function () {
+        var picked = prop ? String(prop.addons || '').split(',').filter(function (a) { return ADDONS[a]; }) : [];
+        var site = picked.filter(function (a) { return a !== 'site_audit'; });
+        var steps = [];
+        if (picked.indexOf('site_audit') > -1) steps.push('The site audit comes in the same report. I look at your website the way a visitor does, so there\'s nothing to set up for it.');
+        if (site.length) steps.push('For the ' + oxford_(site.map(function (a) { return ADDONS[a].item.toLowerCase(); })) +
+          ', I\'ll ask for access to your website (or a quick intro to whoever looks after it).');
+        return steps.map(function (t, i) { return '\n' + (4 + i) + '. ' + t; }).join('');
+      })(),
     payment_step: paymentStep,
     manager_id: setting_('ADS_MANAGER_ID') || '',
     report_url: l.report_slug ? siteUrl_() + '/report/' + l.report_slug : '',
-    report_finding: (function () {
-      var r = l.report_slug ? findRow_(TAB.reports, HEAD.reports, 'slug', l.report_slug) : null;
-      try { return r ? JSON.parse(r.spec_json).top_finding : ''; } catch (err) { return ''; }
-    })()
+    report_finding: reportSpecOf_(l).top_finding || '',
+    report_value_para: (function () {
+      var v = reportSpecOf_(l).value;
+      return v ? 'Going by the calls and forms your account recorded, your ads bring in roughly $' + money_(v.low) + ' to $' + money_(v.high) +
+        ' a month in work. The report shows how that\'s worked out.\n\n' : '';
+    })(),
+    value_para: (function () { var e = valueWords_(spec.value).email; return e ? e + '\n\n' : ''; })()
   };
+}
+
+function reportSpecOf_(l) {
+  var r = l && l.report_slug ? findRow_(TAB.reports, HEAD.reports, 'slug', l.report_slug) : null;
+  try { return r ? JSON.parse(r.spec_json) : {}; } catch (err) { return {}; }
 }
 
 function fillText_(s, vars) {
@@ -2734,7 +3119,168 @@ function siteUrl_() { return String(setting_('SITE_URL') || 'https://ledgecommun
 function auditUrl_(l) { return siteUrl_() + '/audit/' + l.audit_slug; }
 function unsubUrl_(l) { return siteUrl_() + '/api/unsubscribe?id=' + encodeURIComponent(l.id) + '&t=' + token_(l.id); }
 function ownerLink_(action, l) { return prop_('WEB_APP_URL') + '?action=' + action + '&id=' + encodeURIComponent(l.id) + '&t=' + token_(l.id); }
-function paymentLine_() { return setting_('PAYMENT_URL') ? 'Approving tells us to go ahead. You\'ll get a payment link right away.' : 'Approving tells us to go ahead. The invoice follows the same day.'; }
+/* ══════════════════════════ FreshBooks invoices ══════════════════════════ */
+// Once connected (Ledge > Connect FreshBooks), each approved proposal gets a FreshBooks invoice within the hour, sent by
+// FreshBooks with its pay-online button, and the hourly run watches for the payment. All calls happen inside the hourly
+// run (it holds the script lock), because FreshBooks refresh tokens work once each.
+var FB_API = 'https://api.freshbooks.com';
+function fbConnected_() { return !!(prop_('FRESHBOOKS_TOKENS') && prop_('FRESHBOOKS_ACCOUNT_ID')); }
+
+function connectFreshBooks() {
+  ensureSchema_();
+  var ui = SpreadsheetApp.getUi();
+  if (!prop_('FRESHBOOKS_CLIENT_ID') || !prop_('FRESHBOOKS_CLIENT_SECRET') || !prop_('WEB_APP_URL')) {
+    ui.alert('Add FRESHBOOKS_CLIENT_ID and FRESHBOOKS_CLIENT_SECRET to Script Properties first (from your FreshBooks developer app). SETUP.md has the steps.');
+    return;
+  }
+  var state = rand_(24);
+  props_().setProperty('FRESHBOOKS_STATE', state);
+  var url = 'https://auth.freshbooks.com/oauth/authorize/?response_type=code&client_id=' + encodeURIComponent(prop_('FRESHBOOKS_CLIENT_ID')) +
+    '&redirect_uri=' + encodeURIComponent(prop_('WEB_APP_URL')) + '&state=' + state;
+  ui.showModalDialog(HtmlService.createHtmlOutput('<p style="font:15px/1.5 sans-serif">Sign in to FreshBooks and allow access. You\'ll land on a page that says "FreshBooks connected".</p>' +
+    '<p style="font:15px/1.5 sans-serif"><a href="' + url + '" target="_blank" rel="noopener">Connect FreshBooks</a></p>').setWidth(420).setHeight(160), 'Connect FreshBooks');
+}
+
+function freshbooksCallback_(p) {
+  if (!prop_('FRESHBOOKS_STATE') || p.state !== prop_('FRESHBOOKS_STATE')) return page_('Link not recognised', 'Start again from Ledge > Connect FreshBooks.');
+  var tok = fbTokenRequest_({ grant_type: 'authorization_code', code: p.code });
+  if (tok.error) return page_('FreshBooks didn\'t connect', tok.error);
+  var me = UrlFetchApp.fetch(FB_API + '/auth/api/v1/users/me', { headers: { Authorization: 'Bearer ' + tok.access_token }, muteHttpExceptions: true });
+  var account = '';
+  try { account = JSON.parse(me.getContentText()).response.business_memberships[0].business.account_id; } catch (err) {}
+  if (!account) return page_('FreshBooks didn\'t connect', 'Signed in, but no FreshBooks business came back. Check that this login owns the Ledge business in FreshBooks.');
+  props_().setProperty('FRESHBOOKS_ACCOUNT_ID', String(account));
+  props_().setProperty('FRESHBOOKS_SINCE', new Date().toISOString());
+  props_().deleteProperty('FRESHBOOKS_STATE');
+  logEvent_('', '', 'freshbooks', 'connected, account ' + account);
+  return page_('FreshBooks connected', 'From now on, approved proposals get a FreshBooks invoice within the hour. Try Ledge > Send a test invoice to myself.');
+}
+
+// Swaps a code or refresh token for a new pair and saves it. FreshBooks refresh tokens work once, so the new one is kept right away.
+function fbTokenRequest_(grant) {
+  var body = { client_id: prop_('FRESHBOOKS_CLIENT_ID'), client_secret: prop_('FRESHBOOKS_CLIENT_SECRET'), redirect_uri: prop_('WEB_APP_URL') };
+  Object.keys(grant).forEach(function (k) { body[k] = grant[k]; });
+  var r = UrlFetchApp.fetch(FB_API + '/auth/oauth/token', { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), muteHttpExceptions: true });
+  var j = {};
+  try { j = JSON.parse(r.getContentText()); } catch (err) {}
+  if (r.getResponseCode() !== 200 || !j.access_token) return { error: 'FreshBooks said: ' + String(j.error_description || j.error || r.getResponseCode()).slice(0, 200) };
+  var tok = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (Number(j.expires_in) || 43200) * 1000 - 120000 };
+  props_().setProperty('FRESHBOOKS_TOKENS', JSON.stringify(tok));
+  return tok;
+}
+function fbAccess_() {
+  var tok = JSON.parse(prop_('FRESHBOOKS_TOKENS') || '{}');
+  if (tok.access_token && Date.now() < tok.expires_at) return tok.access_token;
+  var fresh = fbTokenRequest_({ grant_type: 'refresh_token', refresh_token: tok.refresh_token });
+  if (fresh.error) {
+    props_().deleteProperty('FRESHBOOKS_TOKENS');
+    ownerMail_('FreshBooks disconnected', 'The hub lost its FreshBooks connection (' + fresh.error + '). Invoices are on hold until you use Ledge > Connect FreshBooks again; ' +
+      'approvals in the meantime still email you the invoice details.');
+    throw new Error('FreshBooks disconnected');
+  }
+  return fresh.access_token;
+}
+function fb_(method, path, body) {
+  var opts = { method: method, headers: { Authorization: 'Bearer ' + fbAccess_() }, muteHttpExceptions: true };
+  if (body) { opts.contentType = 'application/json'; opts.payload = JSON.stringify(body); }
+  var r = UrlFetchApp.fetch(FB_API + '/accounting/account/' + prop_('FRESHBOOKS_ACCOUNT_ID') + path, opts);
+  var j = {};
+  try { j = JSON.parse(r.getContentText()); } catch (err) {}
+  if (r.getResponseCode() >= 300) throw new Error('FreshBooks ' + method.toUpperCase() + ' ' + path.split('?')[0] + ': HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 200));
+  return (j.response || {}).result || {};
+}
+
+function fbClientFor_(lead) {
+  var email = String(lead.email || '').toLowerCase();
+  var found = (fb_('get', '/users/clients?search[email]=' + encodeURIComponent(email)).clients || [])[0];
+  if (found) return found.id;
+  var name = String(lead.name || lead.first_name || '').trim().split(/\s+/);
+  return fb_('post', '/users/clients', { client: { email: email, organization: lead.business || '', fname: name[0] || '', lname: name.slice(1).join(' ') } }).client.id;
+}
+
+// The invoice lines for a proposal: the same items as the invoice details in the approval email.
+function invoiceLines_(prop) {
+  var c = OFFER_COPY[prop.kind] || OFFER_COPY.legacy, credit = Number(prop.credit || 0);
+  var lines = [{ name: c.item, description: credit ? 'Less $' + money_(credit) + ' account audit credit' : '', amount: Math.max(0, Number(prop.price_sprint || 0) - credit) }];
+  String(prop.addons || '').split(',').filter(function (a) { return ADDONS[a]; }).forEach(function (a) {
+    lines.push({ name: ADDONS[a].item, description: '', amount: addonPrice_(a) });
+  });
+  return lines;
+}
+
+function fbSendInvoice_(clientId, email, lines, gst, subject, note) {
+  var inv = fb_('post', '/invoices/invoices', { invoice: {
+    customerid: clientId, create_date: Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd'), currency_code: 'CAD',
+    due_offset_days: Number(setting_('INVOICE_DUE_DAYS') || 0),
+    lines: lines.map(function (l) {
+      var line = { type: 0, name: l.name, description: l.description || '', qty: 1, unit_cost: { amount: Number(l.amount).toFixed(2), code: 'CAD' } };
+      if (gst) { line.taxName1 = 'GST'; line.taxAmount1 = '5'; }
+      return line;
+    })
+  } }).invoice;
+  fb_('put', '/invoices/invoices/' + inv.id, { invoice: { action_email: true, email_recipients: [email], email_include_pdf: false,
+    invoice_customized_email: { subject: subject, body: note } } });
+  return inv;
+}
+
+// Hourly: an invoice for each proposal approved since FreshBooks was connected.
+function sendInvoices_() {
+  if (!fbConnected_()) return;
+  var since = new Date(prop_('FRESHBOOKS_SINCE') || 0).getTime();
+  readRows_(TAB.proposals, HEAD.proposals).filter(function (p) {
+    return p.status === 'approved' && !p.invoice_id && p.approved_at && new Date(p.approved_at).getTime() >= since;
+  }).slice(0, 10).forEach(function (p) {
+    var l = findLead_('id', p.lead_id);
+    if (!l || !l.email) return;
+    try {
+      var inv = fbSendInvoice_(fbClientFor_(l), l.email, invoiceLines_(p), yes_(p.gst), 'Invoice from Ledge Communications',
+        'Hi ' + (l.first_name || firstName_(l.name) || 'there') + ',\n\nHere\'s the invoice for ' + (OFFER_COPY[p.kind] || OFFER_COPY.legacy).item.toLowerCase() +
+        '. You can pay it online by card or bank transfer.\n\nThanks,\n' + firstName_(setting_('SENDER_NAME')) );
+      updateRow_(TAB.proposals, HEAD.proposals, p, { invoice_id: String(inv.id), invoice_number: String(inv.invoice_number || '') });
+      logEvent_(l.id, l.email, 'invoice_sent', 'FreshBooks #' + (inv.invoice_number || inv.id));
+    } catch (err) {
+      logEvent_(l.id, l.email, 'error', 'FreshBooks invoice: ' + String(err && err.message || err).slice(0, 300));
+    }
+  });
+}
+
+// Hourly: paid invoices. Logan hears about each one.
+function checkPayments_() {
+  if (!fbConnected_()) return;
+  readRows_(TAB.proposals, HEAD.proposals).filter(function (p) { return p.invoice_id && !p.paid_at; }).slice(0, 20).forEach(function (p) {
+    var inv;
+    try { inv = fb_('get', '/invoices/invoices/' + p.invoice_id).invoice || {}; } catch (err) { return; }
+    if (!(inv.v3_status === 'paid' || inv.payment_status === 'paid' || Number(inv.status) === 4)) return;
+    updateRow_(TAB.proposals, HEAD.proposals, p, { paid_at: new Date() });
+    var l = findLead_('id', p.lead_id) || {};
+    logEvent_(l.id || '', l.email || '', 'paid', 'FreshBooks #' + (p.invoice_number || p.invoice_id));
+    ownerMail_('Paid: ' + (l.business || 'invoice ' + p.invoice_number), (l.business || 'A client') + ' paid FreshBooks invoice #' + (p.invoice_number || p.invoice_id) +
+      ' (' + (OFFER_COPY[p.kind] || OFFER_COPY.legacy).item + ').');
+  });
+}
+
+// Ledge menu > Send a test invoice to myself: a $1 invoice to OWNER_EMAIL, to see what clients get.
+function testFreshBooksInvoice() {
+  ensureSchema_();
+  var ui = SpreadsheetApp.getUi();
+  if (!fbConnected_()) { ui.alert('Connect FreshBooks first (Ledge > Connect FreshBooks).'); return; }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) { ui.alert('The hourly run is busy. Try again in a minute.'); return; }
+  try {
+    var me = setting_('OWNER_EMAIL') || myEmail_();
+    var inv = fbSendInvoice_(fbClientFor_({ email: me, business: 'Ledge test', name: setting_('SENDER_NAME') }), me,
+      [{ name: 'Test invoice', description: 'Checking the FreshBooks connection. No need to pay it.', amount: 1 }], false, 'Test invoice from Ledge Communications',
+      'This is a test from the Ledge hub. Check that the pay-online button shows, then delete it in FreshBooks.');
+    ui.alert('Sent FreshBooks invoice #' + (inv.invoice_number || inv.id) + ' to ' + me + '.');
+  } catch (err) {
+    ui.alert('That didn\'t work: ' + String(err && err.message || err).slice(0, 300));
+  } finally { lock.releaseLock(); }
+}
+
+function paymentLine_() {
+  if (fbConnected_()) return 'Approving tells us to go ahead. The invoice comes from FreshBooks within the hour, and you can pay it online by card or bank transfer.';
+  return setting_('PAYMENT_URL') ? 'Approving tells us to go ahead. You\'ll get a payment link right away.' : 'Approving tells us to go ahead. The invoice follows the same day.';
+}
 function money_(n) { return Number(n || 0).toLocaleString('en-CA', { maximumFractionDigits: 0 }); }
 function cents_(n) { return Number(n || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 

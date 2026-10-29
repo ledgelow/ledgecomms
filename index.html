@@ -149,26 +149,47 @@ p { margin: 0; }
 .places-foot b { color: var(--ink); font-weight: 600; }
 @media (max-width: 820px) { .places-grid { grid-template-columns: minmax(0, 1fr); } .phone { position: static; max-width: 300px; } }
 
-/* Pricing: three offers, then the fee table */
-.offers { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-.offer { background: var(--snow); border: 1px solid var(--rule); border-radius: 10px; padding: clamp(20px, 3vw, 28px); display: grid; gap: 12px; align-content: start; min-width: 0; }
-.offer.main { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
-.offer .who { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--deep); }
-.offer .amt { font-family: var(--display); font-weight: var(--display-weight); font-size: 2.4rem; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
-.offer .amt small { font-family: var(--body); font-weight: 500; font-size: 0.95rem; letter-spacing: 0; color: var(--muted); }
-.offer p { color: var(--muted); }
-.offer .note { color: var(--ink); font-size: 0.95rem; border-top: 1px solid var(--rule); padding-top: 12px; }
-.fees { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 20px clamp(32px, 6vw, 80px); align-items: start; }
-.fees h3 { margin-bottom: 8px; }
+/* Pricing: plan cards in three groups (audits, running your ads, website add-ons), each card the same shape:
+   who it's for, name, price, one line, ticks, button. The account and site audit is the flagged one. */
+.price-stack { display: grid; gap: clamp(56px, 8vw, 88px); }
+.price-group { display: grid; gap: 22px; }
+.group-head { display: grid; gap: 8px; max-width: 44rem; }
+.group-head p { color: var(--muted); }
+.plans { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+.plan { background: var(--snow); border: 1px solid var(--rule); border-radius: 12px; padding: clamp(22px, 3vw, 30px); display: flex; flex-direction: column; gap: 12px; min-width: 0; position: relative; }
+.plan.main { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.plan .flag { position: absolute; top: 0; left: clamp(22px, 3vw, 30px); transform: translateY(-50%); margin: 0; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; background: var(--ink); color: var(--snow); border-radius: 99px; padding: 4px 12px; white-space: nowrap; }
+.plans .plan.main { margin-top: 0; }
+.plan .who { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--deep); }
+.plan h3 { font-size: 1.35rem; }
+.plan .amt { font-family: var(--display); font-weight: var(--display-weight); font-size: 2.5rem; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.plan .amt small { font-family: var(--body); font-weight: 500; font-size: 0.95rem; letter-spacing: 0; color: var(--muted); }
+.plan .what { color: var(--ink); font-weight: 500; }
+.ticks { list-style: none; margin: 4px 0 0; padding: 14px 0 0; border-top: 1px solid var(--rule); display: grid; gap: 9px; color: var(--muted); font-size: 0.97rem; }
+.ticks li { display: grid; grid-template-columns: 1.1rem minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.ticks li::before { content: ""; width: 0.38rem; height: 0.7rem; border: solid var(--deep); border-width: 0 2px 2px 0; transform: translateY(-0.05rem) rotate(45deg); justify-self: center; }
+.plan .btn { margin-top: auto; width: 100%; }
+.plan .small { font-size: 0.88rem; color: var(--muted); text-align: center; }
+.plan .small a { color: var(--ink); }
+.group-note { color: var(--muted); font-size: 0.95rem; }
+.plan-wide { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 24px clamp(32px, 6vw, 72px); align-items: start; }
+.plan-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.plan-side .small { text-align: left; }
+.plan-side .btn { width: auto; align-self: flex-start; margin-top: 6px; }
+.fees { display: grid; gap: 10px; min-width: 0; }
 .fees p { color: var(--muted); }
-.fee-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.fee-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; margin-top: 6px; }
 .fee-table th, .fee-table td { text-align: left; padding: 11px 4px; border-bottom: 1px solid var(--rule); }
 .fee-table thead th { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--ink); }
 .fee-table td:last-child, .fee-table th:last-child { text-align: right; font-weight: 600; }
-@media (max-width: 900px) { .offers { grid-template-columns: minmax(0, 1fr); } .fees { grid-template-columns: minmax(0, 1fr); } }
-.addons-line { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--rule); display: grid; gap: 8px; max-width: 52rem; }
-.addons-line p { color: var(--muted); }
-.addons-line b { color: var(--ink); font-weight: 600; }
+.extras { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.extras li { background: var(--snow); border: 1px solid var(--rule); border-radius: 12px; padding: 20px 22px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.extras h3 { font-size: 1.15rem; }
+.extras .amt-sm { font-family: var(--display); font-weight: var(--display-weight); font-size: 1.6rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.extras .amt-sm small { font-family: var(--body); font-weight: 500; font-size: 0.9rem; color: var(--muted); }
+.extras p:last-child { color: var(--muted); font-size: 0.97rem; }
+@media (max-width: 960px) { .plans, .extras { grid-template-columns: minmax(0, 1fr); } .plan-wide { grid-template-columns: minmax(0, 1fr); } }
 
 /* Who it's for: one card per kind of business, each with the searches that matter */
 .trades { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }

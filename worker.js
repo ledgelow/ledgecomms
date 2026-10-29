@@ -62,7 +62,7 @@ function validPricing(d) {
   const short = (v, n) => typeof v === "string" && v.length <= n;
   const optionalNum = (v) => v === undefined || num(v);
   return !!d && d.ok === true && num(d.price_audit) && num(d.credit_days) && num(d.min_fee) && num(d.min_budget) &&
-    optionalNum(d.price_page_fixes) && optionalNum(d.price_landing_page) &&
+    optionalNum(d.price_page_fixes) && optionalNum(d.price_landing_page) && optionalNum(d.price_full) && optionalNum(d.price_site_support) &&
     short(d.cap_line, 140) && short(d.setup_months, 20) && Array.isArray(d.rows) && d.rows.length >= 1 && d.rows.length <= 10 &&
     d.rows.every((r) => Array.isArray(r) && r.length === 2 && short(r[0], 40) && short(r[1], 40));
 }
@@ -186,8 +186,9 @@ async function quoteRequest(request, env) {
   const offer = pick("offer", ["account_audit", "starting_plan", "details"]);
   const budget = pick("budget", ["not sure", "under 1000", "1000-2000", "2000-4000", "4000+"]);
   const running_ads = pick("running_ads", ["yes", "no", "not sure"]);
+  const addons = [...new Set(form.getAll("addons").map(String))].filter((a) => ["site_audit"].includes(a)).join(",");
   if (!id || !t || !env.HUB_URL || !env.HUB_KEY) return buttonReply(request, false, 400, QUOTE_MSG);
-  const out = await toHub(env, { type: "quote", id, t, notes, offer, budget, running_ads });
+  const out = await toHub(env, { type: "quote", id, t, notes, offer, budget, running_ads, addons });
   return buttonReply(request, out.ok, out.ok ? 200 : 502, QUOTE_MSG);
 }
 
@@ -198,7 +199,7 @@ async function approve(request, env) {
   const id = String(form.get("id") || "").slice(0, 40);
   const t = String(form.get("t") || "").slice(0, 64);
   if (!id || !t || !env.HUB_URL || !env.HUB_KEY) return buttonReply(request, false, 400, APPROVE_MSG);
-  const addons = [...new Set(form.getAll("addons").map(String))].filter((a) => ["page_fixes", "landing_page"].includes(a)).join(",");
+  const addons = [...new Set(form.getAll("addons").map(String))].filter((a) => ["page_fixes", "landing_page", "site_audit"].includes(a)).join(",");
   const out = await toHub(env, { type: "approve", id, t, addons });
   return buttonReply(request, out.ok, out.ok ? 200 : 502, APPROVE_MSG);
 }

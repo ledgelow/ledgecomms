@@ -7,7 +7,8 @@ Two tracks, picked by the shop's segment on the Leads tab: shops already running
 Placeholders: {first} first name, {business}, {audit_url}, {proposal_url}, {top_finding} and {fix_1} (from the audit), {sender} (SENDER_NAME), {sign} (its first word, for sign-offs), {next_day} (next business day), {booking_line} (only when BOOKING_URL is set).
 Built from the audit's first search: {search_hook} ("who shows up for "furnace repair airdrie"", or "a quick look at how you show up on Google" when no search ran), {ads_hook}, {search_line} ("I searched "furnace repair airdrie" on a phone in Airdrie and put together a one-page look at what came up, and where {business} sits."), and {keyword_q}.
 Built from the segment or the offer: {offer_line}, {offer_noun}, {audit_price_line} (from PRICE_ACCOUNT_AUDIT and ACCOUNT_AUDIT_CREDIT_DAYS), {proposal_intro}, and {kickoff_steps} (from the offer, on the proposal page too).
-For the account audit: {manager_id} (ADS_MANAGER_ID), {report_url}, and {report_finding} (the report's biggest finding).
+For the account audit: {manager_id} (ADS_MANAGER_ID), {report_url}, {report_finding} (the report's biggest finding), and {report_value_para} (what the ads bring in, when the report has an estimate).
+{value_para} is the audit's yearly estimate as one sentence ("Going by Google's search estimates and typical rates, those searches are worth roughly $7,200 to $12,000 a year in work to a business that shows up on them."), left out when there's no estimate.
 Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com, and a one-click unsubscribe link.
 
 The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your markup) and this file gets regenerated.
@@ -27,7 +28,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > {search_line} No cost and nothing to sign up for:
 > {audit_url}
 >
-> The short version: {top_finding}
+> {value_para}The short version: {top_finding}
 >
 > If you'd like to see what a small Google Ads budget aimed at those searches would look like, reply "yes" and I'll put together a starting plan.{booking_line}
 >
@@ -85,7 +86,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > {search_line} It includes where your ads showed up. No cost and nothing to sign up for:
 > {audit_url}
 >
-> The biggest thing that stood out: {top_finding}
+> {value_para}The biggest thing that stood out: {top_finding}
 >
 > If you'd like me to look inside the account and show you where the budget is going, reply "yes" and I'll send the details.{booking_line}
 >

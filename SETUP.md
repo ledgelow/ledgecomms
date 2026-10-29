@@ -15,29 +15,67 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 28, late): the paid account audit runs itself
+## Where you are (Oct 28, night): dollar estimates, the account and site audit, FreshBooks
 
-The Google Ads version is live: site, pricing page, hub, DataForSEO, and the manager account (871-805-0188).
-**Find prospects now** ran for Airdrie and found 15 shops, and the 10 Calgary shops from Oct 27 are being redone.
-The hub runs searches for 6 shops an hour, then Claude writes the audits.
+Live: site, pricing page, hub, DataForSEO, the manager account (871-805-0188), and the export script (authorized
+through ledgelow@gmail.com, running hourly).
 
-New in this update: the $500 account audit, end to end. See "Account audits" below for how it flows.
+New in this update:
+- **What it's worth.** Free audits now open with roughly what the searches are worth in booked work a year, and
+  account reports with roughly what the ads bring in a month. The emails lead with it too. Every page carries a footnote
+  saying it's an estimate and how it was worked out. See "How the estimate works" below.
+- **Account and site audit, $1,000.** The account audit stays $500. When a free audit finds things to fix on the
+  website as well as in the ads, its ask offers both, with the $1,000 one picked. The report then adds a "Your website"
+  section (speed on a phone, tap-to-call, forms, booking, service pages, trust, tracking) with each fix priced.
+- **Site support, $100 an hour**, for site changes bigger than the page fixes add-on. On the pricing page and in reports.
+- **No more "you can do this yourself" tags.** Quick wins say "Quick win, included in any Ledge plan", and page
+  fixes say "We make the changes, or guide whoever runs your site".
+- **Pricing page** rebuilt as plan cards: audits, running your ads, and website add-ons.
+- **FreshBooks invoicing**, ready to switch on once you've done the steps in "FreshBooks and payments" below.
 
-**Ship this update (15 minutes)**
-1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, **Deploy** > **Manage deployments** > edit > **New
-   version** > **Deploy**. On its next run the hub adds two tabs, **Ads exports** and **Account reports**.
-2. **GitHub:** upload all 25 files from the new zip (one new: `sample-report.html`, the sample report the pricing page
-   and the free audits now link to).
-3. **The export script, in the manager account (once):**
-   1. In Google Ads, switch to the manager account (871-805-0188). **Tools** > **Bulk actions** > **Scripts** > the
-      blue **+** > **New script**.
-   2. Name it `Ledge account export`. Delete what's in the editor and paste all of `ledge-ads-export.js`.
-   3. Near the top, replace the two placeholders: `HUB_URL` is the hub's web app address (Script Properties >
-      `WEB_APP_URL`, it ends in `/exec`) and `HUB_KEY` is the `HUB_KEY` value from the same place. These go straight
-      into the script, never into chat.
-   4. Click **Authorize** and allow it. Then **Preview**: the log at the bottom should say `0 account(s) to export`.
-      Anything else, send me the log.
-   5. **Save** and **Close**. In the scripts list, set its **Frequency** to **Hourly**.
+**Ship this update (10 minutes)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
+   version** > **Deploy**. The next run adds the new Settings rows (`PRICE_FULL_AUDIT` 1000, `PRICE_SITE_SUPPORT` 100,
+   `INVOICE_DUE_DAYS`, and the `VALUE_` rows) and a few columns.
+2. **GitHub:** upload the 25 files from the new zip (same names as last time).
+3. **Before your first site audit (5 minutes):** a free Google API key for the speed test, which otherwise gets
+   rate-limited. In Google Cloud Console (signed in as the Ledge account): pick or create a project > **APIs & Services**
+   > **Library** > "PageSpeed Insights API" > **Enable**. Then **Credentials** > **Create credentials** > **API key**.
+   Paste it into Script Properties as `PAGESPEED_API_KEY`.
+
+**Audits already built** don't have the estimate. Any still waiting for your review: use **Rebuild** to get the new
+version. Ones already sent stay as they are.
+
+**How the estimate works**
+- Free audit: Google's monthly search estimates for the town, across all the related searches about the work (one
+  extra DataForSEO lookup per town and trade, about 7.5 cents, kept 60 days), times typical Google Ads rates for that
+  trade, times the share of calls and forms that get booked, times a typical Calgary-area price for the everyday job.
+  In big markets it stops at what a $1,500 a month budget buys, so Calgary numbers don't balloon. The big job (a furnace
+  replacement, say) is mentioned separately.
+- Account report: the calls and forms the account actually recorded, times the booking rate, times the same prices.
+- `VALUE_BOOK_RATE` (35% to start) is the one to change once you know a client's real booking rate. Prices and trade
+  rates are in the code, with every source in `engine/value-sources.md`. Tell me if a trade's prices look off.
+
+**FreshBooks and payments (about 30 minutes, plus FreshBooks' review)**
+You don't need a separate Stripe account. FreshBooks Payments in Canada runs on Stripe and is set up inside FreshBooks.
+1. In FreshBooks (the Ledge business): **Settings** > **Business info**: country Canada, and your GST number if you
+   have one.
+2. **Settings** > **Payments and Client Billing** > **Online Payments** > **Get Started**. It asks for your details,
+   business type, and bank account (institution, transit, and account numbers), then FreshBooks reviews it and
+   emails you. Once it shows as active, turn on online payments by default for new invoices.
+3. The developer app: go to **my.freshbooks.com/#/developer** > **Create an App**. Name: `Ledge hub`. Type: **Private
+   App**. Scopes: clients (read and write), invoices (read and write), and payments (read). Redirect URI: the hub's web
+   app address (Script Properties > `WEB_APP_URL`, the one ending in `/exec`). Save.
+4. Copy the app's **Client ID** and **Client Secret** straight into Script Properties as `FRESHBOOKS_CLIENT_ID` and
+   `FRESHBOOKS_CLIENT_SECRET`.
+5. In the Sheet: **Ledge** > **Connect FreshBooks** > the link > sign in and allow. You'll land on "FreshBooks
+   connected".
+6. **Ledge** > **Send a test invoice to myself**: a $1 invoice to your inbox. Check the pay-online button shows,
+   then delete it in FreshBooks. Send me what you see if anything's off.
+
+After that, each approved proposal gets a FreshBooks invoice within the hour (setup or the audit, less any credit, plus
+add-ons and GST), and you get a "Paid" email when it's paid. Monthly management fees aren't automatic yet: set those
+up as recurring invoices in FreshBooks for now, and I'll fold them in with the monthly reports.
 
 **Prices from here on** are just the Settings tab: edit a cell and proposals use it right away; the site follows
 within about 10 minutes.
@@ -47,7 +85,10 @@ within about 10 minutes.
    **Looks right**, **Rebuild**, or **Skip** link. Approving sends nothing while `COLD_EMAIL_ON` is no.
 5. Send me anything that reads off. When they read right, `COLD_EMAIL_ON` = yes.
 
-**Account audits ($500)**
+**Account audits ($500, or $1,000 with the site audit)**
+The export script lives in the manager account (**Tools** > **Bulk actions** > **Scripts** > "Ledge account export"),
+authorized through ledgelow@gmail.com and running hourly. If that user is ever removed from the manager account, the
+script stops until another admin authorizes it.
 1. They approve the account audit. The kickoff email asks for their 10-digit Google Ads customer ID.
 2. They reply with it. The hub reads the ID from the reply (ignoring their phone number), tells them a link request is
    coming, and sends you a "Send a link request" email with the one manual step: manager account > **Accounts** >
@@ -55,7 +96,8 @@ within about 10 minutes.
    the reply for you instead. For anyone who sends it some other way, use **Ledge** > **Run an account audit**.
 3. They accept the link. Within the hour the export script reads 90 days of their account (it only reads) and sends
    it to the hub, which works out the numbers itself: spend, searches that brought nothing, what's counted as a
-   conversion, locations, budget limits, and the rest. Claude writes the report around those numbers.
+   conversion, locations, budget limits, and the rest. With the site audit, the hub also scans their home page and runs
+   Google's speed test on a phone. Claude writes the report around those numbers.
 4. You get a "Check this account audit" email with the report link, the biggest finding, and the management price
    it would lead to. **Looks right, send both** sends them the report and a management plan priced on what they
    spend now, with the $500 off setup. **Write the report again** reruns Claude on the same data.
@@ -63,8 +105,8 @@ within about 10 minutes.
    within three weeks, the hub stops asking and emails you.
 
 **Later**
-7. Next builds: monthly reports for clients (the same export script, a short report each month), and a page per
-   industry.
+7. Next builds: monthly reports for clients (the same export script, a short report each month, with recurring
+   FreshBooks invoices), and a page per industry.
 8. Optional: move the domain registration to Cloudflare Registrar before Mar 31, 2027. FreshBooks automation later.
 
 **Add-ons.** Audits can tag one move as a page fix or a landing page, with its price. Proposals then show it as an
@@ -73,7 +115,9 @@ The pricing section on the site lists both. Prices live on the Settings tab like
 
 **New on the Ledge menu**
 - **Check one shop**: runs the audit searches on any website and shows the results. Nothing is saved to Leads.
-- **Run an account audit**: starts one by hand from an email address and customer ID (adds the lead if it's new).
+- **Run an account audit**: starts one by hand from an email address and customer ID (adds the lead if it's new), and
+  asks whether to include the site audit.
+- **Connect FreshBooks** and **Send a test invoice to myself**: see "FreshBooks and payments".
 - **Make a management proposal**: for anyone already running ads, outside the account audit flow. Asks for their email and
   monthly ad budget, then the proposal goes through the usual review and send. An approved account audit inside the
   credit window comes off setup automatically.

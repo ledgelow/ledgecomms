@@ -139,6 +139,24 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 .ask .btn { background: var(--accent); color: var(--accent-ink); }
 .ask .err { color: #FFB4A6; font-weight: 500; }
 
+.value { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: clamp(18px, 3.5vw, 28px); display: grid; gap: 10px; margin-top: 8px; }
+.value .label { margin: 0; }
+.value-big { font-family: var(--display); font-weight: var(--display-weight); font-size: clamp(1.9rem, 6vw, 2.6rem); line-height: 1.05; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.value-big small { font-family: var(--body); font-weight: 500; font-size: 0.95rem; color: var(--muted); letter-spacing: 0; }
+.value p { max-width: 40rem; }
+.value .fine { max-width: 44rem; }
+
+.pick { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 36rem; min-width: 0; }
+.pick legend { font-size: 0.9rem; font-weight: 600; padding: 0; margin-bottom: 4px; }
+.pick label { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; font-weight: 400; background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.18); border-radius: 6px; padding: 12px 14px; cursor: pointer; }
+.pick label:has(input:checked) { border-color: var(--accent); background: rgba(255, 255, 255, 0.1); }
+.pick input { margin-top: 0.3em; accent-color: var(--accent); }
+.pick b { display: block; font-weight: 600; }
+.pick .tag { display: inline-block; margin-left: 6px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--accent);
+  color: var(--accent-ink); border-radius: 99px; padding: 1px 8px; vertical-align: 2px; }
+.pick span span { color: var(--on-dark-muted); font-size: 0.93rem; }
+
 .sources { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; color: var(--muted); font-size: 0.95rem; }
 .sources a { color: var(--ink); overflow-wrap: anywhere; }
 .method { margin-top: 12px; }
@@ -155,7 +173,13 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
     <p class="label">Prepared for</p>
     <h1>Example Heating &amp; Plumbing (sample)</h1>
     <p class="meta"><span>Airdrie</span><span>Checked Oct 28, 2026</span><span>Public information only</span></p>
-    <p class="lede">This is a made-up shop to show what an audit looks like. It has strong reviews, but someone in Airdrie searching for furnace repair on their phone sees three other companies in Google Guaranteed and two in the ads before they reach it, sixth on the map.</p>
+    <p class="lede">This is a made-up shop to show what an audit looks like. It has strong reviews, but someone in Airdrie searching for furnace repair on their phone sees three other companies in Google Guaranteed and two in the ads before they reach it, sixth on the map. Those searches are worth roughly $3,000 to $8,400 a year in work, and right now other shops are getting them.</p>
+    <div class="value" >
+      <p class="label">What these searches are worth</p>
+      <p class="value-big" >$3,000 to $8,400 a year <small>in work, roughly*</small></p>
+      <p>Google estimates about 910 searches a month in Airdrie for heating and cooling. At typical rates for Google Ads, a business showing up on them could book about one job a month from them, at $250 to $700 for a furnace repair. One furnace replacement runs $5,000 to $8,000, which covers about three months of a $1,500 ad budget and our fee.</p>
+      <p class="fine">* An estimate, not a promise: Google&#39;s monthly search estimates in Airdrie, times typical Google Ads rates for heating and cooling (6 in 100 searches click an ad at about $13 a click, and 7 in 100 clicks call or send a form), times about 1 in 3 of those booked, at typical Calgary-area prices. It assumes your ads show on these searches. Your prices, service area, and how fast you answer the phone will change it.</p>
+    </div>
   </div>
 
   <section aria-labelledby="searches-title" >
@@ -183,7 +207,7 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
       <p class="you-line">You showed up #9 in Google Maps. Not in Google Guaranteed, the ads, or the top 20 websites.</p>
     </li>
     </ol>
-    <p class="estimates" >Google estimates about 440 searches a month in Airdrie across searches like these: “furnace repair airdrie” (170), “furnace repair near me” (140), “furnace replacement airdrie” (40), and “furnace replacement near me” (90).</p>
+    <p class="estimates" >Google estimates about 910 searches a month in Airdrie across 34 searches about this work, including “furnace repair airdrie” (170), “furnace airdrie” (110), “hvac airdrie” (90), and “furnace replacement airdrie” (70).</p>
   </section>
 
   <section aria-labelledby="checks-title">
@@ -203,7 +227,7 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
     <ol class="moves">
       <li><h3>Get into Google Guaranteed for furnace and plumbing calls</h3><p>It&#39;s the first thing people see on both searches, and you pay for each lead it sends, not each click. Your reviews would put you level with the shops there now.</p><p class="offer setup">Part of the starting plan</p></li>
       <li><h3>Run a small search campaign on furnace repair in Airdrie</h3><p>Google estimates about 170 searches a month for &quot;furnace repair airdrie&quot; alone, and only two shops advertise on it. A modest budget aimed at Airdrie would put you above the map.</p><p class="offer setup">Part of the starting plan</p></li>
-      <li><h3>Set your main Google category to HVAC contractor</h3><p>Most of the searches above are about furnaces, and your profile leads with plumbing. Plumber can stay on as a second category.</p><p class="effort">What it takes: About five minutes in your Google Business Profile.</p><p class="offer free">You can do this yourself</p></li>
+      <li><h3>Set your main Google category to HVAC contractor</h3><p>Most of the searches above are about furnaces, and your profile leads with plumbing. Plumber can stay on as a second category.</p><p class="effort">What it takes: About five minutes in your Google Business Profile.</p><p class="offer free">Quick win, included in any Ledge plan</p></li>
     </ol>
     <div class="later" >
       <h3>Also worth a look</h3>
@@ -215,16 +239,21 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 
   <div class="ask" id="ask-audit" hidden>
     <h2>Want a look inside your ad account?</h2>
-    <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-audit-done" data-label="Book the account audit">
+    <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-audit-done" data-label="Book the audit">
       <p>From the outside we can see where you show up. Inside your Google Ads account we can see why: which searches you're paying for, what each call costs you, and where the budget goes. You'd link your account to our Google Ads manager account. We only look, nothing changes without your OK, and you can remove our access at any time. <a href="/report/sample/" target="_blank" rel="noopener">See a sample report</a>.</p>
-      <p class="price">$500 + GST for the account audit. <small >If you go ahead with setup or monthly management within 30 days, the $500 comes off.</small></p>
+      <fieldset class="pick" >
+        <legend>Pick one</legend>
+        <label for="a-pick-1"><input type="radio" id="a-pick-1" name="addons" value=""> <span><b>Account audit, $500 + GST</b><span>Where your ad budget goes and what to change first.</span></span></label>
+        <label for="a-pick-2"><input type="radio" id="a-pick-2" name="addons" value="site_audit" checked> <span><b>Account and site audit, $1,000 + GST <span class="tag">Suggested</span></b><span>The same, plus your website checked the way a customer on a phone sees it, with each fix priced. Your audit found things to fix on both.</span></span></label>
+      </fieldset>
+      <p class="price"><span hidden>$500 + GST for the account audit. </span><small >Either way, $500 comes off setup or monthly management if you go ahead within 30 days.</small></p>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
       <input type="hidden" name="offer" value="account_audit">
       <label for="a-notes"><span>Anything we should know? <span class="opt">(optional)</span></span>
         <textarea id="a-notes" name="notes" placeholder="For example: we spend about $1,500 a month and most calls come from Airdrie."></textarea></label>
       <p class="err" role="alert" hidden></p>
-      <div class="row"><button class="btn" type="submit">Book the account audit</button></div>
+      <div class="row"><button class="btn" type="submit">Book the audit</button></div>
     </form>
     <div id="ask-audit-done" hidden>
       <p><strong>Got it.</strong> You'll have the next steps, including how to link your account, by the end of the next business day.</p>
