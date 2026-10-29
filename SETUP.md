@@ -15,11 +15,39 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 28, night): dollar estimates, the account and site audit, FreshBooks
+## Where you are (Oct 28, late night): monthly reports and billing
 
-Live: site, pricing page, hub, DataForSEO, the manager account (871-805-0188), and the export script (authorized
-through ledgelow@gmail.com, running hourly).
+Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected; online payments pending FreshBooks'
+review), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
+**Ship this update (10 minutes)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
+   version** > **Deploy**. The next run adds two tabs, **Clients** and **Invoices**, and a `MONTHLY_REVIEW` setting.
+2. **The export script:** signed in as ledgelow@gmail.com (the login that authorized it), open the manager account >
+   **Tools** > **Bulk actions** > **Scripts** > "Ledge account export". Select all, paste the new `ledge-ads-export.js`
+   over it, put your `HUB_URL` and `HUB_KEY` back in on lines 11 and 12, then **Save**. **Preview** should still say
+   `0 account(s) to export`.
+3. **GitHub:** upload `Code.gs`, `Templates.gs`, and `SETUP.md` (nothing else changed).
+
+**Monthly reports and billing**
+- **Clients tab.** Every approved management plan or starting plan adds a row. It's yours to edit: `status` (active,
+  paused, or ended), `monthly_fee`, `bill_from` (the first month to invoice, as 2026-12), and `notes_for_report` (what you
+  worked on or want mentioned; the next report uses it).
+- **Customer IDs.** Management clients reply to the kickoff with theirs, the hub fills it in, and you get the usual
+  "Send a link request" email. For a starting plan, put the new account's customer ID in the Clients tab once you've
+  made the account.
+- **Between the 2nd and the 7th of each month**, the hub asks the export script for last month's numbers and the
+  account's change history for each active client with a customer ID. Claude writes a short report (the month against
+  the one before, roughly what the calls and forms are worth, what we changed, the searches that brought calls, and what's
+  next) and you get a "Check ... report" email. Approving sends it to the client. It also flags when last month's spend
+  sits in a different fee tier from what they pay.
+- **The month's management invoices** are drafted at the same time and come to you in one email; one link sends them
+  all from FreshBooks, and you get a "Paid" email for each. Management plans bill from the month after approval
+  (setup covers the first). A starting plan bills from the first full month after its ads start spending.
+- `MONTHLY_REVIEW` is yes to start, so nothing goes to a client or out as an invoice without your OK. Set it to no
+  once you trust it.
+
+**Earlier on Oct 28**
 New in this update:
 - **What it's worth.** Free audits now open with roughly what the searches are worth in booked work a year, and
   account reports with roughly what the ads bring in a month. The emails lead with it too. Every page carries a footnote
@@ -32,8 +60,11 @@ New in this update:
   fixes say "We make the changes, or guide whoever runs your site".
 - **Pricing page** rebuilt as plan cards: audits, running your ads, and website add-ons.
 - **FreshBooks invoicing**, ready to switch on once you've done the steps in "FreshBooks and payments" below.
+- **Sharper checks (Oct 28, late):** free audits now read the shop's Business Profile details from the Maps results we
+  already pay for (claimed or not, categories, photos against the shops above, hours, booking link), and site audits
+  add PageSpeed's search basics and accessibility checks. Only `Code.gs` and `Templates.gs` changed.
 
-**Ship this update (10 minutes)**
+**Shipped earlier tonight (done)**
 1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
    version** > **Deploy**. The next run adds the new Settings rows (`PRICE_FULL_AUDIT` 1000, `PRICE_SITE_SUPPORT` 100,
    `INVOICE_DUE_DAYS`, and the `VALUE_` rows) and a few columns.
@@ -74,8 +105,8 @@ You don't need a separate Stripe account. FreshBooks Payments in Canada runs on 
    then delete it in FreshBooks. Send me what you see if anything's off.
 
 After that, each approved proposal gets a FreshBooks invoice within the hour (setup or the audit, less any credit, plus
-add-ons and GST), and you get a "Paid" email when it's paid. Monthly management fees aren't automatic yet: set those
-up as recurring invoices in FreshBooks for now, and I'll fold them in with the monthly reports.
+add-ons and GST), and you get a "Paid" email when it's paid. Monthly management fees go out each month too (see
+"Monthly reports and billing" above).
 
 **Prices from here on** are just the Settings tab: edit a cell and proposals use it right away; the site follows
 within about 10 minutes.
@@ -105,9 +136,8 @@ script stops until another admin authorizes it.
    within three weeks, the hub stops asking and emails you.
 
 **Later**
-7. Next builds: monthly reports for clients (the same export script, a short report each month, with recurring
-   FreshBooks invoices), and a page per industry.
-8. Optional: move the domain registration to Cloudflare Registrar before Mar 31, 2027. FreshBooks automation later.
+7. Next build: a page per industry. Monthly reports and billing are done (above).
+8. Optional: move the domain registration to Cloudflare Registrar before Mar 31, 2027.
 
 **Add-ons.** Audits can tag one move as a page fix or a landing page, with its price. Proposals then show it as an
 optional checkbox next to the approve button, and the "Approved" note and invoice details include whatever they tick.

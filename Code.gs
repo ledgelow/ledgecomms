@@ -34,7 +34,7 @@
 var TAB = {
   settings: 'Settings', leads: 'Leads', audits: 'Audits', proposals: 'Proposals',
   jobs: 'Engine jobs', events: 'Events', dnc: 'Do not contact', evidence: 'Evidence', volumes: 'Search volumes',
-  exports: 'Ads exports', reports: 'Account reports'
+  exports: 'Ads exports', reports: 'Account reports', clients: 'Clients', invoices: 'Invoices'
 };
 // New columns only ever go on the end, so older sheets can be extended in place (see ensureSchema_).
 var HEAD = {
@@ -52,10 +52,16 @@ var HEAD = {
   evidence: ['lead_id', 'created', 'segment', 'town', 'cost_usd', 'evidence_json'],
   volumes: ['keyword', 'location', 'volume', 'bid_low_usd', 'bid_high_usd', 'fetched', 'detail'],
   // One row per account audit export. The data itself is split across d1 to d8 (a cell holds 50,000 characters).
-  exports: ['id', 'lead_id', 'customer_id', 'requested', 'status', 'updated', 'detail', 'report_slug', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'site', 'site_json'],
+  exports: ['id', 'lead_id', 'customer_id', 'requested', 'status', 'updated', 'detail', 'report_slug', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'site', 'site_json',
+    'kind', 'month'],
+  // One row per client we run ads for. Logan can edit status (active, paused, ended), bill_from, monthly_fee, and notes_for_report.
+  clients: ['lead_id', 'business', 'email', 'customer_id', 'status', 'plan', 'started', 'bill_from', 'monthly_fee', 'ad_budget', 'notes_for_report',
+    'last_report', 'last_invoice'],
+  // Monthly management invoices. The first column is always filled (rows with an empty first cell are skipped).
+  invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '7';
+var SCHEMA_VERSION = '8';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -95,6 +101,7 @@ var SETTINGS_DEFAULTS = [
   ['PRICE_PAGE_FIXES', '500', 'Add-on: page fixes on their current site (tap-to-call near the top, a shorter form, a booking button, call tracking). CAD before GST, one time.'],
   ['PRICE_LANDING_PAGE', '1000', 'Add-on: a landing page built for their ads. CAD before GST, one time.'],
   ['PRICE_FULL_AUDIT', '1000', 'Account and site audit together, CAD before GST. Offered when a free audit finds things to fix in both the ads and the website. The site part costs this minus PRICE_ACCOUNT_AUDIT.'],
+  ['MONTHLY_REVIEW', 'yes', 'yes holds each monthly report and the month\'s management invoices for your OK. no sends them as soon as they\'re ready.'],
   ['INVOICE_DUE_DAYS', '7', 'Once FreshBooks is connected: days until an invoice is due.'],
   ['PRICE_SITE_SUPPORT', '100', 'Site support, CAD per hour before GST: changes and fixes on their website beyond the page fixes add-on.'],
   ['VALUE_CLICK_RATE', '6', 'For the dollar estimate in audits: percent of searches that click an ad. Used for kinds of business without their own benchmark (most trades have one in the code).'],
@@ -311,6 +318,7 @@ function doGet(e) {
     return text_(html || 'not_found');
   }
   if (!p.id || p.t !== token_(p.id)) return page_('Link not recognised', 'This link is incomplete or out of date.');
+  if (p.action === 'approve_invoices' && /^invoices-\d{4}-\d{2}$/.test(p.id)) return ownerApproveInvoices_(p.id.slice(9));
   var lead = findLead_('id', p.id);
   if (!lead) return page_('Lead not found', 'That lead is no longer in the pipeline.');
   var res;
@@ -320,6 +328,7 @@ function doGet(e) {
   else if (p.action === 'rebuild') res = ownerRebuild_(lead);
   else if (p.action === 'approve_report') res = ownerApproveReport_(lead);
   else if (p.action === 'rebuild_report') res = ownerRebuildReport_(lead);
+  else if (p.action === 'approve_monthly') res = ownerApproveMonthly_(lead, p.slug);
   else if (p.action === 'handled') {
     updateLead_(lead, { attention: '' });
     logEvent_(lead.id, lead.email, 'handled', '');
@@ -404,6 +413,7 @@ function handleApprove_(id, t, addons) {
   // An account audit isn't finished when it's paid for: the lead waits for their customer ID, then the export.
   updateLead_(lead, { status: prop.kind === 'account_audit' ? 'audit_access' : 'won', next_touch: '' });
   logEvent_(lead.id, lead.email, 'won', (prop.kind || 'fixed price') + ' $' + prop.price_sprint);
+  if (prop.kind === 'management' || prop.kind === 'starting_plan') addClient_(findLead_('id', id), prop);
   safeSend_(findLead_('id', id), 'kickoff');
   ownerMail_('Approved: ' + lead.business + ', ' + (OFFER_COPY[prop.kind] || OFFER_COPY.legacy).label.toLowerCase(),
     lead.business + ' approved the proposal.\n\n' +
@@ -413,7 +423,8 @@ function handleApprove_(id, t, addons) {
     'Audit: ' + auditUrl_(lead) + '\n\n' +
     'They were told: ' + paymentLine_() + ' Next from you: ' + (setting_('PAYMENT_URL') || fbConnected_() ? '' : 'the invoice, then ') +
     ({ account_audit: 'a link request from the manager account (' + (setting_('ADS_MANAGER_ID') || '') + ') once they reply with their customer ID.',
-      starting_plan: 'their new account under the manager account (Accounts > + > Create new account), an admin invite to them, then your setup questions.',
+      starting_plan: 'their new account under the manager account (Accounts > + > Create new account), an admin invite to them, then your setup questions. ' +
+        'Put the new account\'s customer ID in the Clients tab so the monthly reports can read it.',
       management: lead.ads_customer_id ? 'nothing for access, the account (' + lead.ads_customer_id + ') is already linked from the audit. Start the cleanup.'
         : 'a link request from the manager account (' + (setting_('ADS_MANAGER_ID') || '') + ') once they reply with their customer ID.' }[prop.kind] || 'the steps to add you as a user on their tools.') +
     '\n\n' + (fbConnected_() ? 'FreshBooks sends the invoice within the hour (you\'ll get a copy of what went out):\n' : '') + invoiceBlock_(lead, prop) +
@@ -446,7 +457,9 @@ function runHourly() {
     step_('submitJobs', submitJobs_);
     step_('deliverAudits', deliverAudits_);
     step_('deliverProposals', deliverProposals_);
+    step_('monthlyRun', monthlyRun_);
     step_('sendInvoices', sendInvoices_);
+    step_('sendMonthlyInvoices', sendMonthlyInvoices_);
     step_('checkPayments', checkPayments_);
     step_('sendColdEmails', sendColdEmails_);
     step_('sendFollowUps', sendFollowUps_);
@@ -744,8 +757,11 @@ function sendFollowUps_() {
 
 function checkReplies_() {
   var me = myEmail_();
+  // Clients are done as leads, but a management client's reply with their customer ID still needs reading.
+  var waiting = {};
+  readRows_(TAB.clients, HEAD.clients).forEach(function (c) { if (c.plan === 'management' && !c.customer_id) waiting[c.lead_id] = true; });
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
-    if (!l.thread_id || DONE_STATUSES.indexOf(l.status) > -1) return;
+    if (!l.thread_id || (DONE_STATUSES.indexOf(l.status) > -1 && !(l.status === 'won' && waiting[l.id]))) return;
     if (l.last_touch && Date.now() - new Date(l.last_touch).getTime() > 60 * 864e5) return;
     var thread;
     try { thread = GmailApp.getThreadById(l.thread_id); } catch (err) { return; }
@@ -772,6 +788,12 @@ function handleReply_(l, msg) {
   logEvent_(l.id, l.email, 'reply_' + kind, text.slice(0, 200));
 
   if (kind === 'unsubscribe') { stopLead_(l, 'unsubscribed', text.slice(0, 200)); return; }
+  var client = l.status === 'won' ? clientOf_(l.id) : null;
+  if (client && !client.customer_id && client.plan === 'management') {
+    var rawC = String(msg.getPlainBody() || '').split(/\r?\n\s*(On .{4,200}wrote:|-{2,}\s*Original Message|From: .+@)/)[0];
+    var cidC = customerIdFrom_(rawC, l);
+    if (cidC) { linkClient_(l, client, cidC); return; }
+  }
   if (l.status === 'audit_access') {
     var raw = String(msg.getPlainBody() || '').split(/\r?\n\s*(On .{4,200}wrote:|-{2,}\s*Original Message|From: .+@)/)[0];
     var cid = customerIdFrom_(raw, l);
@@ -1293,10 +1315,35 @@ function readMaps_(s, items, domain, name, ev) {
     var e = entry_(list[i].title, list[i].domain || list[i].url, list[i].rating);
     if (!isShop_(e, domain, name)) continue;
     s.you.maps = i + 1;
-    if (!ev.profile) ev.profile = { name: e.name, rating: e.rating, reviews: e.reviews, category: String(list[i].category || '').slice(0, 60) };
+    if (!ev.profile) ev.profile = profileOf_(list[i], e);
     break;
   }
-  s.maps_top = list.slice(0, 5).map(function (it, i) { var e = entry_(it.title, it.domain || it.url, it.rating); e.rank = i + 1; if (s.you.maps === i + 1) e.you = true; return e; });
+  s.maps_top = list.slice(0, 5).map(function (it, i) {
+    var e = entry_(it.title, it.domain || it.url, it.rating);
+    e.rank = i + 1;
+    if (it.total_photos != null) e.photos = Number(it.total_photos);
+    if (s.you.maps === i + 1) e.you = true;
+    return e;
+  });
+}
+
+// What the shop's Google Business Profile shows, from the same Maps result: claimed, categories, photos, hours, booking link.
+function profileOf_(it, e) {
+  var p = { name: e.name, rating: e.rating, reviews: e.reviews, category: String(it.category || '').slice(0, 60),
+    extra_categories: (it.additional_categories || []).map(String).slice(0, 8), claimed: it.is_claimed == null ? null : !!it.is_claimed,
+    photos: it.total_photos == null ? null : Number(it.total_photos), phone: !!it.phone, website: !!it.url, booking: !!it.book_online_url, hours: '' };
+  var t = (it.work_hours || {}).timetable;
+  if (t) {
+    var pad = function (x) { return (x.hour < 10 ? '0' : '') + x.hour + ':' + (x.minute < 10 ? '0' : '') + (x.minute || 0); };
+    p.hours = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(function (d) {
+      var slots = t[d];
+      if (!slots || !slots.length) return d.slice(0, 3) + ' closed';
+      return d.slice(0, 3) + ' ' + slots.map(function (x) {
+        return x.open && x.close && x.open.hour === 0 && x.open.minute === 0 && x.close.hour === 0 && x.close.minute === 0 ? 'open 24 hours' : pad(x.open || {}) + '-' + pad(x.close || {});
+      }).join(', ');
+    }).join('; ');
+  }
+  return p;
 }
 
 function readAds_(items, domain) {
@@ -1406,8 +1453,18 @@ function evidenceText_(ev) {
     '. Call tracking: ' + (s.call_tracking || 'none seen') + '. Meta pixel: ' + (s.meta_pixel ? 'yes' : 'no') +
     '. Tap-to-call links: ' + s.tel_links + '. Forms: ' + s.forms + '. Online booking: ' + (s.booking || 'none seen') +
     '. Mentions 24/7 or emergency service: ' + (s.emergency ? 'yes' : 'no') + '.');
-  if (ev.profile) L.push('Their Google Business Profile (from Maps): ' + ev.profile.name + (ev.profile.rating != null ? ', ' + ev.profile.rating + ' stars' : '') +
-    (ev.profile.reviews != null ? ' from ' + ev.profile.reviews + ' reviews' : '') + (ev.profile.category ? ', category ' + ev.profile.category : '') + '.');
+  if (ev.profile) {
+    var pr = ev.profile;
+    var others = [];
+    (ev.searches || []).forEach(function (q) { (q.maps_top || []).forEach(function (m) { if (!m.you && m.photos != null && m.rank <= 3) others.push(m.photos); }); });
+    L.push('Their Google Business Profile (from Maps): ' + pr.name + (pr.rating != null ? ', ' + pr.rating + ' stars' : '') +
+      (pr.reviews != null ? ' from ' + pr.reviews + ' reviews' : '') + (pr.category ? ', main category ' + pr.category : '') +
+      (pr.extra_categories && pr.extra_categories.length ? ', other categories: ' + pr.extra_categories.join(', ') : pr.extra_categories ? ', no other categories' : '') +
+      (pr.claimed === false ? '. NOT claimed by the owner' : pr.claimed ? '. Claimed by the owner' : '') +
+      (pr.photos != null ? '. ' + pr.photos + ' photos' + (others.length ? ' (the top three shops on these searches have ' + Math.round(others.reduce(function (a, b) { return a + b; }, 0) / others.length) + ' on average)' : '') : '') +
+      (pr.hours ? '. Hours: ' + pr.hours : '. No hours listed') + '. Phone on the profile: ' + (pr.phone ? 'yes' : 'no') + '. Website on the profile: ' + (pr.website ? 'yes' : 'no') +
+      '. Booking link on the profile: ' + (pr.booking ? 'yes' : 'no') + '.');
+  }
   if (ev.ads) L.push('Google Ads Transparency Center, Google Search ads in Canada over the last 30 days for ' + ev.ads.domain + ': ' +
     (ev.ads.count ? ev.ads.count + (ev.ads.capped ? ' or more' : '') + ' ads (' + Object.keys(ev.ads.formats).map(function (f) { return ev.ads.formats[f] + ' ' + f; }).join(', ') +
       '), last shown ' + ev.ads.last_shown + (ev.ads.advertiser ? ', advertiser "' + ev.ads.advertiser + '"' + (ev.ads.verified ? ' (verified)' : '') : '') : 'none') + '.');
@@ -1507,7 +1564,7 @@ function addProspect_(s, area) {
 
 function queueJob_(kind, leadId, area) {
   var open = readRows_(TAB.jobs, HEAD.jobs).some(function (j) {
-    return j.kind === kind && j.lead_id === leadId && (kind !== 'find' || j.area === area) && ['queued', 'submitted'].indexOf(j.status) > -1;
+    return j.kind === kind && j.lead_id === leadId && ((kind !== 'find' && kind !== 'monthly_report') || j.area === area) && ['queued', 'submitted'].indexOf(j.status) > -1;
   });
   if (open) return;
   appendRow_(TAB.jobs, HEAD.jobs, {
@@ -1557,6 +1614,7 @@ function submitJobs_() {
 
 function jobParams_(job) {
   if (job.kind === 'account_report') return reportParams_(job);
+  if (job.kind === 'monthly_report') return monthlyParams_(job);
   var model = setting_('MODEL') || 'claude-opus-5-5';
   var loc = { type: 'approximate', city: 'Calgary', region: 'Alberta', country: 'CA', timezone: 'America/Edmonton' };
   var today = Utilities.formatDate(new Date(), tz_(), 'EEEE, MMMM d, yyyy');
@@ -1628,10 +1686,12 @@ function handleResult_(job, result) {
   if (!data) {
     var retry = attempts < 3;
     updateRow_(TAB.jobs, HEAD.jobs, job, { status: retry ? 'queued' : 'error', attempts: attempts, est_cost_usd: totalCost, detail: why, updated: new Date() });
-    if (!retry && job.kind === 'account_report') {
+    if (!retry && (job.kind === 'account_report' || job.kind === 'monthly_report')) {
       var rl = findLead_('id', job.lead_id) || {};
-      ownerMail_('Account audit report failed: ' + (rl.business || job.lead_id), 'The report for ' + (rl.business || job.lead_id) + ' failed three times: ' + why +
-        '\n\nThe export is saved. To try again: ' + (rl.id ? ownerLink_('rebuild_report', rl) : 'the lead is gone') + '\nOr tell Claude in the Ledge project what came back.');
+      ownerMail_((job.kind === 'monthly_report' ? 'Monthly report failed: ' : 'Account audit report failed: ') + (rl.business || job.lead_id),
+        'The report for ' + (rl.business || job.lead_id) + ' failed three times: ' + why + '\n\nThe export is saved. ' +
+        (job.kind === 'monthly_report' ? 'Tell Claude in the Ledge project what came back.' : 'To try again: ' + (rl.id ? ownerLink_('rebuild_report', rl) : 'the lead is gone') +
+          '\nOr tell Claude in the Ledge project what came back.'));
       logEvent_(job.lead_id, '', 'error', 'Job ' + job.job_id + ' gave up: ' + why);
     } else if (!retry) {
       var l = findLead_('id', job.lead_id);
@@ -1640,7 +1700,8 @@ function handleResult_(job, result) {
     }
     return;
   }
-  var outcome = job.kind === 'find' ? applyFind_(job, data) : job.kind === 'account_report' ? applyAccountReport_(job, data) : applyAudit_(job, data);
+  var outcome = job.kind === 'find' ? applyFind_(job, data) : job.kind === 'account_report' ? applyAccountReport_(job, data) :
+    job.kind === 'monthly_report' ? applyMonthlyReport_(job, data) : applyAudit_(job, data);
   if (outcome === 'retry' && attempts < 3) {
     updateRow_(TAB.jobs, HEAD.jobs, job, { status: 'queued', attempts: attempts, est_cost_usd: totalCost, detail: 'Incomplete ' + (job.kind === 'account_report' ? 'report' : 'audit') + ', retrying', updated: new Date() });
     return;
@@ -1782,6 +1843,286 @@ function knownDomains_() {
   return out;
 }
 
+/* ══════════════════════════ clients: monthly reports and invoices ══════════════════════════ */
+/*
+ * Every management or starting plan approval adds a row to the Clients tab. Between the 2nd and the 7th of each month:
+ *   1. The hub asks the export script for last month's numbers and change history for each active client with a customer ID.
+ *   2. Claude writes a short report around the numbers (worked out here) and Logan's notes_for_report; Logan checks it
+ *      (MONTHLY_REVIEW) and approving emails it to the client.
+ *   3. Each active client billed from this month on gets a management fee invoice (through FreshBooks when connected),
+ *      held for one OK covering the month.
+ */
+function clientOf_(leadId) { return findRow_(TAB.clients, HEAD.clients, 'lead_id', leadId); }
+function ym_(d) { return Utilities.formatDate(d, tz_(), 'yyyy-MM'); }
+function addMonths_(month, n) { var p = month.split('-'); var d = new Date(Number(p[0]), Number(p[1]) - 1 + n, 15); return Utilities.formatDate(d, tz_(), 'yyyy-MM'); }
+function monthName_(month) { var p = String(month || '').split('-'); return p.length === 2 ? Utilities.formatDate(new Date(Number(p[0]), Number(p[1]) - 1, 15), tz_(), 'MMMM yyyy') : ''; }
+function monthRange_(month) {
+  var p = month.split('-'), y = Number(p[0]), m = Number(p[1]);
+  var last = new Date(y, m, 0).getDate();
+  return { start: month + '-01', end: month + '-' + (last < 10 ? '0' : '') + last, days: last };
+}
+
+function addClient_(l, prop) {
+  if (!l || clientOf_(l.id)) return;
+  appendRow_(TAB.clients, HEAD.clients, {
+    lead_id: l.id, business: l.business, email: l.email, customer_id: prop.kind === 'management' ? (l.ads_customer_id || '') : '', status: 'active', plan: prop.kind,
+    started: new Date(), monthly_fee: Number(prop.price_care || 0), ad_budget: Number(prop.ad_spend || 0), notes_for_report: '', last_report: '', last_invoice: '',
+    // Management bills from next month (setup covers this one). A starting plan bills from the first full month after its ads start spending.
+    bill_from: prop.kind === 'management' ? addMonths_(ym_(new Date()), 1) : ''
+  });
+}
+
+// A management client replied with their customer ID: same one manual step as the account audit.
+function linkClient_(l, client, cid) {
+  cid = formatCid_(cid);
+  updateRow_(TAB.clients, HEAD.clients, client, { customer_id: cid });
+  updateLead_(l, { ads_customer_id: cid, attention: '' });
+  logEvent_(l.id, l.email, 'client_linked', cid);
+  var mgr = setting_('ADS_MANAGER_ID') || 'your manager account';
+  ownerMail_('Send a link request: ' + l.business + ' (' + cid + ')', l.business + ' replied with their Google Ads customer ID: ' + cid + '.\n\n' +
+    'In Google Ads, open your manager account (' + mgr + ') > Accounts > the blue + > Link existing account > enter ' + cid + ' > Send request.\n\n' +
+    'They\'ve been told it\'s coming. Their monthly report reads the account from next month on.');
+  safeSend_(findLead_('id', l.id), 'link_ack');
+}
+
+function monthlyRun_() {
+  var now = new Date(), day = Number(Utilities.formatDate(now, tz_(), 'd')), month = ym_(now);
+  if (day < 2 || day > 7 || prop_('MONTHLY_RUN') === month) return;
+  props_().setProperty('MONTHLY_RUN', month);
+  var last = addMonths_(month, -1), lastEnd = new Date(monthRange_(last).end + 'T23:59:59');
+  var clients = readRows_(TAB.clients, HEAD.clients).filter(function (c) { return String(c.status || 'active').toLowerCase() === 'active'; });
+  var queued = 0;
+  clients.forEach(function (c) {
+    if (!formatCid_(c.customer_id) || new Date(c.started).getTime() > lastEnd.getTime()) return;
+    var have = readRows_(TAB.exports, HEAD.exports).some(function (e) { return e.lead_id === c.lead_id && e.kind === 'monthly' && e.month === last; });
+    if (have) return;
+    appendRow_(TAB.exports, HEAD.exports, { id: newId_('X'), lead_id: c.lead_id, customer_id: formatCid_(c.customer_id), requested: new Date(), status: 'requested',
+      updated: new Date(), detail: 'Waiting for the export script', kind: 'monthly', month: last });
+    queued++;
+  });
+  logEvent_('', '', 'monthly_run', month + ': ' + queued + ' reports queued');
+  monthlyInvoices_(month, clients);
+}
+
+function monthlyExport_(e, l, data) {
+  var json = packExport_(data);
+  var fields = { status: 'report_queued', updated: new Date(), detail: 'Read ' + data.start + ' to ' + data.end };
+  for (var i = 0; i < 8; i++) fields['d' + (i + 1)] = json.slice(i * 45000, (i + 1) * 45000);
+  updateRow_(TAB.exports, HEAD.exports, e, fields);
+  // A starting plan's billing starts with the first full month after its ads start spending.
+  var c = clientOf_(e.lead_id), f = accountFacts_(data);
+  if (c && !c.bill_from && f.cost > 0) updateRow_(TAB.clients, HEAD.clients, c, { bill_from: addMonths_(e.month, 2) });
+  queueJob_('monthly_report', e.lead_id, e.month);
+  logEvent_(e.lead_id, l.email || '', 'ads_export', 'monthly ' + e.month + ': $' + money_(f.cost));
+  return { ok: true };
+}
+function monthlyExportOf_(leadId, month) {
+  return readRows_(TAB.exports, HEAD.exports).filter(function (e) { return e.lead_id === leadId && e.kind === 'monthly' && e.month === month && e.d1; }).pop() || null;
+}
+
+// The month's numbers, with last month's beside them when we have it.
+function monthFacts_(data, prev, trade, hint) {
+  var f = accountFacts_(data, trade, hint), p = prev ? accountFacts_(prev, trade, hint) : null;
+  var r2 = function (x) { return Math.round(x * 100) / 100; };
+  var m = { cost: f.cost, clicks: f.clicks, leads: Math.round(f.leads), cost_per_lead: f.leads ? r2(f.cost / f.leads) : null, conversions: f.conversions,
+    prev: p ? { cost: p.cost, clicks: p.clicks, leads: Math.round(p.leads), cost_per_lead: p.leads ? r2(p.cost / p.leads) : null } : null,
+    converting_top: f.converting_top.slice(0, 6), wasted: f.wasted, wasted_top: f.wasted_top.slice(0, 6), lost_to_budget: f.lost_to_budget,
+    impression_share: f.impression_share, campaigns: f.campaigns, calls: f.calls, value: null };
+  var jv = jobValueFor_(trade, hint), book = valueRates_().book;
+  if (jv && m.leads && book) {
+    var jobs = Math.round(m.leads * book / 100);
+    m.value = { work: jv[1], job: jv[2][0], job_low: jv[2][1], job_high: jv[2][2], big: '', book: book, leads_month: m.leads, jobs: jobs,
+      low: jobs * jv[2][1], high: jobs * jv[2][2], spend: f.cost, wasted_month: 0, extra_leads: 0 };
+  }
+  // What changed in the account, grouped, from Google's change history.
+  var groups = {};
+  (data.changes || []).forEach(function (c) {
+    var k = String(c.type || 'OTHER') + ' ' + String(c.op || '');
+    groups[k] = groups[k] || { type: c.type, op: c.op, count: 0, campaigns: {}, fields: {} };
+    groups[k].count++;
+    if (c.campaign) groups[k].campaigns[c.campaign] = true;
+    String(c.fields || '').split(',').forEach(function (x) { x = x.trim(); if (x) groups[k].fields[x.replace(/^[a-z_]+\./, '')] = true; });
+  });
+  m.changes = Object.keys(groups).map(function (k) {
+    var g = groups[k];
+    return { type: g.type, op: g.op, count: g.count, campaigns: Object.keys(g.campaigns).slice(0, 4), fields: Object.keys(g.fields).slice(0, 6) };
+  }).sort(function (a, b) { return b.count - a.count; });
+  m.change_count = (data.changes || []).length;
+  return m;
+}
+
+function monthlyFactsText_(m, month, notes) {
+  var L = [], d = function (cur, prev, money) {
+    if (prev == null || cur == null) return '';
+    var diff = cur - prev;
+    return ' (' + (diff >= 0 ? 'up ' : 'down ') + (money ? dollars_(Math.abs(diff)) : Math.abs(Math.round(diff))) + ' from last month)';
+  };
+  L.push('MONTH: ' + monthName_(month) + '. Every number here was worked out for you; use them as given.');
+  L.push('Spend ' + dollars_(m.cost) + d(m.cost, m.prev && m.prev.cost, true) + ', ' + m.clicks + ' clicks' + d(m.clicks, m.prev && m.prev.clicks) +
+    ', ' + m.leads + ' calls and forms' + d(m.leads, m.prev && m.prev.leads) + (m.cost_per_lead != null ? ', ' + dollars_(m.cost_per_lead) + ' each' +
+    (m.prev && m.prev.cost_per_lead != null ? ' (' + dollars_(m.prev.cost_per_lead) + ' last month)' : '') : '') + '.' + (m.prev ? '' : ' No earlier month to compare with.'));
+  L.push('Calls from ads: ' + (m.calls.total || 0) + ' (' + (m.calls.missed || 0) + ' missed).');
+  L.push('Searches that brought calls or forms: ' + (m.converting_top.map(function (t) { return '"' + t.term + '" ' + t.conversions + ' for ' + dollars_(t.cost); }).join('; ') || 'none recorded') + '.');
+  L.push('Spend on searches with no conversions: ' + dollars_(m.wasted) + '. Biggest: ' + (m.wasted_top.map(function (t) { return '"' + t.term + '" ' + dollars_(t.cost); }).join('; ') || 'none') + '.');
+  if (m.lost_to_budget != null) L.push('Search campaigns showed on ' + m.impression_share + '% of eligible searches; ' + m.lost_to_budget + '% missed because the budget ran out.');
+  L.push('Changes made in the account this month (Google\'s change history): ' + (m.change_count ? m.changes.map(function (c) {
+    return c.count + ' ' + String(c.type).toLowerCase().replace(/_/g, ' ') + ' ' + String(c.op).toLowerCase() + (c.campaigns.length ? ' in ' + c.campaigns.join(', ') : '') +
+      (c.fields.length ? ' (' + c.fields.join(', ') + ')' : '');
+  }).join('; ') : 'none recorded') + '.');
+  L.push('Logan\'s notes for this report: ' + (String(notes || '').trim() || 'none') + '.');
+  if (m.value) {
+    var rv = reportValueWords_(m.value);
+    L.push('VALUE ESTIMATE, worked out by our tools. Use these figures exactly as written, always as an estimate: about ' + rv.headline + ' in work from about ' + m.leads +
+      ' calls and forms, if ' + inN_(m.value.book) + ' are booked at typical prices.');
+  }
+  return L.join('\n');
+}
+
+function monthlyParams_(job) {
+  var lead = findLead_('id', job.lead_id), ex = lead ? monthlyExportOf_(lead.id, job.area) : null;
+  var data = ex ? readExport_(ex) : null;
+  if (!lead || !data) return null;
+  var prevEx = monthlyExportOf_(lead.id, addMonths_(job.area, -1)), prev = prevEx ? readExport_(prevEx) : null;
+  var c = clientOf_(lead.id) || {};
+  return {
+    model: setting_('MODEL') || 'claude-opus-5-5', max_tokens: 3000, system: PROMPT_MONTHLY_REPORT,
+    messages: [{ role: 'user', content: 'Write the ' + monthName_(job.area) + ' report for this client.\n\nBusiness: ' + lead.business + '\nKind of business: ' +
+      (lead.trade || 'local service business') + '\nTown: ' + (lead.area || 'Alberta') + '\nPlan: ' + (c.plan === 'starting_plan' ? 'starting plan' : 'monthly management') + '\n\n' +
+      monthlyFactsText_(monthFacts_(data, prev, lead.trade, reportHint_(lead)), job.area, c.notes_for_report) }]
+  };
+}
+
+function applyMonthlyReport_(job, a) {
+  var l = findLead_('id', job.lead_id);
+  if (!l) return 'lead gone';
+  var ex = monthlyExportOf_(l.id, job.area), data = ex ? readExport_(ex) : null;
+  if (!data) return 'no export';
+  var list = function (x, lo, hi) { return Array.isArray(x) && x.length >= lo && x.length <= hi && x.every(function (t) { return t && String(t).trim(); }); };
+  if (!a.headline || !a.summary || !list(a.changes, 1, 6) || !list(a.next, 1, 4)) return 'retry';
+  var prevEx = monthlyExportOf_(l.id, addMonths_(job.area, -1));
+  var m = monthFacts_(data, prevEx ? readExport_(prevEx) : null, l.trade, reportHint_(l));
+  var spec = { v: 1, type: 'monthly', business: l.business, month: job.area, month_name: monthName_(job.area), date: Utilities.formatDate(new Date(), tz_(), 'MMM d, yyyy'),
+    totals: { cost: m.cost, clicks: m.clicks, leads: m.leads, cost_per_lead: m.cost_per_lead }, prev: m.prev, value: m.value,
+    converting_top: m.converting_top, headline: String(a.headline), summary: String(a.summary), changes: a.changes.map(String), next: a.next.map(String) };
+  var slug = slugify_(l.business) + '-' + job.area + '-' + rand_(5);
+  appendRow_(TAB.reports, HEAD.reports, { slug: slug, lead_id: l.id, export_id: ex.id, created: new Date(), status: 'draft', spec_json: JSON.stringify(spec) });
+  updateRow_(TAB.exports, HEAD.exports, ex, { status: 'report_ready', report_slug: slug, updated: new Date() });
+  if (yes_(setting_('MONTHLY_REVIEW'))) requestMonthlyReview_(l, slug, spec);
+  else sendMonthly_(l, slug, spec);
+  return 'monthly ' + slug;
+}
+
+function requestMonthlyReview_(l, slug, spec) {
+  var c = clientOf_(l.id) || {}, fee = Number(c.monthly_fee || 0), tierFee = feeFor_(spec.totals.cost);
+  ownerMail_('Check ' + l.business + '\'s ' + spec.month_name + ' report', l.business + '\'s ' + spec.month_name + ' report is ready.\n\n' +
+    'Report: ' + siteUrl_() + '/report/' + slug + '\n' + spec.headline + '\n\n' +
+    'Spend ' + dollars_(spec.totals.cost) + ', ' + spec.totals.leads + ' calls and forms' + (spec.totals.cost_per_lead != null ? ' at ' + dollars_(spec.totals.cost_per_lead) + ' each' : '') + '.' +
+    (fee && Math.abs(tierFee - fee) >= 1 && spec.totals.cost >= Number(setting_('MIN_AD_BUDGET') || 0) ?
+      '\n\nHeads-up: last month\'s spend sits in the $' + money_(tierFee) + ' fee tier, and their fee is $' + money_(fee) + '. To change it, edit monthly_fee in the Clients tab.' : '') +
+    '\n\nLooks right, send it: ' + ownerLink_('approve_monthly', l) + '&slug=' + encodeURIComponent(slug) + '\n\n' +
+    'Want something different in it? Tell Claude in the Ledge project.');
+  logEvent_(l.id, l.email, 'review_requested', 'monthly ' + spec.month);
+}
+
+function ownerApproveMonthly_(l, slug) {
+  var rep = slug ? findRow_(TAB.reports, HEAD.reports, 'slug', slug) : null;
+  if (!rep || rep.lead_id !== l.id) return { title: 'Report not found', message: 'That report isn\'t in the Account reports tab.' };
+  if (rep.status === 'sent') return { title: 'Already sent', message: 'This report went to ' + l.business + ' already.' };
+  sendMonthly_(l, slug, JSON.parse(rep.spec_json));
+  return { title: 'Sent', message: l.business + ' has their ' + JSON.parse(rep.spec_json).month_name + ' report.' };
+}
+
+function sendMonthly_(l, slug, spec) {
+  var v = spec.value;
+  sendLeadEmail_(l, 'monthly_report', {
+    report_month: spec.month_name.replace(/ \d{4}$/, ''), monthly_url: siteUrl_() + '/report/' + slug, monthly_headline: spec.headline,
+    monthly_value_para: v ? 'Going by the calls and forms your ads brought in, that\'s roughly $' + money_(v.low) + ' to $' + money_(v.high) + ' in work. The report shows how that\'s worked out.\n\n' : ''
+  });
+  var rep = findRow_(TAB.reports, HEAD.reports, 'slug', slug);
+  updateRow_(TAB.reports, HEAD.reports, rep, { status: 'sent' });
+  var c = clientOf_(l.id);
+  if (c) updateRow_(TAB.clients, HEAD.clients, c, { last_report: spec.month });
+  logEvent_(l.id, l.email, 'monthly_sent', spec.month);
+}
+
+// Spec in, HTML out, with no Sheet access (build.py renders the sample through this).
+function renderMonthlySpec_(spec, o) {
+  var t = spec.totals || {}, p = spec.prev || null;
+  var delta = function (cur, prev, money, lowerIsBetter) {
+    if (!p || prev == null || cur == null || cur === prev) return '';
+    var up = cur > prev, good = lowerIsBetter === null ? null : lowerIsBetter ? !up : up;
+    return '<span class="delta ' + (good === null ? 'neutral' : good ? 'good' : 'gap') + '">' + (up ? '↑ ' : '↓ ') + esc_(money ? dollars_(Math.abs(cur - prev)) : String(Math.abs(Math.round(cur - prev)))) + '</span>';
+  };
+  var tile = function (label, value, d) { return '      <div class="tile"><span class="tile-label">' + esc_(label) + '</span><span class="tile-value">' + esc_(value) + '</span>' + d + '</div>'; };
+  var rv = reportValueWords_(spec.value);
+  return fill_(MONTHLY_TEMPLATE, {
+    business: spec.business, month_name: spec.month_name, date: spec.date, headline: spec.headline, summary: spec.summary, sender_name: o.sender_name,
+    value_headline: rv.headline, value_footnote: rv.footnote,
+    value_line: spec.value ? 'About ' + spec.value.leads_month + ' calls and forms came in from your ads. If ' + inN_(spec.value.book) + ' turned into booked jobs at $' +
+      money_(spec.value.job_low) + ' to $' + money_(spec.value.job_high) + ' for ' + spec.value.job + ', that\'s about ' + (spec.value.jobs === 1 ? 'one job' : word_(spec.value.jobs) + ' jobs') +
+      ', for ' + dollars_(spec.value.spend) + ' in ad spend.' : '',
+    compare_note: p ? 'Arrows compare with the month before.' : 'Next month\'s report compares with this one.'
+  }, {
+    tiles: [tile('Ad spend', dollars_(t.cost), delta(t.cost, p && p.cost, true, null)), tile('Calls and forms', String(t.leads || 0), delta(t.leads, p && p.leads, false, false)),
+      tile('Each call or form', t.cost_per_lead != null ? dollars_(t.cost_per_lead) : 'n/a', delta(t.cost_per_lead, p && p.cost_per_lead, true, true)),
+      tile('Clicks', money_(t.clicks), delta(t.clicks, p && p.clicks, false, false))].join('\n'),
+    value_hidden: spec.value ? '' : 'hidden',
+    changes: (spec.changes || []).map(function (x) { return '      <li>' + esc_(x) + '</li>'; }).join('\n'),
+    next: (spec.next || []).map(function (x) { return '      <li>' + esc_(x) + '</li>'; }).join('\n'),
+    searches: (spec.converting_top || []).map(function (x) {
+      return '          <tr><td>' + esc_(x.term) + '</td><td>' + esc_(String(x.conversions)) + '</td><td>' + esc_(dollars_(x.cost)) + '</td></tr>';
+    }).join('\n'),
+    searches_hidden: (spec.converting_top || []).length ? '' : 'hidden'
+  });
+}
+
+// The month's management fee invoices: drafted between the 2nd and the 7th, held for one OK when MONTHLY_REVIEW is yes.
+function monthlyInvoices_(month, clients) {
+  var made = [];
+  clients.forEach(function (c) {
+    if (!c.bill_from || String(c.bill_from) > month || c.last_invoice === month || !(Number(c.monthly_fee) > 0)) return;
+    var item = 'Google Ads management, ' + monthName_(month);
+    appendRow_(TAB.invoices, HEAD.invoices, { lead_id: c.lead_id, month: month, item: item, amount: Number(c.monthly_fee), status: 'draft', created: new Date() });
+    updateRow_(TAB.clients, HEAD.clients, c, { last_invoice: month });
+    made.push(c.business + ': $' + money_(c.monthly_fee));
+  });
+  if (!made.length) return;
+  var gst = yes_(setting_('GST_REGISTERED'));
+  if (!fbConnected_()) {
+    readRows_(TAB.invoices, HEAD.invoices).forEach(function (r) { if (r.month === month && r.status === 'draft') updateRow_(TAB.invoices, HEAD.invoices, r, { status: 'manual' }); });
+    ownerMail_('Management invoices for ' + monthName_(month), 'Send these from FreshBooks (it isn\'t connected to the hub):\n\n' + made.join('\n') + (gst ? '\n\nEach + 5% GST.' : ''));
+    return;
+  }
+  if (!yes_(setting_('MONTHLY_REVIEW'))) { ownerApproveInvoices_(month); return; }
+  var id = 'invoices-' + month;
+  ownerMail_('Check ' + monthName_(month) + ' management invoices', made.length + ' management invoice' + (made.length > 1 ? 's' : '') + ' for ' + monthName_(month) + ':\n\n' +
+    made.join('\n') + (gst ? '\n\nEach + 5% GST.' : '') + '\n\nTo change one, edit monthly_fee in the Clients tab and tell Claude in the Ledge project first.\n\n' +
+    'Send them all from FreshBooks: ' + prop_('WEB_APP_URL') + '?action=approve_invoices&id=' + id + '&t=' + token_(id));
+}
+function ownerApproveInvoices_(month) {
+  var n = 0;
+  readRows_(TAB.invoices, HEAD.invoices).forEach(function (r) { if (r.month === month && r.status === 'draft') { updateRow_(TAB.invoices, HEAD.invoices, r, { status: 'approved' }); n++; } });
+  logEvent_('', '', 'invoices_approved', month + ': ' + n);
+  return page_(n ? 'On their way' : 'Nothing to send', n ? n + ' invoice' + (n > 1 ? 's go' : ' goes') + ' out from FreshBooks within the hour.' : 'These invoices were already approved.');
+}
+// Hourly, inside the lock: approved monthly invoices go out from FreshBooks.
+function sendMonthlyInvoices_() {
+  if (!fbConnected_()) return;
+  readRows_(TAB.invoices, HEAD.invoices).filter(function (r) { return r.status === 'approved' && !r.invoice_id; }).slice(0, 15).forEach(function (r) {
+    var l = findLead_('id', r.lead_id);
+    if (!l || !l.email) return;
+    try {
+      var inv = fbSendInvoice_(fbClientFor_(l), l.email, [{ name: r.item, description: '', amount: Number(r.amount) }], yes_(setting_('GST_REGISTERED')),
+        'Invoice from Ledge Communications', 'Hi ' + (l.first_name || firstName_(l.name) || 'there') + ',\n\nHere\'s the invoice for ' + String(r.item).replace(/^Google Ads management/, 'managing your Google Ads') +
+          '. You can pay it online by card or bank transfer.\n\nThanks,\n' + firstName_(setting_('SENDER_NAME')));
+      updateRow_(TAB.invoices, HEAD.invoices, r, { invoice_id: String(inv.id), invoice_number: String(inv.invoice_number || ''), status: 'sent', sent_at: new Date() });
+      logEvent_(l.id, l.email, 'invoice_sent', 'FreshBooks #' + (inv.invoice_number || inv.id) + ', ' + r.month);
+    } catch (err) {
+      logEvent_(l.id, l.email, 'error', 'FreshBooks monthly invoice: ' + String(err && err.message || err).slice(0, 300));
+    }
+  });
+}
+
 /* ══════════════════════════ paid account audits ══════════════════════════ */
 /*
  * After someone approves the $500 account audit:
@@ -1821,7 +2162,11 @@ function customerIdFrom_(text, lead) {
   var about = hits.filter(function (h) { return h.about; });
   if (about.length) return about[0].cid;
   var unique = hits.map(function (h) { return h.cid; }).filter(function (c, i, all) { return all.indexOf(c) === i; });
-  return unique.length === 1 ? unique[0] : '';
+  if (unique.length === 1) return unique[0];
+  // Several numbers (a phone number in the signature, say): take the one on the first line, if only one is there.
+  var first = (String(text || '').split(/\r?\n/).filter(function (x) { return x.trim(); })[0] || '').replace(/\D+/g, ' ');
+  var onFirst = unique.filter(function (c) { return (' ' + first + ' ').replace(/(\d{3}) (\d{3}) (\d{4})/g, '$1$2$3').indexOf(c.replace(/-/g, '')) > -1; });
+  return onFirst.length === 1 ? onFirst[0] : '';
 }
 function formatCid_(cid) {
   var d = String(cid || '').replace(/\D/g, '');
@@ -1913,14 +2258,22 @@ function gatherSiteChecks_() {
 function pagespeed_(url) {
   var key = prop_('PAGESPEED_API_KEY');
   try {
-    var r = UrlFetchApp.fetch('https://www.googleapis.com/pagespeedonline/v5/runPagespeed?strategy=mobile&category=performance&url=' + encodeURIComponent(url) +
+    var r = UrlFetchApp.fetch('https://www.googleapis.com/pagespeedonline/v5/runPagespeed?strategy=mobile&category=performance&category=seo&category=accessibility&url=' + encodeURIComponent(url) +
       (key ? '&key=' + encodeURIComponent(key) : ''), { muteHttpExceptions: true });
     if (r.getResponseCode() !== 200) return { error: 'HTTP ' + r.getResponseCode() + (r.getResponseCode() === 429 ? ' (add a PAGESPEED_API_KEY)' : '') };
     var j = JSON.parse(r.getContentText()), lh = j.lighthouseResult || {}, au = lh.audits || {};
     var shown = function (k) { return (au[k] || {}).displayValue || ''; };
     var field = (j.loadingExperience || {}).metrics || {};
     var lcpField = field.LARGEST_CONTENTFUL_PAINT_MS || null;
+    var cats = lh.categories || {};
+    var score = function (c) { return cats[c] && cats[c].score != null ? Math.round(cats[c].score * 100) : null; };
+    // The SEO and accessibility checks it failed, in Google's words (Claude puts them in plain ones).
+    var failed = function (c) {
+      return ((cats[c] || {}).auditRefs || []).filter(function (a) { return a.weight > 0 && au[a.id] && au[a.id].score === 0; })
+        .map(function (a) { return String(au[a.id].title || a.id).replace(/`/g, '').slice(0, 120); }).slice(0, 8);
+    };
     return {
+      seo: score('seo'), accessibility: score('accessibility'), seo_failed: failed('seo'), accessibility_failed: failed('accessibility'),
       url: url, score: lh.categories && lh.categories.performance && lh.categories.performance.score != null ? Math.round(lh.categories.performance.score * 100) : null,
       lcp: shown('largest-contentful-paint'), fcp: shown('first-contentful-paint'), tbt: shown('total-blocking-time'), cls: shown('cumulative-layout-shift'),
       field_lcp: lcpField ? (lcpField.percentile / 1000).toFixed(1) + ' s (' + String(lcpField.category || '').toLowerCase() + ')' : ''
@@ -1940,7 +2293,9 @@ function siteText_(site) {
   (site.pages || []).forEach(function (p) {
     L.push('Google PageSpeed on a phone, ' + p.url + ': performance ' + (p.score != null ? p.score + '/100' : 'unknown') + ', largest content shows at ' + (p.lcp || '?') +
       ', first content at ' + (p.fcp || '?') + ', blocking time ' + (p.tbt || '?') + ', layout shift ' + (p.cls || '?') +
-      (p.field_lcp ? '. Real visitors (Chrome data): largest content at ' + p.field_lcp : '') + '.');
+      (p.field_lcp ? '. Real visitors (Chrome data): largest content at ' + p.field_lcp : '') + '.' +
+      (p.seo != null ? ' Search basics (SEO) ' + p.seo + '/100' + ((p.seo_failed || []).length ? ', failed: ' + p.seo_failed.join('; ') : '') + '.' : '') +
+      (p.accessibility != null ? ' Accessibility ' + p.accessibility + '/100' + ((p.accessibility_failed || []).length ? ', failed: ' + p.accessibility_failed.join('; ') : '') + '.' : ''));
   });
   if ((site.errors || []).length) L.push('Site checks that could not run: ' + site.errors.join('; ') + '.');
   return L.join('\n');
@@ -1949,13 +2304,25 @@ function siteText_(site) {
 function adsQueue_() {
   var rows = readRows_(TAB.exports, HEAD.exports).filter(function (e) { return e.status === 'requested'; });
   rows.forEach(function (e) {
+    if (e.kind === 'monthly') {
+      if (Date.now() - new Date(e.requested).getTime() <= 7 * 864e5) return;
+      updateRow_(TAB.exports, HEAD.exports, e, { status: 'expired', updated: new Date(), detail: 'Not linked for a week' });
+      var c = findLead_('id', e.lead_id) || {};
+      ownerMail_('Monthly report stalled: ' + (c.business || e.customer_id), 'The export script couldn\'t read ' + e.customer_id + ' for the ' + monthName_(e.month) +
+        ' report: the account isn\'t linked to the manager account any more. Once it\'s linked again, tell Claude in the Ledge project and it can be rerun.');
+      return;
+    }
     if (Date.now() - new Date(e.requested).getTime() <= 21 * 864e5) return;
     updateRow_(TAB.exports, HEAD.exports, e, { status: 'expired', updated: new Date(), detail: 'The link was never accepted' });
     var l = findLead_('id', e.lead_id) || {};
     ownerMail_('Account audit stalled: ' + (l.business || e.customer_id), 'The link to ' + e.customer_id + ' still wasn\'t accepted after three weeks, so the export ' +
       'stopped trying. Once they accept it, start it again with Ledge > Run an account audit.');
   });
-  return { ok: true, requests: rows.filter(function (e) { return e.status === 'requested'; }).map(function (e) { return { id: e.id, customer_id: e.customer_id }; }) };
+  return { ok: true, requests: rows.filter(function (e) { return e.status === 'requested'; }).map(function (e) {
+    if (e.kind !== 'monthly') return { id: e.id, customer_id: e.customer_id };
+    var r = monthRange_(e.month);
+    return { id: e.id, customer_id: e.customer_id, kind: 'monthly', start: r.start, end: r.end };
+  }) };
 }
 
 function handleAdsExport_(b) {
@@ -1973,6 +2340,7 @@ function handleAdsExport_(b) {
       '\n\nOnce it\'s sorted, start it again with Ledge > Run an account audit.');
     return { ok: true };
   }
+  if (e.kind === 'monthly') return monthlyExport_(e, l, b.data);
   var json = packExport_(b.data);
   var f = accountFacts_(b.data);
   var fields = { status: 'report_queued', updated: new Date(),
@@ -2001,7 +2369,10 @@ function readExport_(e) {
   for (var i = 1; i <= 8; i++) s += String(e['d' + i] || '');
   try { return JSON.parse(s); } catch (err) { return null; }
 }
-function latestExport_(leadId) { return findRow_(TAB.exports, HEAD.exports, 'lead_id', leadId); }
+// The account audit's export (monthly exports are kept apart).
+function latestExport_(leadId) {
+  return readRows_(TAB.exports, HEAD.exports).filter(function (e) { return e.lead_id === leadId && e.kind !== 'monthly'; }).pop() || null;
+}
 
 // The numbers the report stands on, worked out here so Claude never has to do arithmetic.
 function accountFacts_(d, trade, siteHint) {
@@ -2299,6 +2670,8 @@ function renderReport_(slug) {
   var row = findRow_(TAB.reports, HEAD.reports, 'slug', slug);
   if (!row) return null;
   var lead = findLead_('id', row.lead_id) || {};
+  var mspec = JSON.parse(row.spec_json);
+  if (mspec.type === 'monthly') return renderMonthlySpec_(mspec, { sender_name: setting_('SENDER_NAME') || 'Logan' });
   return renderReportSpec_(JSON.parse(row.spec_json), {
     sender_name: setting_('SENDER_NAME') || 'Logan', proposal_url: row.status === 'sent' && lead.proposal_slug ? siteUrl_() + '/proposal/' + lead.proposal_slug : '',
     credit: (function () {
@@ -2779,6 +3152,16 @@ var EMAILS = {
     body: 'Hi {first},\n\nThanks, that\'s all I need. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, ' +
       'under Admin > Access and security > Managers. Once you approve it, I\'ll get started, and you\'ll have the audit within about a week.\n\n{sign}'
   },
+  link_ack: {
+    fallbackSubject: 'Linking your Google Ads account',
+    body: 'Hi {first},\n\nThanks, that\'s all I need. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, ' +
+      'under Admin > Access and security > Managers. Once you approve it, I\'ll get started on the cleanup.\n\n{sign}'
+  },
+  monthly_report: {
+    subject: 'Your {report_month} Google Ads report',
+    body: 'Hi {first},\n\nYour {report_month} report is ready:\n{monthly_url}\n\n{monthly_headline}\n\n{monthly_value_para}' +
+      'It also covers what we changed and what\'s next. If there\'s anything you\'d like done differently, just reply here.\n\n{sign}'
+  },
   account_report: {
     fallbackSubject: 'Your Google Ads account audit',
     body: 'Hi {first},\n\nYour Google Ads account audit is ready:\n{report_url}\n\nThe short version: {report_finding}\n\n{report_value_para}' +
@@ -2880,10 +3263,11 @@ function previewEmail_(l, key) {
   return (tpl.subject ? 'Subject: ' + fillText_(tpl.subject, vars) + '\n\n' : '') + fillText_(tpl.body, vars);
 }
 
-function sendLeadEmail_(l, key) {
+function sendLeadEmail_(l, key, extra) {
   if (!l || !l.email) return;
   var actual = trackKey_(l, key);
   var tpl = EMAILS[actual], vars = emailVars_(l);
+  Object.keys(extra || {}).forEach(function (k) { vars[k] = extra[k]; });
   var text = fillText_(tpl.body, vars) + footer_(l);
   var res;
   if (l.thread_id && !tpl.subject) {
@@ -2895,8 +3279,8 @@ function sendLeadEmail_(l, key) {
   logEvent_(l.id, l.email, 'sent_' + key, actual !== key ? actual : '');
 }
 
-function safeSend_(l, key) {
-  try { sendLeadEmail_(l, key); } catch (err) { logEvent_(l && l.id, l && l.email, 'error', 'Email ' + key + ' failed: ' + (err && err.message || err)); }
+function safeSend_(l, key, extra) {
+  try { sendLeadEmail_(l, key, extra); } catch (err) { logEvent_(l && l.id, l && l.email, 'error', 'Email ' + key + ' failed: ' + (err && err.message || err)); }
 }
 
 function threadSubject_(threadId) {
@@ -3247,6 +3631,16 @@ function sendInvoices_() {
 // Hourly: paid invoices. Logan hears about each one.
 function checkPayments_() {
   if (!fbConnected_()) return;
+  readRows_(TAB.invoices, HEAD.invoices).filter(function (r) { return r.invoice_id && !r.paid_at; }).slice(0, 20).forEach(function (r) {
+    var inv;
+    try { inv = fb_('get', '/invoices/invoices/' + r.invoice_id).invoice || {}; } catch (err) { return; }
+    if (!(inv.v3_status === 'paid' || inv.payment_status === 'paid' || Number(inv.status) === 4)) return;
+    updateRow_(TAB.invoices, HEAD.invoices, r, { paid_at: new Date(), status: 'paid' });
+    var l = findLead_('id', r.lead_id) || {};
+    logEvent_(l.id || '', l.email || '', 'paid', 'FreshBooks #' + (r.invoice_number || r.invoice_id) + ', ' + r.month);
+    ownerMail_('Paid: ' + (l.business || 'invoice ' + r.invoice_number) + ', ' + monthName_(r.month), (l.business || 'A client') + ' paid FreshBooks invoice #' +
+      (r.invoice_number || r.invoice_id) + ' (' + r.item + ').');
+  });
   readRows_(TAB.proposals, HEAD.proposals).filter(function (p) { return p.invoice_id && !p.paid_at; }).slice(0, 20).forEach(function (p) {
     var inv;
     try { inv = fb_('get', '/invoices/invoices/' + p.invoice_id).invoice || {}; } catch (err) { return; }
