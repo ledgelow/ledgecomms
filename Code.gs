@@ -3736,9 +3736,39 @@ function fbSendInvoice_(clientId, email, lines, gst, subject, note) {
       return line;
     })
   } }).invoice;
+  // Invoices made through the API don't get the pay-online button on their own: copy the account's defaults onto it first.
+  try { inv.payment_gateway = fbEnableOnlinePayments_(inv.invoiceid || inv.id); }
+  catch (err) { inv.payments_error = String(err && err.message || err).slice(0, 300); }
   fb_('put', '/invoices/invoices/' + inv.id, { invoice: { action_email: true, email_recipients: [email], email_include_pdf: false,
     invoice_customized_email: { subject: subject, body: note } } });
+  if (inv.payments_error && !/test/i.test(subject)) {
+    ownerMail_('No pay-online button on FreshBooks invoice #' + (inv.invoice_number || inv.id),
+      'The invoice went out, but FreshBooks wouldn\'t switch on online payments for it:\n' + inv.payments_error + '\n\n' +
+      'Open the invoice in FreshBooks and turn on online payments there, then resend it. If this keeps happening, run ' +
+      'Ledge > Send a test invoice to myself and send Claude what it says.');
+  }
   return inv;
+}
+
+// FreshBooks' online payments API (separate from accounting). Returns the parsed body.
+function fbPayments_(method, path, body) {
+  var opts = { method: method, headers: { Authorization: 'Bearer ' + fbAccess_() }, muteHttpExceptions: true };
+  if (body) { opts.contentType = 'application/json'; opts.payload = JSON.stringify(body); }
+  var r = UrlFetchApp.fetch(FB_API + '/payments/account/' + prop_('FRESHBOOKS_ACCOUNT_ID') + path, opts);
+  var j = {};
+  try { j = JSON.parse(r.getContentText()); } catch (err) {}
+  if (r.getResponseCode() >= 300) throw new Error('FreshBooks payments ' + method.toUpperCase() + ' ' + path.split('?')[0] + ': HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 200));
+  return j.payment_options || ((j.response || {}).result || {}).payment_options || {};
+}
+
+// Puts the account's default online payment options (set in FreshBooks > Payments > Online Payments) on one invoice.
+function fbEnableOnlinePayments_(invoiceId) {
+  var d = {};
+  try { d = fbPayments_('get', '/payment_options?entity_type=invoice'); } catch (err) { d = {}; }
+  var body = { gateway_name: d.gateway_name || 'fbpay', has_credit_card: d.has_credit_card !== false, entity_type: 'invoice', entity_id: String(invoiceId) };
+  Object.keys(d).forEach(function (k) { if (/^(has_|allow_)/.test(k) && k !== 'has_credit_card') body[k] = d[k]; });
+  fbPayments_('post', '/invoice/' + invoiceId + '/payment_options', body);
+  return body.gateway_name;
 }
 
 // Hourly: an invoice for each proposal approved since FreshBooks was connected.
@@ -3799,7 +3829,8 @@ function testFreshBooksInvoice() {
     var inv = fbSendInvoice_(fbClientFor_({ email: me, business: 'Ledge test', name: setting_('SENDER_NAME') }), me,
       [{ name: 'Test invoice', description: 'Checking the FreshBooks connection. No need to pay it.', amount: 1 }], false, 'Test invoice from Ledge Communications',
       'This is a test from the Ledge hub. Check that the pay-online button shows, then delete it in FreshBooks.');
-    ui.alert('Sent FreshBooks invoice #' + (inv.invoice_number || inv.id) + ' to ' + me + '.');
+    ui.alert('Sent FreshBooks invoice #' + (inv.invoice_number || inv.id) + ' to ' + me + '.\n\n' +
+      (inv.payments_error ? 'Online payments did NOT switch on: ' + inv.payments_error : 'Online payments: on (' + inv.payment_gateway + '). The email should have a pay button.'));
   } catch (err) {
     ui.alert('That didn\'t work: ' + String(err && err.message || err).slice(0, 300));
   } finally { lock.releaseLock(); }

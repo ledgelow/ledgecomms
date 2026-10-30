@@ -10,17 +10,26 @@ Two rules while you set up:
 
 What it costs: $0 a month in fixed tools. Usage costs are the Claude API (roughly 50 cents to a dollar per audit on
 Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both and pauses itself at
-`MONTHLY_ENGINE_BUDGET_USD` (US$60 to start).
+`MONTHLY_ENGINE_BUDGET_USD` (US$250 since Oct 30, to see the first 100 or so cold emails through).
 
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
 ## Where you are (Oct 30, evening): mailbox address, worksheet decisions built
 
-Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected; online payments pending FreshBooks'
-review), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
+Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected, with online payments), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
-**Ship this update (10 minutes)**
+**Online payments on invoices (Oct 30, late afternoon, 5 minutes)**
+Invoices the hub makes through FreshBooks' API don't get a pay-online button on their own. The hub now copies your
+default online payment options onto each invoice before FreshBooks emails it.
+1. **Apps Script:** replace `Code.gs`, save, then deploy a new version. **GitHub:** upload `Code.gs` and `SETUP.md`.
+2. In FreshBooks > **Payments** > **Online Payments**, check the defaults for invoices are on (card, and bank payments if
+   you offer them). Those are what get copied.
+3. **Ledge** > **Send a test invoice to myself**. The pop-up says "Online payments: on" or why not. If it says HTTP 401 or
+   403, add the online payments permission to the Ledge app in the FreshBooks developer settings, then run **Ledge** >
+   **Connect FreshBooks** again and retry.
+
+**Evening update (done)**
 1. **Settings tab:** set `MAILING_ADDRESS` to `1122 3 St SE, Ste 1906 #117, Calgary, AB T2G 0E7` (one line). Every
    email footer uses it from then on.
 2. **FreshBooks:** Settings > Business > address: the same mailbox address, so invoices carry it too.
