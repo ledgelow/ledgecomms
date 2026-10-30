@@ -15,24 +15,37 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 30): pricing cleanup, then the email worksheet
+## Where you are (Oct 30, evening): mailbox address, worksheet decisions built
 
 Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected; online payments pending FreshBooks'
 review), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
-**Ship this update (Oct 30, 5 minutes)**
-1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
+**Ship this update (10 minutes)**
+1. **Settings tab:** set `MAILING_ADDRESS` to `1122 3 St SE, Ste 1906 #117, Calgary, AB T2G 0E7` (one line). Every
+   email footer uses it from then on.
+2. **FreshBooks:** Settings > Business > address: the same mailbox address, so invoices carry it too.
+3. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
    version** > **Deploy**.
-2. **GitHub:** upload `Code.gs`, `Templates.gs`, `index.html`, `pricing.html`, `sample-audit.html`, `sample-proposal.html`,
-   `sample-report.html`, `inbound-sequence.md`, and `SETUP.md`.
-3. **Settings tab:** nothing to do. The next hourly run moves page fixes to $750, the landing page to $1,500, and site
-   support to $125 an hour, as long as those cells still hold the old prices (a number you typed yourself stays). The
-   site shows the new prices within an hour after that.
+4. **GitHub:** upload `Code.gs`, `Templates.gs`, `worker.js`, `index.html`, `pricing.html`, `sample-audit.html`,
+   `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md`.
+5. **Settings tab, on its own:** the next hourly run applies the worksheet calls you made, wherever a cell still holds
+   the old default: `COLD_PER_DAY_MAX` 10, `PROSPECTS_PER_WEEK` 40, `REVIEW_PROPOSALS_FIRST` 10, `TRADES` without roofing
+   and eavestroughs (add them back in March), and a new `INBOUND_HOLD_HOURS` of 3.
 
-What changed: the pricing headline is "Clear prices, no long-term contract.", and "Is there a contract?" now leads with
-the written plan they approve before anything starts. The paid audit is "Google Ads audit" (and "Google Ads and site
-audit") everywhere a customer sees it: pricing, audit pages, proposals, reports, emails, and invoices. The email address
-in the site footer is a link on desktop too. Cold email stays off until the email worksheet is done.
+What's new:
+- **Mailbox address** in the site footer (home and pricing pages). Your home address is no longer used anywhere once
+  `MAILING_ADDRESS` is changed.
+- **Who opened their audit.** The audit page tells the hub once it's been on screen for four seconds (link scanners
+  don't count, and neither do your own checks before it goes out). New Leads columns `audit_opened` and `audit_opens`;
+  the weekly digest counts first opens and replies.
+- **Check back later.** Each reply in the 5 pm needs-you email now has three links: in a month, in 3 months, early
+  March. Pick one and that shop gets one short note on the day, and nothing before it.
+- **A personal line on site-form audits.** Site-form audits now wait up to 3 hours (`INBOUND_HOLD_HOURS`) for your OK.
+  The email about it has an "Add a personal line and send" link: type a line, tap Send, and it goes right under "Hi
+  Dana,". If you don't get to it, it goes out on its own. An audit you approve after 9 pm goes at 7 am.
+
+**Pricing cleanup (Oct 30, afternoon, done):** "Clear prices, no long-term contract.", the "Is there a contract?" answer,
+"Google Ads audit" everywhere a customer sees it, add-ons at $750, $1,500, and $125 an hour, and the footer email link.
 
 **Oct 28 update (done)**
 1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
@@ -347,12 +360,33 @@ with that word in the title, so the rest of your calendar is left alone.
 
 ## 7. Mailing address (1 minute)
 
-Canada's anti-spam law requires a mailing address in every commercial email, cold or not. Your home address is fine.
-It only appears in email footers, never on the site, audit, or proposal pages. Put it in the `MAILING_ADDRESS`
-setting on one line. Cold email won't start until it's filled in.
+Canada's anti-spam law requires a mailing address in every commercial email, cold or not. Use the Ledge mailbox
+(Anytime Mailbox Calgary): `1122 3 St SE, Ste 1906 #117, Calgary, AB T2G 0E7`, in the `MAILING_ADDRESS` setting on one
+line. It's also in the site footer and on FreshBooks invoices. Cold email won't start until it's filled in.
 
-If you ever want it out of the footers, a Canada Post PO box (roughly $120 to $215 a year) is the cheap swap:
-change the setting and every email after that uses the new address.
+Keep the mailbox off your Google Business Profile: Google doesn't accept mailbox addresses there (next step).
+
+## 7a. Ledge's own Google Business Profile (optional, 20 minutes plus verification)
+
+A profile puts Ledge on the map and gives first clients somewhere to leave reviews, which matters for a business that
+sells local search. Google lists businesses that have a location customers can visit, or that travel to customers where
+they are. Ledge fits the second only if you'll actually meet clients at their shop (a kickoff visit counts). If it stays
+email and phone only, skip this: Google's rules don't cover a remote-only service.
+
+1. At business.google.com, signed in as ledgecommunications@gmail.com, add **Ledge Communications**: the real name,
+   nothing added to it.
+2. Category: **Internet marketing service**. Add **Marketing agency** as a second one.
+3. When it asks about a location customers can visit, say **no**. Give your home address only where Google asks for it
+   to verify; it stays hidden from the public. Never use the mailbox here: Google doesn't accept mailbox or virtual
+   office addresses, and that's a common reason profiles get suspended.
+4. Service areas: Calgary, Airdrie, Chestermere, Cochrane, and Okotoks (the same as `AREAS`). Google allows up to 20, within
+   about two hours' drive.
+5. Website ledgecommunications.com. A phone number is optional (it ties into the worksheet's phone decision).
+6. Verification is usually a short, unedited video, filmed in one take. Show where you are (street signs or landmarks near
+   home are fine for a home-based business), that the business exists (your workspace, with the site or an audit on
+   screen), and that you run it (a FreshBooks invoice or other document in the name Ledge Communications). Keep bank,
+   tax, and ID numbers out of frame.
+7. Hours: when you take calls.
 
 ## 8. Trial runs (20 minutes, phone is fine)
 

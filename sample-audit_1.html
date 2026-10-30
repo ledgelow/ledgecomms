@@ -350,6 +350,22 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
         });
     });
   });
+  // Tells the hub the audit was read: once per visit, after four seconds on screen.
+  var id = document.querySelector('.ask-form input[name="id"]'), tk = document.querySelector('.ask-form input[name="t"]');
+  if (!id || !tk || !id.value || id.value === 'sample' || !navigator.sendBeacon) return;
+  var sent = false, timer = null;
+  function arm() {
+    clearTimeout(timer);
+    if (sent || document.visibilityState !== 'visible') return;
+    timer = setTimeout(function () {
+      if (sent || document.visibilityState !== 'visible') return;
+      sent = true;
+      var d = new FormData(); d.append('id', id.value); d.append('t', tk.value);
+      navigator.sendBeacon('/api/viewed', d);
+    }, 4000);
+  }
+  document.addEventListener('visibilitychange', arm);
+  arm();
 })();
 </script>
 </body>

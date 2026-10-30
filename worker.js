@@ -79,6 +79,7 @@ async function handleApi(request, env, path) {
     "/api/quote-request": { POST: quoteRequest },
     "/api/approve": { POST: approve },
     "/api/unsubscribe": { GET: unsubscribeGet, POST: unsubscribePost },
+    "/api/viewed": { POST: viewed },
   };
   const route = routes[path];
   if (!route) return json({ ok: false, error: "not_found" }, 404);
@@ -190,6 +191,16 @@ async function quoteRequest(request, env) {
   if (!id || !t || !env.HUB_URL || !env.HUB_KEY) return buttonReply(request, false, 400, QUOTE_MSG);
   const out = await toHub(env, { type: "quote", id, t, notes, offer, budget, running_ads, addons });
   return buttonReply(request, out.ok, out.ok ? 200 : 502, QUOTE_MSG);
+}
+
+// POST /api/viewed: an audit page was on screen for a few seconds (a beacon from the page, so link scanners don't count).
+async function viewed(request, env) {
+  const form = await request.formData().catch(() => null);
+  const id = form ? String(form.get("id") || "").slice(0, 40) : "";
+  const t = form ? String(form.get("t") || "").slice(0, 64) : "";
+  if (!id || !t || id === "sample" || !env.HUB_URL || !env.HUB_KEY) return json({ ok: false }, 400);
+  const out = await toHub(env, { type: "viewed", id, t });
+  return json({ ok: out.ok });
 }
 
 // POST /api/approve: the "Approve and get started" button on a proposal page.

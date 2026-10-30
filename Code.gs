@@ -41,7 +41,10 @@ var HEAD = {
   leads: ['id', 'created', 'source', 'status', 'attention', 'first_name', 'name', 'business', 'website', 'email',
     'phone', 'trade', 'area', 'consent_basis', 'consent_proof', 'audit_slug', 'top_finding', 'fix_1',
     'proposal_slug', 'thread_id', 'last_msg_id', 'last_reply_at', 'touches', 'next_touch', 'last_touch',
-    'booked_at', 'notes', 'owner_says', 'segment', 'budget', 'ads_customer_id', 'report_slug'],
+    'booked_at', 'notes', 'owner_says', 'segment', 'budget', 'ads_customer_id', 'report_slug',
+    // audit_opened: first time the audit page was read after it went out (audit_opens counts every time).
+    // check_back: the date a "try me later" lead gets its one note. personal_line: Logan's line atop a site-form audit email.
+    'audit_opened', 'audit_opens', 'check_back', 'personal_line'],
   audits: ['slug', 'lead_id', 'created', 'business', 'spec_json'],
   // price_sprint is the one-time amount and price_care the monthly fee, whatever the offer.
   proposals: ['slug', 'lead_id', 'created', 'price_sprint', 'price_care', 'gst', 'status', 'sent_at', 'approved_at', 'kind', 'ad_spend', 'credit', 'addons',
@@ -61,11 +64,13 @@ var HEAD = {
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '9';
+var SCHEMA_VERSION = '10';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
-  PRICE_PAGE_FIXES: ['400', '500'], PRICE_LANDING_PAGE: ['900', '1000'], PRICE_SITE_SUPPORT: ['100']
+  PRICE_PAGE_FIXES: ['400', '500'], PRICE_LANDING_PAGE: ['900', '1000'], PRICE_SITE_SUPPORT: ['100'],
+  COLD_PER_DAY_MAX: ['20'], PROSPECTS_PER_WEEK: ['15'], REVIEW_PROPOSALS_FIRST: ['3'],
+  TRADES: ['heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair']
 };
 var SETTINGS_DEFAULTS = [
   ['OWNER_EMAIL', '', 'Where your notifications go (your everyday inbox).'],
@@ -80,14 +85,15 @@ var SETTINGS_DEFAULTS = [
   ['GST_REGISTERED', 'yes', 'yes adds "+ GST" to prices.'],
   ['PAYMENT_URL', '', 'Optional payment link (Stripe or Wave) sent after a proposal is approved.'],
   ['REVIEW_AUDITS_FIRST', '5', 'Hold the first N audits for your one-click OK. 0 turns it off.'],
-  ['REVIEW_PROPOSALS_FIRST', '3', 'Hold the first N proposals for your one-click OK. 0 turns it off.'],
+  ['REVIEW_PROPOSALS_FIRST', '10', 'Hold the first N proposals for your one-click OK. 0 turns it off.'],
+  ['INBOUND_HOLD_HOURS', '3', 'Site-form audits wait this many hours for your OK, so you can add a personal line, then go out on their own. 0 sends them as soon as they\'re ready.'],
   ['COLD_EMAIL_ON', 'no', 'yes starts cold emails. Leave it at no until you\'re happy with the first audits.'],
   ['COLD_PER_DAY_START', '5', 'Cold emails per weekday in the first week.'],
-  ['COLD_PER_DAY_MAX', '20', 'Ceiling after adding 5 a week.'],
-  ['PROSPECTS_PER_WEEK', '15', 'New shops to look for each Monday.'],
+  ['COLD_PER_DAY_MAX', '10', 'Ceiling after adding 5 a week. Raise it once replies look healthy.'],
+  ['PROSPECTS_PER_WEEK', '40', 'New shops to look for each Monday. Keep it about one and a half times the week\'s cold emails: 40 at 5 a day, 75 at 10. Each one gets an audit, so engine spend rises with it.'],
   ['AREAS', 'Calgary NE, Calgary NW, Calgary SE, Calgary SW, Airdrie, Chestermere, Cochrane, Okotoks', 'Areas to work through, in order.'],
-  ['TRADES', 'heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair',
-    'Kinds of business to look for, comma separated. Each one gets its own Google searches.'],
+  ['TRADES', 'heating and cooling, plumbing, electrical, garage doors, appliance repair',
+    'Kinds of business to look for, comma separated. Each one gets its own Google searches. Roofing and eavestroughs are off for the winter; add them back in March.'],
   ['MODEL', 'claude-opus-5-5', 'Claude model for finding shops and writing audits. claude-sonnet-5-5 costs about half.'],
   ['MONTHLY_ENGINE_BUDGET_USD', '60', 'The engine pauses for the rest of the month once estimated spend passes this (Claude and search data together).'],
   ['PRICE_ACCOUNT_AUDIT', '500', 'Paid Google Ads account audit, CAD before GST. Shown on audits for shops already running ads.'],
@@ -274,7 +280,7 @@ function refreshSettingDefaults_(st) {
 function rebuildLegacyAudits_() {
   var n = 0;
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
-    if (['awaiting_review', 'audit_ready', 'ready_to_send'].indexOf(l.status) === -1 || Number(l.touches || 0) > 0 || !l.audit_slug) return;
+    if (['awaiting_review', 'audit_ready', 'audit_approved', 'ready_to_send'].indexOf(l.status) === -1 || Number(l.touches || 0) > 0 || !l.audit_slug) return;
     var row = findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug);
     var spec = {};
     try { spec = row ? JSON.parse(row.spec_json) : {}; } catch (err) {}
@@ -299,6 +305,7 @@ function doPost(e) {
     if (body.type === 'quote') return json_(handleQuoteRequest_(body.id, body.t, body.notes, body.offer, body.budget, body.running_ads, body.addons));
     if (body.type === 'approve') return json_(handleApprove_(body.id, body.t, body.addons));
     if (body.type === 'unsubscribe') return json_(handleUnsubscribe_(body.id, body.t));
+    if (body.type === 'viewed') return json_(handleViewed_(body.id, body.t));
     if (body.type === 'ads_queue') return json_(adsQueue_());
     if (body.type === 'ads_export') return json_(handleAdsExport_(body));
     return json_({ ok: false, error: 'unknown_type' });
@@ -323,6 +330,7 @@ function doGet(e) {
   var lead = findLead_('id', p.id);
   if (!lead) return page_('Lead not found', 'That lead is no longer in the pipeline.');
   var res;
+  if (p.action === 'audit_line') return auditLinePage_(lead);
   if (p.action === 'approve_audit') res = ownerApproveAudit_(lead);
   else if (p.action === 'approve_proposal') res = ownerApproveProposal_(lead);
   else if (p.action === 'skip') res = ownerSkip_(lead);
@@ -330,6 +338,7 @@ function doGet(e) {
   else if (p.action === 'approve_report') res = ownerApproveReport_(lead);
   else if (p.action === 'rebuild_report') res = ownerRebuildReport_(lead);
   else if (p.action === 'approve_monthly') res = ownerApproveMonthly_(lead, p.slug);
+  else if (p.action === 'check_back') res = ownerCheckBack_(lead, p.when);
   else if (p.action === 'handled') {
     updateLead_(lead, { attention: '' });
     logEvent_(lead.id, lead.email, 'handled', '');
@@ -477,35 +486,65 @@ function step_(name, fn) {
 /* ── audits ready to go out ── */
 
 function deliverAudits_() {
-  var toReview = [];
+  var toReview = [], now = new Date();
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    // A site-form audit you didn't get to goes out on its own once its hold is up, so the promised day holds.
+    if (l.status === 'awaiting_review' && l.source !== 'cold' && l.next_touch && new Date(l.next_touch) <= now) {
+      updateLead_(l, { status: 'audit_approved', next_touch: '' });
+      logEvent_(l.id, l.email, 'audit_auto_released', 'hold ran out');
+      releaseAudit_(findLead_('id', l.id));
+      return;
+    }
+    // Approved (or released) outside sending hours: it goes at the next chance, without being held again.
+    if (l.status === 'audit_approved') { releaseAudit_(l); return; }
     if (l.status !== 'audit_ready') return;
-    if (reviewsLeft_('audit') > 0) { toReview.push(l); return; }
+    if (reviewsLeft_('audit') > 0 || inboundHoldHours_(l) > 0) { toReview.push(l); return; }
     releaseAudit_(l);
   });
   if (toReview.length === 1) requestAuditReview_(toReview[0]);
   else if (toReview.length > 1) requestAuditReviews_(toReview);
 }
 
+// Site-form audits wait this many hours for Logan (so he can add a personal line), then go out on their own.
+function inboundHoldHours_(l) {
+  return l && l.source !== 'cold' ? Math.max(0, Number(setting_('INBOUND_HOLD_HOURS') || 0)) : 0;
+}
+
+// Marks an audit as waiting for Logan. A site-form one gets a time it goes out on its own.
+function holdAudit_(l) {
+  var h = inboundHoldHours_(l);
+  var until = h ? new Date(Date.now() + h * 3600e3) : null;
+  updateLead_(l, { status: 'awaiting_review', next_touch: until || '' });
+  return until;
+}
+
+function holdLines_(l, until) {
+  if (l.source === 'cold') return '';
+  return '   Add a personal line and send: ' + ownerLink_('audit_line', l) + '\n' +
+    (until ? '   If you don\'t get to it, it goes out on its own around ' + Utilities.formatDate(until, tz_(), 'h:mm a') + '.\n' : '');
+}
+
 // Several audits ready in the same run: one email, one block per shop, and the full email wording for the first.
 function requestAuditReviews_(list) {
   var adsLabel = { running_ads: 'running ads', no_ads: 'no ads found', unknown: 'not sure about ads' };
   var blocks = list.map(function (l, i) {
-    updateLead_(l, { status: 'awaiting_review' });
+    var until = holdAudit_(l);
     logEvent_(l.id, l.email, 'review_requested', 'audit');
     return (i + 1) + '. ' + l.business + ' (' + (l.source === 'cold' ? 'cold prospect' : 'asked on the site') + ', ' + (l.area || '') + ', ' +
       (adsLabel[l.segment] || adsLabel.unknown) + ')\n' +
       '   Audit: ' + auditUrl_(l) + '\n' +
       '   Biggest finding: ' + l.top_finding + '\n' +
       (l.source === 'cold' ? '   Email found: ' + l.email + ' (' + String(l.consent_proof || '').split(' | ')[0] + ')\n' : '') +
-      '   Looks right: ' + ownerLink_('approve_audit', l) + '\n' +
+      '   Looks right: ' + ownerLink_('approve_audit', l) + '\n' + holdLines_(l, until) +
       '   Rebuild: ' + ownerLink_('rebuild', l) + '\n' +
       '   Skip: ' + ownerLink_('skip', l);
   });
   var first = list[0];
   ownerMail_('Check these ' + list.length + ' audits',
-    'These are among the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so each waits for your OK. ' +
-    (yes_(setting_('COLD_EMAIL_ON')) ? 'Approved cold prospects go into the next cold email slots.' : 'Approving a cold prospect sends nothing while COLD_EMAIL_ON is no.') + '\n\n' +
+    (reviewsLeft_('audit') > 0 ? 'These are among the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so each waits for your OK. '
+      : 'Site-form audits wait a few hours in case you want to add a personal line. ') +
+    (!list.some(function (l) { return l.source === 'cold'; }) ? '' :
+      yes_(setting_('COLD_EMAIL_ON')) ? 'Approved cold prospects go into the next cold email slots.' : 'Approving a cold prospect sends nothing while COLD_EMAIL_ON is no.') + '\n\n' +
     blocks.join('\n\n') + '\n\n' +
     'The email ' + first.business + ' would get (the others follow the same wording):\n────────\n' +
     (first.source === 'cold' ? previewEmail_(first, 'cold_1') : previewEmail_(first, 'inbound_audit')) + '\n────────\n\n' +
@@ -525,18 +564,19 @@ function releaseAudit_(l) {
 }
 
 function requestAuditReview_(l) {
-  updateLead_(l, { status: 'awaiting_review' });
+  var until = holdAudit_(l);
   var first = l.source === 'cold' ? previewEmail_(l, 'cold_1') : previewEmail_(l, 'inbound_audit');
   ownerMail_('Check this audit: ' + l.business,
     l.business + ' (' + (l.source === 'cold' ? 'cold prospect' : 'asked on the site') + ') is ready. ' +
-    'It\'s one of the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so it waits for your OK (' + reviewsLeft_('audit') + ' left).\n\n' +
+    (reviewsLeft_('audit') > 0 ? 'It\'s one of the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so it waits for your OK (' + reviewsLeft_('audit') + ' left).\n\n'
+      : 'It waits a few hours in case you want to add a personal line.\n\n') +
     'Audit: ' + auditUrl_(l) + '\n' +
     'Google Ads: ' + ({ running_ads: 'running ads, so the page offers the $' + money_(setting_('PRICE_ACCOUNT_AUDIT') || 500) + ' account audit',
       no_ads: 'no ads found, so the page offers a starting plan' }[l.segment] || 'couldn\'t tell, so the page asks where they are with ads') + '\n' +
     'Biggest finding: ' + l.top_finding + '\n' +
     (l.source === 'cold' ? 'Email found: ' + l.email + '\nWhere: ' + l.consent_proof + '\n' : '') +
     '\nThe email they\'ll get:\n────────\n' + first + '\n────────\n\n' +
-    'Looks right, send it: ' + ownerLink_('approve_audit', l) + '\n' +
+    'Looks right, send it: ' + ownerLink_('approve_audit', l) + '\n' + holdLines_(l, until).replace(/^   /gm, '') +
     'Rebuild the audit: ' + ownerLink_('rebuild', l) + '\n' +
     'Skip this shop: ' + ownerLink_('skip', l) + '\n\n' +
     'Want a change to how audits are written? Tell Claude in the Ledge project and it\'ll update the instructions.');
@@ -546,11 +586,73 @@ function requestAuditReview_(l) {
 function ownerApproveAudit_(l) {
   if (l.status !== 'awaiting_review') return { title: 'Already handled', message: 'Status is ' + l.status + '.' };
   logEvent_(l.id, l.email, 'audit_approved', '');
-  updateLead_(l, { status: 'audit_ready' });
+  updateLead_(l, { status: 'audit_approved', next_touch: '' });
   l = findLead_('id', l.id);
   var sent = releaseAudit_(l);
   return { title: 'Approved', message: l.source === 'cold' ? l.business + ' is queued for the next cold email slot.' :
     sent ? 'The audit went to ' + l.business + '.' : 'It goes out at 7 am, ' + l.business + ' included.' };
+}
+
+// The audit page reports it was on screen for a few seconds (worker /api/viewed). Before the audit goes out, the only
+// person looking is Logan checking it, so those views don't count.
+function handleViewed_(id, t) {
+  if (!id || t !== token_(id)) return { ok: false, error: 'bad_token' };
+  var l = findLead_('id', id);
+  if (!l) return { ok: false, error: 'not_found' };
+  if (!Number(l.touches || 0)) return { ok: true, counted: false };
+  var fields = { audit_opens: Number(l.audit_opens || 0) + 1 };
+  if (!l.audit_opened) { fields.audit_opened = new Date(); logEvent_(l.id, l.email, 'audit_opened', ''); }
+  updateLead_(l, fields);
+  return { ok: true, counted: true };
+}
+
+// "Try me later": one short note on the day Logan picks from the needs-you email, nothing before it.
+function checkBackDate_(when, from) {
+  var d = new Date(from.getTime());
+  if (when === '1m') d.setMonth(d.getMonth() + 1);
+  else if (when === '3m') d.setMonth(d.getMonth() + 3);
+  else if (when === 'march') d = new Date(d.getFullYear() + (d.getMonth() >= 2 ? 1 : 0), 2, 2);
+  else return null;
+  while (Number(Utilities.formatDate(d, tz_(), 'u')) > 5) d.setDate(d.getDate() + 1);
+  d.setHours(9, 0, 0, 0);
+  return d;
+}
+
+function ownerCheckBack_(l, when) {
+  var d = checkBackDate_(String(when || ''), new Date());
+  if (!d) return { title: 'Link not recognised', message: 'That check-back link is incomplete.' };
+  updateLead_(l, { status: 'check_back', check_back: d, next_touch: d, touches: 1, attention: '' });
+  logEvent_(l.id, l.email, 'check_back_set', Utilities.formatDate(d, tz_(), 'yyyy-MM-dd'));
+  return { title: 'Check-back set', message: (l.business || l.email) + ' gets one short note on ' + Utilities.formatDate(d, tz_(), 'EEEE, MMMM d') +
+    ', and nothing before it. If they write first, it comes to you as usual.' };
+}
+
+// The "add a personal line" page for a site-form audit waiting on Logan. The button calls sendAuditWithLine.
+function auditLinePage_(l) {
+  if (l.status !== 'awaiting_review') return page_('Already handled', 'Status is ' + l.status + '.');
+  var t = token_(l.id);
+  var html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;color:#1B2A38">' +
+    '<h2 style="margin:0 0 6px">A line for ' + esc_(l.business || l.email) + '</h2>' +
+    '<p style="color:#566A7E;margin:0 0 14px">It goes right under "Hi ' + esc_(l.first_name || 'there') + '," in the email with their audit. Leave it empty to send as is.</p>' +
+    '<textarea id="line" rows="4" maxlength="600" style="width:100%;box-sizing:border-box;font:16px/1.5 Arial,sans-serif;padding:10px;border:1px solid #9AAFC2;border-radius:6px">' +
+    esc_(l.personal_line || '') + '</textarea>' +
+    '<p><button id="go" style="font:600 16px Arial,sans-serif;padding:10px 18px;border:0;border-radius:6px;background:#1B2A38;color:#fff">Send the audit</button></p>' +
+    '<p id="out" style="color:#566A7E"></p></div>' +
+    '<script>document.getElementById("go").onclick=function(){var b=this;b.disabled=true;b.textContent="Sending...";' +
+    'google.script.run.withSuccessHandler(function(m){document.getElementById("out").textContent=m;b.textContent="Sent";})' +
+    '.withFailureHandler(function(){b.disabled=false;b.textContent="Send the audit";document.getElementById("out").textContent="That didn\'t go through. Try again.";})' +
+    '.sendAuditWithLine(' + JSON.stringify(l.id) + ',' + JSON.stringify(t) + ',document.getElementById("line").value);};</script>';
+  return HtmlService.createHtmlOutput(html).setTitle('Add a line').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// Called from the page above (google.script.run). Public name on purpose: names ending in _ can't be called from a page.
+function sendAuditWithLine(id, t, line) {
+  if (!id || t !== token_(id)) return 'That link is out of date.';
+  var l = findLead_('id', id);
+  if (!l) return 'That lead is no longer in the pipeline.';
+  if (l.status !== 'awaiting_review') return 'Already handled: status is ' + l.status + '.';
+  updateLead_(l, { personal_line: String(line || '').replace(/\s+/g, ' ').trim().slice(0, 600) });
+  return ownerApproveAudit_(findLead_('id', id)).message;
 }
 
 function ownerSkip_(l) {
@@ -565,7 +667,7 @@ function rebuildWaitingAudits() {
   ensureSchema_();
   var ui = SpreadsheetApp.getUi();
   var list = readRows_(TAB.leads, HEAD.leads).filter(function (l) {
-    return ['awaiting_review', 'audit_ready', 'ready_to_send'].indexOf(l.status) > -1 && !Number(l.touches || 0) && l.audit_slug;
+    return ['awaiting_review', 'audit_ready', 'audit_approved', 'ready_to_send'].indexOf(l.status) > -1 && !Number(l.touches || 0) && l.audit_slug;
   });
   if (!list.length) { ui.alert('No audits are waiting. Nothing to rebuild.'); return; }
   var ok = ui.alert('Rebuild ' + list.length + ' audit' + (list.length > 1 ? 's' : '') + '?', 'None of these have gone out. Each gets fresh searches and a new write-up ' +
@@ -753,6 +855,7 @@ function sendColdEmails_() {
 
 var SEQUENCES = {
   in_sequence: [null, { key: 'cold_2', gap: 4 }, { key: 'cold_3', gap: 5 }, { key: 'cold_4', gap: 0 }],
+  check_back: [null, { key: 'check_back', gap: 0 }],
   audit_sent: [null, { key: 'inbound_nudge1', gap: 3 }, { key: 'inbound_nudge2', gap: 0 }],
   proposal_sent: [null, { key: 'proposal_nudge', gap: 0 }]
 };
@@ -824,7 +927,7 @@ function handleReply_(l, msg) {
   }
   if (kind === 'negative') { stopLead_(l, 'not_interested', text.slice(0, 200)); return; }
 
-  var preAudit = ['requested', 'researching', 'audit_ready', 'awaiting_review', 'ready_to_send'].indexOf(l.status) > -1;
+  var preAudit = ['requested', 'researching', 'audit_ready', 'audit_approved', 'awaiting_review', 'ready_to_send'].indexOf(l.status) > -1;
   var proposalStage = ['quote_requested', 'awaiting_proposal_review', 'proposal_sent'].indexOf(l.status) > -1;
   if (kind === 'positive' && !preAudit && !proposalStage) {
     queueProposal_(l, 'reply');
@@ -1786,7 +1889,7 @@ function applyAudit_(job, a) {
   fields.top_finding = a.top_finding;
   fields.fix_1 = String(a.fix_1).replace(/\.$/, '');
   // A lead that has moved on (booked the account audit, signed up) keeps its status; the audit is just stored.
-  if (['', 'requested', 'researching', 'audit_ready', 'awaiting_review', 'ready_to_send', 'error'].indexOf(String(l.status || '')) > -1) fields.status = 'audit_ready';
+  if (['', 'requested', 'researching', 'audit_ready', 'audit_approved', 'awaiting_review', 'ready_to_send', 'error'].indexOf(String(l.status || '')) > -1) fields.status = 'audit_ready';
   if (!l.business) fields.business = spec.business;
   updateLead_(l, fields);
   logEvent_(l.id, fields.email || l.email, 'audit_built', slug);
@@ -3106,7 +3209,7 @@ var EMAILS = {
       'If there\'s anything you\'d like me to look at in particular, like a service you want more calls for, just reply to this email.\n\nTalk soon,\n{sign}'
   },
   inbound_audit: {
-    body: 'Hi {first},\n\nHere\'s your audit:\n{audit_url}\n\nIt starts with what a customer sees when they search on a phone, then the three things I\'d do first. ' +
+    body: 'Hi {first},\n\n{personal_para}Here\'s your audit:\n{audit_url}\n\nIt starts with what a customer sees when they search on a phone, then the three things I\'d do first. ' +
       'The biggest finding: {top_finding}\n\n{value_para}If you\'d like a hand, there\'s a short form at the bottom of the page, or just reply "yes".{booking_line}\n\n{sign}'
   },
   inbound_nudge1: {
@@ -3150,6 +3253,10 @@ var EMAILS = {
   },
   cold_ads_4: {
     body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to look at it later:\n{audit_url}\n\nAll the best,\n{sign}'
+  },
+  check_back: {
+    body: 'Hi {first},\n\nChecking back like I said I would. Your audit is still up here:\n{audit_url}\n\n' +
+      'If now is a better time to look at Google Ads, just reply and I\'ll put together a plan for where you could start.\n\n{sign}'
   },
   positive_ack: {
     body: 'Thanks {first}, appreciate you getting back to me.\n\nI\'ll put together {offer_noun} and send it over by end of day {next_day}.{booking_line}\n\n{sign}'
@@ -3261,7 +3368,8 @@ function emailVars_(l) {
       return v ? 'Going by the calls and forms your account recorded, your ads bring in roughly $' + money_(v.low) + ' to $' + money_(v.high) +
         ' a month in work. The report shows how that\'s worked out.\n\n' : '';
     })(),
-    value_para: (function () { var e = valueWords_(spec.value).email; return e ? e + '\n\n' : ''; })()
+    value_para: (function () { var e = valueWords_(spec.value).email; return e ? e + '\n\n' : ''; })(),
+    personal_para: l.personal_line ? String(l.personal_line).trim() + '\n\n' : ''
   };
 }
 
@@ -3366,7 +3474,9 @@ function sendNeedsYou_() {
       var last = String(l.notes || '').split('\n').filter(function (n) { return /^Reply:/.test(n); }).pop() || '';
       return '• ' + (l.business || l.email) + ' <' + l.email + '>\n  ' + last.slice(0, 260) + '\n' +
         '  Open the thread: https://mail.google.com/mail/?authuser=' + encodeURIComponent(myEmail_()) + '#all/' + l.thread_id + '\n' +
-        '  Done with it: ' + ownerLink_('handled', l);
+        '  Done with it: ' + ownerLink_('handled', l) + '\n' +
+        '  Check back later, one short note on the day: in a month ' + ownerLink_('check_back', l) + '&when=1m' +
+        ' · in 3 months ' + ownerLink_('check_back', l) + '&when=3m' + ' · early March ' + ownerLink_('check_back', l) + '&when=march';
     }).join('\n\n'));
 }
 
@@ -3388,6 +3498,8 @@ function sendDigest() {
     '• Audits built: ' + count('audit_built') + ', skipped: ' + count('skipped') + '\n' +
     '• Site audit requests: ' + count('inbound_request') + '\n' +
     '• Cold first emails sent: ' + count('sent_cold_1') + ' (today\'s cap ' + (yes_(setting_('COLD_EMAIL_ON')) ? coldCapToday_() : 'cold email is off') + ')\n' +
+    '• Audits opened for the first time: ' + count('audit_opened') + '\n' +
+    '• Replies: ' + ev.filter(function (e) { return /^reply_/.test(e.event); }).length + '\n' +
     '• Asked for a price: ' + count('quote_requested') + '\n' +
     '• Proposals approved: ' + count('won') + '\n' +
     '• Calls booked: ' + count('booked') + '\n' +

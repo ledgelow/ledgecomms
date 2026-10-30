@@ -7,6 +7,7 @@ Built from the audit's first search: {search_hook} ("who shows up for "furnace r
 Built from the segment or the offer: {offer_line}, {offer_noun}, {audit_price_line} (from PRICE_ACCOUNT_AUDIT and ACCOUNT_AUDIT_CREDIT_DAYS), {proposal_intro}, and {kickoff_steps} (from the offer, on the proposal page too).
 For the account audit: {manager_id} (ADS_MANAGER_ID), {report_url}, {report_finding} (the report's biggest finding), and {report_value_para} (what the ads bring in, when the report has an estimate).
 {value_para} is the audit's yearly estimate as one sentence ("Going by Google's search estimates and typical rates, those searches are worth roughly $7,200 to $12,000 a year in work to a business that shows up on them."), left out when there's no estimate.
+{personal_para} is the line you add before a site-form audit goes out (left out when you don't add one).
 Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com, and a one-click unsubscribe link.
 
 The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your markup) and this file gets regenerated.
@@ -26,13 +27,13 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > Talk soon,
 > {sign}
 
-## When the audit is ready (after your OK for the first few)
+## When the audit is ready (it waits up to INBOUND_HOLD_HOURS for your OK and an optional personal line)
 
 *Same thread, "Re:" the first subject.*
 
 > Hi {first},
 >
-> Here's your audit:
+> {personal_para}Here's your audit:
 > {audit_url}
 >
 > It starts with what a customer sees when they search on a phone, then the three things I'd do first. The biggest finding: {top_finding}
@@ -124,6 +125,25 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > {kickoff_steps}
 >
 > I'll keep you posted along the way.
+>
+> {sign}
+
+---
+
+# Check back later
+
+When a reply says "not now", the needs-you email offers a check-back date (in a month, in 3 months, or early March). On that day they get this one note, and nothing before it.
+
+## On the date you picked
+
+*Same thread, "Re:" the first subject.*
+
+> Hi {first},
+>
+> Checking back like I said I would. Your audit is still up here:
+> {audit_url}
+>
+> If now is a better time to look at Google Ads, just reply and I'll put together a plan for where you could start.
 >
 > {sign}
 
