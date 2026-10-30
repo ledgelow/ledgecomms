@@ -61,11 +61,11 @@ var HEAD = {
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '8';
+var SCHEMA_VERSION = '9';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
-  PRICE_PAGE_FIXES: ['400'], PRICE_LANDING_PAGE: ['900']
+  PRICE_PAGE_FIXES: ['400', '500'], PRICE_LANDING_PAGE: ['900', '1000'], PRICE_SITE_SUPPORT: ['100']
 };
 var SETTINGS_DEFAULTS = [
   ['OWNER_EMAIL', '', 'Where your notifications go (your everyday inbox).'],
@@ -98,12 +98,12 @@ var SETTINGS_DEFAULTS = [
   ['MIN_AD_BUDGET', '750', 'The smallest monthly ad budget a plan is built on, CAD. The site says plans start here.'],
   ['SETUP_MONTHS', '1', 'Setup fee, as months of the monthly fee (1 = setup costs the same as one month).'],
   ['ADS_MANAGER_ID', '871-805-0188', 'Ledge\'s Google Ads manager account. Clients link their accounts to it; the kickoff emails tell them how.'],
-  ['PRICE_PAGE_FIXES', '500', 'Add-on: page fixes on their current site (tap-to-call near the top, a shorter form, a booking button, call tracking). CAD before GST, one time.'],
-  ['PRICE_LANDING_PAGE', '1000', 'Add-on: a landing page built for their ads. CAD before GST, one time.'],
+  ['PRICE_PAGE_FIXES', '750', 'Add-on: page fixes on their current site (tap-to-call near the top, a shorter form, a booking button, call tracking). CAD before GST, one time.'],
+  ['PRICE_LANDING_PAGE', '1500', 'Add-on: a landing page built for their ads. CAD before GST, one time.'],
   ['PRICE_FULL_AUDIT', '1000', 'Account and site audit together, CAD before GST. Offered when a free audit finds things to fix in both the ads and the website. The site part costs this minus PRICE_ACCOUNT_AUDIT.'],
   ['MONTHLY_REVIEW', 'yes', 'yes holds each monthly report and the month\'s management invoices for your OK. no sends them as soon as they\'re ready.'],
   ['INVOICE_DUE_DAYS', '7', 'Once FreshBooks is connected: days until an invoice is due.'],
-  ['PRICE_SITE_SUPPORT', '100', 'Site support, CAD per hour before GST: changes and fixes on their website beyond the page fixes add-on.'],
+  ['PRICE_SITE_SUPPORT', '125', 'Site support, CAD per hour before GST: changes and fixes on their website beyond the page fixes add-on.'],
   ['VALUE_CLICK_RATE', '6', 'For the dollar estimate in audits: percent of searches that click an ad. Used for kinds of business without their own benchmark (most trades have one in the code).'],
   ['VALUE_LEAD_RATE', '7', 'For the dollar estimate: percent of ad clicks that call or send a form. Used for kinds of business without their own benchmark.'],
   ['VALUE_CPC', '12', 'For the dollar estimate: typical cost per click in CAD, for kinds of business without their own benchmark.'],
@@ -116,7 +116,7 @@ var CHECK_NAMES = ['Map results', 'Local Services Ads', 'Search ads', 'Reviews',
 var PILL = { good: 'Looks good', gap: 'Needs work', leak: 'Needs work', unknown: 'Couldn\'t check' };
 var OFFERS = {
   free: 'Quick win, included in any Ledge plan',
-  paid_audit: 'Part of the account audit',
+  paid_audit: 'Part of the Google Ads audit',
   setup: 'Part of the starting plan',
   management: 'Part of monthly management',
   page_fixes: 'Page fixes add-on',
@@ -192,6 +192,7 @@ function onOpen() {
     .addItem('Check one shop', 'checkOneShop')
     .addItem('Make a management proposal', 'makeManagementProposal')
     .addItem('Run an account audit', 'runAccountAudit')
+    .addItem('Rebuild audits that haven\'t gone out', 'rebuildWaitingAudits')
     .addItem('Connect FreshBooks', 'connectFreshBooks')
     .addItem('Send a test invoice to myself', 'testFreshBooksInvoice')
     .addItem('Send me the weekly digest now', 'sendDigest')
@@ -556,6 +557,26 @@ function ownerSkip_(l) {
   updateLead_(l, { status: 'skipped', next_touch: '' });
   logEvent_(l.id, l.email, 'skipped', 'by Logan');
   return { title: 'Skipped', message: (l.business || l.email) + ' won\'t get anything.' };
+}
+
+// Ledge menu > Rebuild audits that haven't gone out: every audit waiting for review or for cold email to start gets
+// fresh searches and a new write-up (current wording, the dollar estimate, and the profile details).
+function rebuildWaitingAudits() {
+  ensureSchema_();
+  var ui = SpreadsheetApp.getUi();
+  var list = readRows_(TAB.leads, HEAD.leads).filter(function (l) {
+    return ['awaiting_review', 'audit_ready', 'ready_to_send'].indexOf(l.status) > -1 && !Number(l.touches || 0) && l.audit_slug;
+  });
+  if (!list.length) { ui.alert('No audits are waiting. Nothing to rebuild.'); return; }
+  var ok = ui.alert('Rebuild ' + list.length + ' audit' + (list.length > 1 ? 's' : '') + '?', 'None of these have gone out. Each gets fresh searches and a new write-up ' +
+    '(roughly US$' + (list.length * 0.8).toFixed(0) + ' in Claude and search data all told). They come back for review over the next few hours.', ui.ButtonSet.OK_CANCEL);
+  if (ok !== ui.Button.OK) return;
+  list.forEach(function (l) {
+    updateLead_(l, { status: l.source === 'cold' ? 'researching' : 'requested', audit_slug: '' });
+    queueJob_('audit', l.id, '');
+    logEvent_(l.id, l.email, 'rebuild', 'rebuild all waiting');
+  });
+  ui.alert('Queued ' + list.length + '. The hourly run gathers searches for 6 shops an hour, then Claude writes the audits.');
 }
 
 function ownerRebuild_(l) {
@@ -1173,7 +1194,8 @@ function gatherEvidence_() {
 }
 
 function buildEvidence_(lead) {
-  var ev = { v: 2, checked: Utilities.formatDate(new Date(), tz_(), 'MMM d, yyyy'), site: { url: siteUrlOf_(lead.website) },
+  // v3: adds the search market, the value estimate, and the Business Profile details. Older evidence is gathered again.
+  var ev = { v: 3, checked: Utilities.formatDate(new Date(), tz_(), 'MMM d, yyyy'), site: { url: siteUrlOf_(lead.website) },
     searches: [], ads: null, profile: null, segment: 'unknown', errors: [], cost: 0 };
   var domain = domainOf_(ev.site.url), text = '';
   if (ev.site.url) {
@@ -1424,13 +1446,13 @@ function saveEvidence_(lead, ev) {
 }
 
 function evidenceFor_(leadId) {
-  var r = leadId ? findRow_(TAB.evidence, HEAD.evidence, 'lead_id', leadId) : null;
+  var r = leadId ? readRows_(TAB.evidence, HEAD.evidence).filter(function (x) { return x.lead_id === leadId; }).pop() : null;
   if (!r) return null;
   try { var e = JSON.parse(r.evidence_json); e._created = r.created; return e; } catch (err) { return null; }
 }
 function freshEvidence_(leadId) {
   var e = evidenceFor_(leadId);
-  return e && Date.now() - new Date(e._created).getTime() < 7 * 864e5 ? e : null;
+  return e && Number(e.v || 0) >= 3 && Date.now() - new Date(e._created).getTime() < 7 * 864e5 ? e : null;
 }
 
 // The evidence as plain text for the audit request.
@@ -1583,9 +1605,9 @@ function submitJobs_() {
     }
     return;
   }
-  // Audits wait for their evidence (gatherEvidence_ runs just before this).
+  // Audits wait for current evidence (gatherEvidence_ runs just before this).
   var withEvidence = {};
-  readRows_(TAB.evidence, HEAD.evidence).forEach(function (r) { withEvidence[r.lead_id] = true; });
+  readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) { if (j.kind === 'audit' && j.status === 'queued' && freshEvidence_(j.lead_id)) withEvidence[j.lead_id] = true; });
   // Account reports with a site audit wait for the site checks (gatherSiteChecks_ runs just before this too).
   var siteWaiting = {};
   readRows_(TAB.exports, HEAD.exports).forEach(function (e) { if (e.status === 'report_queued' && yes_(e.site) && !e.site_json) siteWaiting[e.lead_id] = true; });
@@ -2703,7 +2725,7 @@ function renderReportSpec_(spec, o) {
     wasted_line: w.total ? dollars_(w.total) + (w.share != null ? ', or ' + w.share + '% of what the listed searches cost,' : '') +
       ' went to searches with no conversions in these ' + (spec.days || 90) + ' days.' : '',
     proposal_url: o.proposal_url || '#',
-    doc_label: site ? 'Account and site audit' : 'Account audit', hero_label: site ? 'Google Ads account and site audit for' : 'Google Ads account audit for',
+    doc_label: site ? 'Google Ads and site audit' : 'Google Ads audit', hero_label: site ? 'Google Ads and site audit for' : 'Google Ads audit for',
     value_headline: rv.headline, value_line: rv.line, value_extra: rv.extra, value_footnote: rv.footnote, site_note: platformLine,
     ask_line: 'The plan is priced on what you spend now' + (o.credit ? ', and the $' + money_(o.credit) + ' for this audit comes off setup.' : '.')
   }, {
@@ -2897,7 +2919,7 @@ function renderProposal_(slug) {
 // What each offer covers. Used on the proposal page, in the kickoff email, and on the invoice note.
 var OFFER_COPY = {
   account_audit: {
-    label: 'Account audit', item: 'Google Ads account audit', approve: 'Approve and book the audit', scope_title: 'What we\'ll look at',
+    label: 'Google Ads audit', item: 'Google Ads audit', approve: 'Approve and book the audit', scope_title: 'What we\'ll look at',
     lede: 'A look inside your Google Ads account, so you know where the budget goes and what to change first. It picks up where your free audit left off.',
     scope: [
       ['Where the budget goes', 'Which searches you pay for, which ones bring calls, and which ones don\'t.'],
@@ -2925,7 +2947,7 @@ var OFFER_COPY = {
       ['Your Google Business Profile', 'Categories, services, and hours checked, so the map and the ads tell the same story.']
     ],
     included: ['Everything set up and tested before anything goes live', 'Weekly checks in the first month', 'A short report each month: calls, what they cost, and what we changed',
-      'Month to month once it\'s live. No contract.'],
+      'Month to month once it\'s live, with no long-term contract.'],
     excluded: ['Your ad budget, paid to Google directly', 'Local Services Ads leads, also paid to Google directly', 'Website rebuilds. We\'ll tell you if a page needs work'],
     timing: ['Ads usually go live two to three weeks after your go-ahead.', 'You add a card to the Google Ads account in your name. We\'ll walk you through it.',
       'You answer a few questions by email: your main services, the areas you cover, your hours, and who answers the phone.'],
@@ -2944,7 +2966,7 @@ var OFFER_COPY = {
       ['A monthly report', 'Calls, what they cost, and what we changed, in plain words.']
     ],
     included: ['The cleanup and tracking in the first two weeks', 'Ongoing changes as the season and your schedule change', 'A short report each month',
-      'Month to month. No contract.'],
+      'Month to month, with no long-term contract.'],
     excluded: ['Your ad budget, paid to Google directly', 'Website rebuilds. We\'ll tell you if a page needs work'],
     timing: ['{access_timing}', 'Cleanup and tracking happen in the first two weeks, and nothing big changes without a heads-up.'],
     kickoff: '1. {payment_step}\n2. {access_step}\n' +
@@ -3003,7 +3025,7 @@ function renderProposalSpec_(p, lead, aspec, o) {
   var vars = {
     keyword: searches[0] ? '\u201c' + searches[0].keyword + '\u201d' : 'your main services', town: aspec.area || lead.area || 'you',
     credit_line: o.credit_days ? 'If you go ahead with setup or monthly management within ' + o.credit_days + ' days, the $' + money_(one) + ' comes off' : '',
-    access_timing: lead.ads_customer_id ? 'We\'re already linked to your Google Ads account from the account audit, so there\'s nothing to set up for access.'
+    access_timing: lead.ads_customer_id ? 'We\'re already linked to your Google Ads account from the Google Ads audit, so there\'s nothing to set up for access.'
       : 'You approve a link from our Google Ads manager account. You\'ll get the steps; it takes a couple of minutes, and you can remove it at any time.'
   };
   var fillv = function (t) { return String(t).replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }); };
@@ -3014,14 +3036,14 @@ function renderProposalSpec_(p, lead, aspec, o) {
       (note ? '<p>' + esc_(note) + '</p>' : '') + '</div>';
   };
   var rows = [];
-  if (kind === 'account_audit') rows.push(row('Google Ads account audit', '$' + money_(one), gst, 'One fixed price.'));
+  if (kind === 'account_audit') rows.push(row('Google Ads audit', '$' + money_(one), gst, 'One fixed price.'));
   else if (kind === 'legacy') {
     rows.push(row('Setting up the three fixes', '$' + money_(one), gst, 'One fixed price. No hourly billing, no surprises.'));
     if (monthly) rows.push(row('Optional care plan once it\'s live', '$' + money_(monthly), '/month ' + gst, 'Month to month. Not required.'));
   } else {
     rows.push(row(kind === 'management' ? 'Setup and cleanup' : 'Setup', '$' + money_(one), 'one time ' + gst,
       one === monthly ? 'Setup costs the same as one month of management.' : ''));
-    if (credit) rows.push(row('Your account audit, credited', '\u2212$' + money_(credit), '', 'You approved the account audit within ' + o.credit_days + ' days, so it comes off setup.', 'credit'));
+    if (credit) rows.push(row('Your Google Ads audit, credited', '\u2212$' + money_(credit), '', 'You approved the Google Ads audit within ' + o.credit_days + ' days, so it comes off setup.', 'credit'));
     rows.push(row('Monthly management', '$' + money_(monthly), '/month ' + gst, kind === 'starting_plan' ? 'Starts the month your ads go live. Month to month.' : 'Month to month.'));
     rows.push(row('Your ad budget', '$' + money_(spend), '/month', 'Paid to Google directly, not to us. You can change it at any time, and the fee follows the table below.', 'quiet'));
   }
@@ -3038,7 +3060,7 @@ function renderProposalSpec_(p, lead, aspec, o) {
   offered = offered.filter(function (a, i) { return offered.indexOf(a) === i; });
   var addonPriceText = function (a) {
     var x = ADDONS[a], price = (o.addon_prices || {})[a];
-    return x.minus ? '$' + money_(price) + ' more ($' + money_(price + one) + ' with the account audit) ' + gst : '$' + money_(price) + ' one time ' + gst;
+    return x.minus ? '$' + money_(price) + ' more ($' + money_(price + one) + ' with the Google Ads audit) ' + gst : '$' + money_(price) + ' one time ' + gst;
   };
   var addonsHtml = offered.length && !approved ? '        <fieldset class="addons"><legend>Add to this <span>(optional)</span></legend>\n' + offered.map(function (a) {
     return '          <label><input type="checkbox" name="addons" value="' + esc_(a) + '"' + (chosen.indexOf(a) > -1 ? ' checked' : '') + '> <span><b>' +
@@ -3046,7 +3068,7 @@ function renderProposalSpec_(p, lead, aspec, o) {
   }).join('\n') + '\n        </fieldset>' : '';
   var withSite = kind === 'account_audit' && chosen.indexOf('site_audit') > -1;
   return fill_(PROPOSAL_TEMPLATE, {
-    business: lead.business, doc_label: withSite ? 'Account and site audit' : c.label, lede: c.lede, scope_title: c.scope_title,
+    business: lead.business, doc_label: withSite ? 'Google Ads and site audit' : c.label, lede: c.lede, scope_title: c.scope_title,
     approve_label: withSite ? 'Approve and book the audits' : c.approve,
     date: Utilities.formatDate(new Date(p.created), tz_(), 'MMM d, yyyy'),
     valid_until: Utilities.formatDate(new Date(new Date(p.created).getTime() + 30 * 864e5), tz_(), 'MMM d, yyyy'),
@@ -3148,7 +3170,7 @@ var EMAILS = {
     body: 'Hi {first},\n\nThanks, we\'re on. Here\'s what happens next:\n\n{kickoff_steps}\n\nI\'ll keep you posted along the way.\n\n{sign}'
   },
   access_ack: {
-    fallbackSubject: 'Your Google Ads account audit',
+    fallbackSubject: 'Your Google Ads audit',
     body: 'Hi {first},\n\nThanks, that\'s all I need. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, ' +
       'under Admin > Access and security > Managers. Once you approve it, I\'ll get started, and you\'ll have the audit within about a week.\n\n{sign}'
   },
@@ -3163,8 +3185,8 @@ var EMAILS = {
       'It also covers what we changed and what\'s next. If there\'s anything you\'d like done differently, just reply here.\n\n{sign}'
   },
   account_report: {
-    fallbackSubject: 'Your Google Ads account audit',
-    body: 'Hi {first},\n\nYour Google Ads account audit is ready:\n{report_url}\n\nThe short version: {report_finding}\n\n{report_value_para}' +
+    fallbackSubject: 'Your Google Ads audit',
+    body: 'Hi {first},\n\nYour Google Ads audit is ready:\n{report_url}\n\nThe short version: {report_finding}\n\n{report_value_para}' +
       'It ends with what I\'d change first. I\'ve also put together a plan for running your ads month to month, priced on what you spend now:\n{proposal_url}\n\n' +
       'Happy to walk through both on a call.{booking_line}\n\n{sign}'
   }
@@ -3210,12 +3232,12 @@ function emailVars_(l) {
     ads_hook: kw ? 'your ads on "' + kw + '"' : 'a quick look at your Google Ads',
     search_line: kw ? 'I searched "' + kw + '" on a phone in ' + town + ' and put together a one-page look at what came up, and where ' + business + ' sits.'
       : 'I looked at how ' + business + ' shows up on Google and put together a one-page audit.',
-    offer_line: l.segment === 'running_ads' ? 'Reply "yes" and I\'ll send the details on the account audit.' : 'Reply "yes" and I\'ll send a starting plan with a fixed price.',
-    offer_noun: { account_audit: 'the details on the account audit', starting_plan: 'a starting plan with a fixed price',
+    offer_line: l.segment === 'running_ads' ? 'Reply "yes" and I\'ll send the details on the Google Ads audit.' : 'Reply "yes" and I\'ll send a starting plan with a fixed price.',
+    offer_noun: { account_audit: 'the details on the Google Ads audit', starting_plan: 'a starting plan with a fixed price',
       management: 'a plan for running your ads month to month', legacy: 'a fixed price for those fixes' }[kind],
-    audit_price_line: 'The account audit is a flat $' + price + (yes_(setting_('GST_REGISTERED')) ? ' + GST' : '') +
+    audit_price_line: 'The Google Ads audit is a flat $' + price + (yes_(setting_('GST_REGISTERED')) ? ' + GST' : '') +
       (credit ? ', and it comes off setup or monthly management if you go ahead within ' + credit + ' days.' : '.'),
-    proposal_intro: { account_audit: 'Here are the details on the Google Ads account audit:', starting_plan: 'Here\'s your starting plan for Google Ads:',
+    proposal_intro: { account_audit: 'Here are the details on the Google Ads audit:', starting_plan: 'Here\'s your starting plan for Google Ads:',
       management: 'Here\'s the plan for running your Google Ads month to month:', legacy: 'Here\'s the fixed price for setting up those fixes:' }[kind],
     kickoff_steps: fillText_(OFFER_COPY[kind].kickoff, { payment_step: paymentStep, manager_id: setting_('ADS_MANAGER_ID') || 'Ledge Communications',
       access_step: l.ads_customer_id ? 'We\'re already linked to your Google Ads account from the audit, so there\'s nothing to do for access.'
@@ -3585,7 +3607,7 @@ function fbClientFor_(lead) {
 // The invoice lines for a proposal: the same items as the invoice details in the approval email.
 function invoiceLines_(prop) {
   var c = OFFER_COPY[prop.kind] || OFFER_COPY.legacy, credit = Number(prop.credit || 0);
-  var lines = [{ name: c.item, description: credit ? 'Less $' + money_(credit) + ' account audit credit' : '', amount: Math.max(0, Number(prop.price_sprint || 0) - credit) }];
+  var lines = [{ name: c.item, description: credit ? 'Less $' + money_(credit) + ' Google Ads audit credit' : '', amount: Math.max(0, Number(prop.price_sprint || 0) - credit) }];
   String(prop.addons || '').split(',').filter(function (a) { return ADDONS[a]; }).forEach(function (a) {
     lines.push({ name: ADDONS[a].item, description: '', amount: addonPrice_(a) });
   });
@@ -3697,7 +3719,7 @@ function invoiceBlock_(lead, prop) {
   return 'For the invoice:\n' +
     'Client: ' + lead.business + ', ' + (lead.name || lead.first_name || '') + ', ' + lead.email + '\n' +
     'Item: ' + item + ', $' + cents_(prop.price_sprint) + '\n' +
-    (Number(prop.credit) ? 'Account audit credit: -$' + cents_(prop.credit) + '\n' : '') +
+    (Number(prop.credit) ? 'Google Ads audit credit: -$' + cents_(prop.credit) + '\n' : '') +
     extras.map(function (a) { return 'Add-on: ' + ADDONS[a].item + ', $' + cents_(addonPrice_(a)) + '\n'; }).join('') +
     'Amount: $' + cents_(sub) + '\n' +
     (gst ? 'GST (5%): $' + cents_(gst) + '\n' : '') +

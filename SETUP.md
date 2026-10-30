@@ -1,7 +1,7 @@
 # Ledge lead system: setup
 
 Everything here is one-time, about two hours in total. After it, leads move from first touch to an approved
-offer without you: a free Local Search Audit, then a $500 Google Ads account audit for shops already running ads, or a
+offer without you: a free Local Search Audit, then a $500 Google Ads audit for shops already running ads, or a
 starting plan (setup plus monthly management) for shops that aren't.
 
 Two rules while you set up:
@@ -15,12 +15,26 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 28, late night): monthly reports and billing
+## Where you are (Oct 30): pricing cleanup, then the email worksheet
 
 Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected; online payments pending FreshBooks'
 review), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
-**Ship this update (10 minutes)**
+**Ship this update (Oct 30, 5 minutes)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
+   version** > **Deploy**.
+2. **GitHub:** upload `Code.gs`, `Templates.gs`, `index.html`, `pricing.html`, `sample-audit.html`, `sample-proposal.html`,
+   `sample-report.html`, `inbound-sequence.md`, and `SETUP.md`.
+3. **Settings tab:** nothing to do. The next hourly run moves page fixes to $750, the landing page to $1,500, and site
+   support to $125 an hour, as long as those cells still hold the old prices (a number you typed yourself stays). The
+   site shows the new prices within an hour after that.
+
+What changed: the pricing headline is "Clear prices, no long-term contract.", and "Is there a contract?" now leads with
+the written plan they approve before anything starts. The paid audit is "Google Ads audit" (and "Google Ads and site
+audit") everywhere a customer sees it: pricing, audit pages, proposals, reports, emails, and invoices. The email address
+in the site footer is a link on desktop too. Cold email stays off until the email worksheet is done.
+
+**Oct 28 update (done)**
 1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then **Deploy** > **Manage deployments** > edit > **New
    version** > **Deploy**. The next run adds two tabs, **Clients** and **Invoices**, and a `MONTHLY_REVIEW` setting.
 2. **The export script:** signed in as ledgelow@gmail.com (the login that authorized it), open the manager account >
@@ -32,7 +46,12 @@ review), the manager account (871-805-0188), and the export script (authorized t
 **Google Verified (Oct 28, late night):** Google retired "Google Guaranteed" (and "Google Screened") in late 2025 for
 one "Google Verified" badge on Local Services Ads, and ended the money-back guarantee. The site, audits, reports,
 proposals, and prompts now say Local Services Ads, with Google Verified only for the badge, and never promise a
-guarantee. Audits built before this update still say Google Guaranteed: Rebuild any that haven't gone out.
+guarantee. Audits built before this update still say Google Guaranteed.
+
+**Rebuild everything that hasn't gone out (once):** **Ledge** > **Rebuild audits that haven't gone out**. It re-runs the
+searches and the write-up for every audit waiting for review or for cold email, so they get the new wording, the dollar
+estimate, and the profile details. (A single Rebuild link clicked before this update reused the old searches, so this
+catches those too.) Roughly 80 US cents an audit; they come back for review over a few hours.
 
 **Monthly reports and billing**
 - **Clients tab.** Every approved management plan or starting plan adds a row. It's yours to edit: `status` (active,
@@ -79,8 +98,7 @@ New in this update:
    > **Library** > "PageSpeed Insights API" > **Enable**. Then **Credentials** > **Create credentials** > **API key**.
    Paste it into Script Properties as `PAGESPEED_API_KEY`.
 
-**Audits already built** don't have the estimate. Any still waiting for your review: use **Rebuild** to get the new
-version. Ones already sent stay as they are.
+**Audits already built:** see "Rebuild everything that hasn't gone out" above.
 
 **How the estimate works**
 - Free audit: Google's monthly search estimates for the town, across all the related searches about the work (one

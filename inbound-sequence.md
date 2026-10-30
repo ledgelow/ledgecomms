@@ -133,7 +133,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 ## When they reply with their customer ID
 
-*Same thread, "Re:" the first subject (or "Your Google Ads account audit" when there's no thread yet).*
+*Same thread, "Re:" the first subject (or "Your Google Ads audit" when there's no thread yet).*
 
 > Hi {first},
 >
@@ -143,11 +143,11 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 ## When the report is ready (after your OK)
 
-*Same thread, "Re:" the first subject (or "Your Google Ads account audit" when there's no thread yet).*
+*Same thread, "Re:" the first subject (or "Your Google Ads audit" when there's no thread yet).*
 
 > Hi {first},
 >
-> Your Google Ads account audit is ready:
+> Your Google Ads audit is ready:
 > {report_url}
 >
 > The short version: {report_finding}
