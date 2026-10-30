@@ -3763,11 +3763,15 @@ function fbPayments_(method, path, body) {
 
 // Puts the account's default online payment options (set in FreshBooks > Payments > Online Payments) on one invoice.
 function fbEnableOnlinePayments_(invoiceId) {
-  var d = {};
-  try { d = fbPayments_('get', '/payment_options?entity_type=invoice'); } catch (err) { d = {}; }
+  var d = {}, readErr = '';
+  try { d = fbPayments_('get', '/payment_options?entity_type=invoice'); } catch (err) { d = {}; readErr = String(err && err.message || err).slice(0, 160); }
   var body = { gateway_name: d.gateway_name || 'fbpay', has_credit_card: d.has_credit_card !== false, entity_type: 'invoice', entity_id: String(invoiceId) };
   Object.keys(d).forEach(function (k) { if (/^(has_|allow_)/.test(k) && k !== 'has_credit_card') body[k] = d[k]; });
-  fbPayments_('post', '/invoice/' + invoiceId + '/payment_options', body);
+  try { fbPayments_('post', '/invoice/' + invoiceId + '/payment_options', body); }
+  catch (err) {
+    throw new Error(String(err && err.message || err).slice(0, 200) + (readErr ? '. Reading your defaults failed too: ' + readErr
+      : '. Your defaults read fine (' + (d.gateway_name || 'no gateway set') + ').'));
+  }
   return body.gateway_name;
 }
 

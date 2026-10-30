@@ -25,9 +25,11 @@ default online payment options onto each invoice before FreshBooks emails it.
 1. **Apps Script:** replace `Code.gs`, save, then deploy a new version. **GitHub:** upload `Code.gs` and `SETUP.md`.
 2. In FreshBooks > **Payments** > **Online Payments**, check the defaults for invoices are on (card, and bank payments if
    you offer them). Those are what get copied.
-3. **Ledge** > **Send a test invoice to myself**. The pop-up says "Online payments: on" or why not. If it says HTTP 401 or
-   403, add the online payments permission to the Ledge app in the FreshBooks developer settings, then run **Ledge** >
-   **Connect FreshBooks** again and retry.
+3. **Ledge** > **Send a test invoice to myself**. The pop-up says "Online payments: on" or why not.
+4. **If it says HTTP 403 (it did on the first try):** the Ledge app in FreshBooks can read payments but not change them.
+   In FreshBooks, open the developer page (my.freshbooks.com/#/developer), edit the `Ledge hub` app, tick **payments: write**
+   (keep everything else), and save. Then **Ledge** > **Connect FreshBooks** again (new permissions need a fresh
+   connection) and rerun the test invoice.
 
 **Evening update (done)**
 1. **Settings tab:** set `MAILING_ADDRESS` to `1122 3 St SE, Ste 1906 #117, Calgary, AB T2G 0E7` (one line). Every
@@ -140,7 +142,7 @@ You don't need a separate Stripe account. FreshBooks Payments in Canada runs on 
    business type, and bank account (institution, transit, and account numbers), then FreshBooks reviews it and
    emails you. Once it shows as active, turn on online payments by default for new invoices.
 3. The developer app: go to **my.freshbooks.com/#/developer** > **Create an App**. Name: `Ledge hub`. Type: **Private
-   App**. Scopes: clients (read and write), invoices (read and write), and payments (read). Redirect URI: the hub's web
+   App**. Scopes: clients (read and write), invoices (read and write), and payments (read and write). Redirect URI: the hub's web
    app address (Script Properties > `WEB_APP_URL`, the one ending in `/exec`). Save.
 4. Copy the app's **Client ID** and **Client Secret** straight into Script Properties as `FRESHBOOKS_CLIENT_ID` and
    `FRESHBOOKS_CLIENT_SECRET`.
