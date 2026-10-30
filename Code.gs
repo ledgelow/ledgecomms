@@ -3738,7 +3738,7 @@ function fbSendInvoice_(clientId, email, lines, gst, subject, note) {
   } }).invoice;
   // Invoices made through the API don't get the pay-online button on their own: copy the account's defaults onto it first.
   try { inv.payment_gateway = fbEnableOnlinePayments_(inv.invoiceid || inv.id); }
-  catch (err) { inv.payments_error = String(err && err.message || err).slice(0, 300); }
+  catch (err) { inv.payments_error = String(err && err.message || err).slice(0, 1500); }
   fb_('put', '/invoices/invoices/' + inv.id, { invoice: { action_email: true, email_recipients: [email], email_include_pdf: false,
     invoice_customized_email: { subject: subject, body: note } } });
   if (inv.payments_error && !/test/i.test(subject)) {
@@ -3757,22 +3757,44 @@ function fbPayments_(method, path, body) {
   var r = UrlFetchApp.fetch(FB_API + '/payments/account/' + prop_('FRESHBOOKS_ACCOUNT_ID') + path, opts);
   var j = {};
   try { j = JSON.parse(r.getContentText()); } catch (err) {}
-  if (r.getResponseCode() >= 300) throw new Error('FreshBooks payments ' + method.toUpperCase() + ' ' + path.split('?')[0] + ': HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 200));
+  if (r.getResponseCode() >= 300) throw new Error('FreshBooks payments ' + method.toUpperCase() + ' ' + path.split('?')[0] + ': HTTP ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 2000));
   return j.payment_options || ((j.response || {}).result || {}).payment_options || {};
 }
 
-// Puts the account's default online payment options (set in FreshBooks > Payments > Online Payments) on one invoice.
+// Puts online payments on one invoice, using the gateway set in FreshBooks > Payments > Online Payments. FreshBooks'
+// docs show only the short form of the request, so the fuller forms are fallbacks; the first one it accepts wins.
 function fbEnableOnlinePayments_(invoiceId) {
   var d = {}, readErr = '';
-  try { d = fbPayments_('get', '/payment_options?entity_type=invoice'); } catch (err) { d = {}; readErr = String(err && err.message || err).slice(0, 160); }
-  var body = { gateway_name: d.gateway_name || 'fbpay', has_credit_card: d.has_credit_card !== false, entity_type: 'invoice', entity_id: String(invoiceId) };
-  Object.keys(d).forEach(function (k) { if (/^(has_|allow_)/.test(k) && k !== 'has_credit_card') body[k] = d[k]; });
-  try { fbPayments_('post', '/invoice/' + invoiceId + '/payment_options', body); }
-  catch (err) {
-    throw new Error(String(err && err.message || err).slice(0, 200) + (readErr ? '. Reading your defaults failed too: ' + readErr
-      : '. Your defaults read fine (' + (d.gateway_name || 'no gateway set') + ').'));
+  try { d = fbPayments_('get', '/payment_options?entity_type=invoice'); } catch (err) { d = {}; readErr = fbErrText_(err); }
+  var g = d.gateway_name || 'fbpay', id = Number(invoiceId);
+  var full = { gateway_name: g, has_credit_card: true, entity_type: 'invoice', entity_id: id };
+  Object.keys(d).forEach(function (k) { if (/^(has_|allow_)/.test(k) && typeof d[k] === 'boolean' && k !== 'has_credit_card') full[k] = d[k]; });
+  var tries = [
+    { gateway_name: g, has_credit_card: true },
+    { gateway_name: g, has_credit_card: true, entity_type: 'invoice', entity_id: id },
+    full
+  ];
+  if (g !== 'fbpay') tries.push({ gateway_name: 'fbpay', has_credit_card: true });
+  var errs = [];
+  for (var i = 0; i < tries.length; i++) {
+    try { fbPayments_('post', '/invoice/' + invoiceId + '/payment_options', tries[i]); return tries[i].gateway_name; }
+    catch (err) { errs.push('Try ' + (i + 1) + ' (' + Object.keys(tries[i]).join(', ') + '): ' + fbErrText_(err)); }
   }
-  return body.gateway_name;
+  throw new Error(errs.join('\n') + (readErr ? '\nReading your defaults failed too: ' + readErr : '\nYour defaults read fine (' + (d.gateway_name || 'no gateway set') + ').'));
+}
+
+// The useful part of a FreshBooks error: the status and each error message, not the whole body.
+function fbErrText_(err) {
+  var m = String(err && err.message || err);
+  var code = (m.match(/HTTP (\d+)/) || [])[1] || '';
+  var body = m.slice(m.indexOf('{') > -1 ? m.indexOf('{') : m.length);
+  var parts = [];
+  try {
+    var j = JSON.parse(body);
+    (j.errors || []).forEach(function (e) { parts.push([e.field || e.loc && [].concat(e.loc).join('.') || '', e.message || e.msg || ''].filter(String).join(': ')); });
+    if (!parts.length) parts.push(j.message || j.error_description || j.error || j.error_type || body.slice(0, 300));
+  } catch (e2) { parts.push(body.slice(0, 300) || m.slice(0, 300)); }
+  return (code ? 'HTTP ' + code + ' ' : '') + parts.join('; ').slice(0, 400);
 }
 
 // Hourly: an invoice for each proposal approved since FreshBooks was connected.
