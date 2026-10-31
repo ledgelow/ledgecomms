@@ -19,7 +19,12 @@ Your Squarespace site stays up on ledgecommunications.com until step 9, so you c
 
 Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected, with online payments), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
-**Ship this update (Oct 31): the final email copy (10 minutes, then a rebuild)**
+**Ship this update (Oct 31, round two: your last email edits, 5 minutes)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then deploy a new version. No rebuild needed this time.
+2. **GitHub:** upload `Code.gs`, `Templates.gs`, `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md`.
+3. A new `SENDER_TITLE` setting (Founder) goes in the signature: "Logan Edgelow | Founder, Ledge Communications".
+
+**Oct 31, morning (done): the final email copy (10 minutes, then a rebuild)**
 1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then deploy a new version.
 2. **GitHub:** upload `Code.gs`, `Templates.gs`, `sample-audit.html`, `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md`.
 3. **Ledge > Rebuild audits that haven't gone out** (once). The audit write-ups now open with one big job, so audits

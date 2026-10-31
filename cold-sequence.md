@@ -40,9 +40,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Following up on the audit I sent. If you only take one thing away from it, I'd start here: {fix_1}.
+> Following up on the audit I sent. If you only take one thing away from it, I'd start here: {business} should absolutely {fix_1_them}.
 >
-> Happy to set it up for you. Just reply and let me know, and I'll send a starting plan with a fixed price.
+> Happy to set it up for you or share more details. Just let me know, and I'll send a plan for how I'd recommend running it.
 >
 > All the best,
 > {sign}
@@ -66,10 +66,10 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to look at it later:
+> I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to check it out down the road:
 > {audit_url}
 >
-> If the timing is better later in the year, just reply and say when, and I'll check back then.
+> If the timing is better later, just let me know when and I'll check back then.
 >
 > All the best,
 > {sign}
@@ -104,7 +104,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > {audit_price_line}
 >
-> If you'd like the details, just reply and let me know.
+> If you'd like the details, just let me know and I'll send them through.
 >
 > All the best,
 > {sign}
@@ -128,10 +128,10 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to look at it later:
+> I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to check it out down the road:
 > {audit_url}
 >
-> If the timing is better later in the year, just reply and say when, and I'll check back then.
+> If the timing is better later, just let me know when and I'll check back then.
 >
 > All the best,
 > {sign}

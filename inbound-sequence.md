@@ -62,7 +62,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Just checking in to see if you've had a chance to review the audit I shared previously and if there were any questions that came up if you did.
+> Just checking in to see if you've had a chance to review the audit I shared previously and whether any questions came up.
 >
 > Some of it is easier to talk through than to read, so if a short call would help, I'm happy to walk you through it.{call_line}
 >
@@ -82,7 +82,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Thanks {first}, appreciate you getting back to me.
 >
-> I'll put together {offer_noun} and send it over by end of day {next_day}.{booking_line}
+> I'll put together {offer_noun} and send it over by end of day {next_day}.{ack_line}
 >
 > All the best,
 > {sign}
@@ -107,7 +107,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > {proposal_intro}
 > {proposal_url}
 >
-> {proposal_hook}It covers what's included, the price, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
+> {proposal_hook}It covers what's included, the price, and what I need from you to get moving.
+>
+> If it looks good, you can approve it right on the page. Any questions, just let me know.
 >
 > All the best,
 > {sign}
@@ -118,7 +120,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Just checking whether you had any questions. Happy to adjust the budget or the scope if something doesn't fit:
+> Just checking whether you had any questions. Happy to adjust the budget or the scope if something doesn't feel right:
 > {proposal_url}
 >
 > All the best,
@@ -134,7 +136,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > {kickoff_steps}
 >
-> I'll keep you posted along the way.
+> I'll keep you posted as I work through it on my end.
 >
 > All the best,
 > {sign}
@@ -154,7 +156,7 @@ When a reply says "not now", the needs-you email offers a check-back date (in a 
 > Hope you're doing well. Checking back in, as promised. Your audit is still up here:
 > {audit_url}
 >
-> If now is a better time to look at Google Ads, just let me know and I'll put together a plan for where you could start.
+> If now is a better time to look at your Google Ads setup, just let me know and I'll put together a plan for where you could start.
 >
 > All the best,
 > {sign}
@@ -169,7 +171,9 @@ When a reply says "not now", the needs-you email offers a check-back date (in a 
 
 > Hi {first},
 >
-> Thanks, that's all I need. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, under Admin > Access and security > Managers. Once you approve it, I'll get started, and you'll have the audit within about a week.
+> Thanks for sending that through. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, under Admin > Access and security > Managers.
+>
+> Once you approve it, I'll get started, and you'll have the audit within about a week. Keep me posted if you're running into any issues or if there's any insights or priorities I should keep in mind with my review.
 >
 > All the best,
 > {sign}
@@ -183,12 +187,12 @@ When a reply says "not now", the needs-you email offers a check-back date (in a 
 > Your Google Ads audit is ready:
 > {report_url}
 >
-> The short version: {report_finding}
+> Key takeaway: {report_finding}
 >
 > {report_value_para}It ends with what I'd change first. I've also put together a plan for running your ads month to month, priced on what you spend now:
 > {proposal_url}
 >
-> Happy to walk through both on a call.{call_line}
+> Let me know if you have any questions.{booking_line}
 >
 > All the best,
 > {sign}

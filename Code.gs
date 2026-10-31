@@ -64,7 +64,7 @@ var HEAD = {
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '11';
+var SCHEMA_VERSION = '12';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -75,6 +75,7 @@ var OLD_DEFAULTS = {
 var SETTINGS_DEFAULTS = [
   ['OWNER_EMAIL', '', 'Where your notifications go (your everyday inbox).'],
   ['SENDER_NAME', '', 'Your full name, as it appears on every email.'],
+  ['SENDER_TITLE', 'Founder', 'Your title in the email signature ("Logan Edgelow | Founder, Ledge Communications"). Leave empty for none.'],
   ['MAILING_ADDRESS', '', 'Mailing address for email footers. Canada\'s anti-spam law requires one. Shown only in email footers.'],
   ['SITE_URL', 'https://ledgecommunications.com', 'Where the site lives. Links in emails point here. Use the workers.dev address while testing.'],
   ['BOOKING_URL', '', 'Your booking page link (Superhuman or Google Calendar). Optional.'],
@@ -1204,7 +1205,8 @@ function valueWords_(v) {
   if (v.jobs) out.year_words = 'those searches are worth roughly $' + money_(v.year_low) + ' to $' + money_(v.year_high) + ' a year in work' +
     (v.by_budget ? ' on a $' + money_(v.plan_budget) + ' a month ad budget' : '') + ', going by Google\'s estimates and typical conversion rates.';
   out.email = out.lead_big ? out.big_line : out.year_words ? 'T' + out.year_words.slice(1) : '';
-  out.more = out.lead_big ? 'One more number from your audit: ' + out.year_words : '';
+  out.more = out.lead_big ? 'One more way to look at your audit: it only takes one ' + bigName + ' from those searches, at $' + money_(v.big_low) + ' to $' + money_(v.big_high) +
+    ', to cover ' + cover + ' of a $' + money_(v.plan_budget) + ' a month ad budget and our fee.' : '';
   if (out.lead_big) {
     out.big_headline = '$' + money_(v.big_low) + ' to $' + money_(v.big_high);
     out.big_note = 'for one ' + bigName + ', roughly*';
@@ -3277,7 +3279,7 @@ var EMAILS = {
     body: 'Hi {first},\n\nQuick follow-up on your audit. If you only do one thing, I\'d start here: {fix_1}.\n\n{offer_line}\n\nAll the best,\n{sign}'
   },
   inbound_nudge2: {
-    body: 'Hi {first},\n\nJust checking in to see if you\'ve had a chance to review the audit I shared previously and if there were any questions that came up if you did.\n\n' +
+    body: 'Hi {first},\n\nJust checking in to see if you\'ve had a chance to review the audit I shared previously and whether any questions came up.\n\n' +
       'Some of it is easier to talk through than to read, so if a short call would help, I\'m happy to walk you through it.{call_line}\n\n' +
       'Your audit still lives here either way in case there\'s anything helpful to pull from it:\n{audit_url}\n\nAll the best,\n{sign}'
   },
@@ -3289,15 +3291,15 @@ var EMAILS = {
       'If it\'d help, I\'m happy to put together a plan for where you could start. Just reply and let me know.\n\nThanks,\n{sign}'
   },
   cold_2: {
-    body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only take one thing away from it, I\'d start here: {fix_1}.\n\n' +
-      'Happy to set it up for you. Just reply and let me know, and I\'ll send a starting plan with a fixed price.\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only take one thing away from it, I\'d start here: {business} should absolutely {fix_1_them}.\n\n' +
+      'Happy to set it up for you or share more details. Just let me know, and I\'ll send a plan for how I\'d recommend running it.\n\nAll the best,\n{sign}'
   },
   cold_3: {
     body: 'Hi {first},\n\n{more_para}\n\nIf you\'d like one, just reply and let me know.{booking_line}\n\nAll the best,\n{sign}'
   },
   cold_4: {
-    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to look at it later:\n{audit_url}\n\n' +
-      'If the timing is better later in the year, just reply and say when, and I\'ll check back then.\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to check it out down the road:\n{audit_url}\n\n' +
+      'If the timing is better later, just let me know when and I\'ll check back then.\n\nAll the best,\n{sign}'
   },
   cold_ads_1: {
     subject: '{ads_subject}',
@@ -3308,22 +3310,22 @@ var EMAILS = {
   },
   cold_ads_2: {
     body: 'Hi {first},\n\nFollowing up on the audit I sent. From the outside I can see where your ads show up. From the inside I can see why: ' +
-      'which searches you\'re paying for, and what a call costs you.\n\n{audit_price_line}\n\nIf you\'d like the details, just reply and let me know.\n\nAll the best,\n{sign}'
+      'which searches you\'re paying for, and what a call costs you.\n\n{audit_price_line}\n\nIf you\'d like the details, just let me know and I\'ll send them through.\n\nAll the best,\n{sign}'
   },
   cold_ads_3: {
     body: 'Hi {first},\n\nOne more thought on your audit. If you only take one thing away from it, I\'d start here: {fix_1}.\n\n' +
       'If you\'d like the details, just reply and let me know.{booking_line}\n\nAll the best,\n{sign}'
   },
   cold_ads_4: {
-    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to look at it later:\n{audit_url}\n\n' +
-      'If the timing is better later in the year, just reply and say when, and I\'ll check back then.\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to check it out down the road:\n{audit_url}\n\n' +
+      'If the timing is better later, just let me know when and I\'ll check back then.\n\nAll the best,\n{sign}'
   },
   check_back: {
     body: 'Hi {first},\n\nHope you\'re doing well. Checking back in, as promised. Your audit is still up here:\n{audit_url}\n\n' +
-      'If now is a better time to look at Google Ads, just let me know and I\'ll put together a plan for where you could start.\n\nAll the best,\n{sign}'
+      'If now is a better time to look at your Google Ads setup, just let me know and I\'ll put together a plan for where you could start.\n\nAll the best,\n{sign}'
   },
   positive_ack: {
-    body: 'Thanks {first}, appreciate you getting back to me.\n\nI\'ll put together {offer_noun} and send it over by end of day {next_day}.{booking_line}\n\nAll the best,\n{sign}'
+    body: 'Thanks {first}, appreciate you getting back to me.\n\nI\'ll put together {offer_noun} and send it over by end of day {next_day}.{ack_line}\n\nAll the best,\n{sign}'
   },
   quote_ack: {
     fallbackSubject: 'Next steps from Ledge Communications',
@@ -3332,18 +3334,19 @@ var EMAILS = {
   proposal: {
     fallbackSubject: 'Your plan from Ledge Communications',
     body: 'Hi {first},\n\n{proposal_intro}\n{proposal_url}\n\n{proposal_hook}' +
-      'It covers what\'s included, the price, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.\n\nAll the best,\n{sign}'
+      'It covers what\'s included, the price, and what I need from you to get moving.\n\nIf it looks good, you can approve it right on the page. Any questions, just let me know.\n\nAll the best,\n{sign}'
   },
   proposal_nudge: {
-    body: 'Hi {first},\n\nJust checking whether you had any questions. Happy to adjust the budget or the scope if something doesn\'t fit:\n{proposal_url}\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\nJust checking whether you had any questions. Happy to adjust the budget or the scope if something doesn\'t feel right:\n{proposal_url}\n\nAll the best,\n{sign}'
   },
   kickoff: {
-    body: 'Hi {first},\n\nThanks, we\'re on. Here\'s what happens next:\n\n{kickoff_steps}\n\nI\'ll keep you posted along the way.\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\nThanks, we\'re on. Here\'s what happens next:\n\n{kickoff_steps}\n\nI\'ll keep you posted as I work through it on my end.\n\nAll the best,\n{sign}'
   },
   access_ack: {
     fallbackSubject: 'Your Google Ads audit',
-    body: 'Hi {first},\n\nThanks, that\'s all I need. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, ' +
-      'under Admin > Access and security > Managers. Once you approve it, I\'ll get started, and you\'ll have the audit within about a week.\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\nThanks for sending that through. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, ' +
+      'under Admin > Access and security > Managers.\n\nOnce you approve it, I\'ll get started, and you\'ll have the audit within about a week. ' +
+      'Keep me posted if you\'re running into any issues or if there\'s any insights or priorities I should keep in mind with my review.\n\nAll the best,\n{sign}'
   },
   link_ack: {
     fallbackSubject: 'Linking your Google Ads account',
@@ -3353,13 +3356,13 @@ var EMAILS = {
   monthly_report: {
     subject: 'Your {report_month} Google Ads report',
     body: 'Hi {first},\n\nYour {report_month} report is ready:\n{monthly_url}\n\n{monthly_headline}\n\n{monthly_value_para}' +
-      'It also covers what we changed and what\'s next. If there\'s anything you\'d like done differently, just reply here.\n\nAll the best,\n{sign}'
+      'It also covers what we changed and what\'s next. If there\'s any questions or anything you\'d like done differently, just let me know.\n\nAll the best,\n{sign}'
   },
   account_report: {
     fallbackSubject: 'Your Google Ads audit',
-    body: 'Hi {first},\n\nYour Google Ads audit is ready:\n{report_url}\n\nThe short version: {report_finding}\n\n{report_value_para}' +
+    body: 'Hi {first},\n\nYour Google Ads audit is ready:\n{report_url}\n\nKey takeaway: {report_finding}\n\n{report_value_para}' +
       'It ends with what I\'d change first. I\'ve also put together a plan for running your ads month to month, priced on what you spend now:\n{proposal_url}\n\n' +
-      'Happy to walk through both on a call.{call_line}\n\nAll the best,\n{sign}'
+      'Let me know if you have any questions.{booking_line}\n\nAll the best,\n{sign}'
   }
 };
 
@@ -3401,10 +3404,13 @@ function emailVars_(l) {
       return /^(Google|Local|I|I'm|I've|LSA|GBP)$/.test(first) || (l.business && f.indexOf(l.business) === 0) ? f : f.charAt(0).toLowerCase() + f.slice(1);
     })(l.top_finding),
     fix_1: String(l.fix_1 || '').replace(/\.$/, ''),
+    // After "<business> should absolutely ...", so "your" reads as "their" (audits written before the prompt said not to use it).
+    fix_1_them: String(l.fix_1 || '').replace(/\.$/, '').replace(/\byou're\b/gi, 'they\'re').replace(/\byours\b/gi, 'theirs').replace(/\byour\b/gi, 'their').replace(/\byou\b/gi, 'they'),
     sender: setting_('SENDER_NAME') || 'Logan',
     sign: String(setting_('SENDER_NAME') || 'Logan').trim().split(/\s+/)[0],
     next_day: nextBusinessDayName_(),
-    booking_line: booking ? ' If a quick call is easier, grab a time here: ' + booking : '',
+    booking_line: booking ? ' If it\'s easier to walk through it on a call, you can grab a time here: ' + booking : '',
+    ack_line: ' Keep me posted with any questions or priorities I should keep in mind' + (booking ? ', and if a quick call is easier, you can grab a time here: ' + booking : '.'),
     keyword_q: kw ? '"' + kw + '"' : 'for what you do' + (town ? ' around ' + townWords_(town) : ''),
     search_hook: kw ? 'who shows up for "' + kw + '"' : 'a quick look at how you show up on Google',
     ads_hook: kw ? 'your ads on "' + kw + '"' : 'a quick look at your Google Ads',
@@ -3412,7 +3418,7 @@ function emailVars_(l) {
     ads_subject: kw ? 'Your ads on "' + kw + '"' : 'Your Google Ads',
     search_line: kw ? 'I searched "' + kw + '" on a phone in ' + townWords_(town) + ' and put together a quick review of what came up, and where ' + business + ' stands.'
       : 'I looked at how ' + business + ' shows up on Google and put together a quick review.',
-    intro_line: 'I\'ve worked in digital marketing for 10+ years and I\'m reaching out to local business owners and operators that I think I could help grow their business.',
+    intro_line: 'I\'ve worked in digital marketing for 10+ years, and I\'m reaching out to a few local businesses I think I could help grow.',
     call_line: booking ? ' Grab a time here: ' + booking : ' Just reply with a time that works.',
     more_para: (function () {
       var m = valueWords_(spec.value).more;
@@ -3467,8 +3473,9 @@ function fillText_(s, vars) {
 }
 
 function footer_(l) {
-  return '\n\n--\n' + (setting_('SENDER_NAME') || 'Logan') + ' · Ledge Communications\n' +
-    (setting_('MAILING_ADDRESS') ? setting_('MAILING_ADDRESS') + ' · ' : '') + 'ledgecommunications.com · ' + myEmail_() + '\n' +
+  var title = setting_('SENDER_TITLE');
+  return '\n\n--\n' + (setting_('SENDER_NAME') || 'Logan') + ' | ' + (title ? title + ', ' : '') + 'Ledge Communications\n' +
+    (setting_('MAILING_ADDRESS') ? String(setting_('MAILING_ADDRESS')).trim() + '\n' : '') + 'ledgecommunications.com\n' + myEmail_() + '\n' +
     'Rather not hear from me? Unsubscribe: ' + unsubUrl_(l);
 }
 
