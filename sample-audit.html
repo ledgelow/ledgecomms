@@ -173,12 +173,12 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
     <p class="label">Prepared for</p>
     <h1>Example Heating &amp; Plumbing (sample)</h1>
     <p class="meta"><span>Airdrie</span><span>Checked Oct 28, 2026</span><span>Public information only</span></p>
-    <p class="lede">This is a made-up shop to show what an audit looks like. It has strong reviews, but someone in Airdrie searching for furnace repair on their phone sees three other companies in Local Services Ads and two in the search ads before they reach it, sixth on the map. Those searches are worth roughly $3,000 to $8,400 a year in work, and right now other shops are getting them.</p>
+    <p class="lede">This is a made-up shop to show what an audit looks like. It has strong reviews, but someone in Airdrie searching for furnace repair on their phone sees three other companies in Local Services Ads and two in the search ads before they reach it, sixth on the map. Landing one furnace replacement from those searches would cover about three months of ads and our fee, and right now other shops are getting them.</p>
     <div class="value" >
       <p class="label">What these searches are worth</p>
-      <p class="value-big" >$3,000 to $8,400 a year <small>in work, roughly*</small></p>
-      <p>Google estimates about 910 searches a month in Airdrie for heating and cooling. At typical rates for Google Ads, a business showing up on them could book about one job a month from them, at $250 to $700 for a furnace repair. One furnace replacement runs $5,000 to $8,000, which covers about three months of a $1,500 ad budget and our fee.</p>
-      <p class="fine">* An estimate, not a promise: Google&#39;s monthly search estimates in Airdrie, times typical Google Ads rates for heating and cooling (6 in 100 searches click an ad at about $13 a click, and 7 in 100 clicks call or send a form), times about 1 in 3 of those booked, at typical Calgary-area prices. It assumes your ads show on these searches. Your prices, service area, and how fast you answer the phone will change it.</p>
+      <p class="value-big" >$5,000 to $8,000 <small>for one furnace replacement, roughly*</small></p>
+      <p>Landing one furnace replacement from these searches would cover about three months of a $1,500 a month ad budget and our fee. Google estimates about 910 searches a month in Airdrie for heating and cooling. At typical rates for Google Ads, a business showing up on them could book about one job a month from them, at $250 to $700 for a furnace repair. In all, roughly $3,000 to $8,400 a year in work. </p>
+      <p class="fine">* An estimate, not a promise: Google&#39;s monthly search estimates in Airdrie, times typical Google Ads rates for heating and cooling (6 in 100 searches click an ad at about $13 a click, and 7 in 100 clicks call or send a form), times about 1 in 3 of those booked, at typical Calgary-area prices. It assumes your ads show on these searches. The big job is a typical Calgary-area price range for that work. Your prices, service area, and how fast you answer the phone will change it.</p>
     </div>
   </div>
 
@@ -243,10 +243,10 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
       <p>From the outside we can see where you show up. Inside your Google Ads account we can see why: which searches you're paying for, what each call costs you, and where the budget goes. You'd link your account to our Google Ads manager account. We only look, nothing changes without your OK, and you can remove our access at any time. <a href="/report/sample/" target="_blank" rel="noopener">See a sample report</a>.</p>
       <fieldset class="pick" >
         <legend>Pick one</legend>
-        <label for="a-pick-1"><input type="radio" id="a-pick-1" name="addons" value=""> <span><b>Account audit, $500 + GST</b><span>Where your ad budget goes and what to change first.</span></span></label>
-        <label for="a-pick-2"><input type="radio" id="a-pick-2" name="addons" value="site_audit" checked> <span><b>Account and site audit, $1,000 + GST <span class="tag">Suggested</span></b><span>The same, plus your website checked the way a customer on a phone sees it, with each fix priced. Your audit found things to fix on both.</span></span></label>
+        <label for="a-pick-1"><input type="radio" id="a-pick-1" name="addons" value=""> <span><b>Google Ads audit, $500 + GST</b><span>Where your ad budget goes and what to change first.</span></span></label>
+        <label for="a-pick-2"><input type="radio" id="a-pick-2" name="addons" value="site_audit" checked> <span><b>Google Ads and site audit, $1,000 + GST <span class="tag">Suggested</span></b><span>The same, plus your website checked the way a customer on a phone sees it, with each fix priced. Your audit found things to fix on both.</span></span></label>
       </fieldset>
-      <p class="price"><span hidden>$500 + GST for the account audit. </span><small >Either way, $500 comes off setup or monthly management if you go ahead within 30 days.</small></p>
+      <p class="price"><span hidden>$500 + GST for the Google Ads audit. </span><small >Either way, $500 comes off setup or monthly management if you go ahead within 30 days.</small></p>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
       <input type="hidden" name="offer" value="account_audit">
@@ -350,6 +350,22 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
         });
     });
   });
+  // Tells the hub the audit was read: once per visit, after four seconds on screen.
+  var id = document.querySelector('.ask-form input[name="id"]'), tk = document.querySelector('.ask-form input[name="t"]');
+  if (!id || !tk || !id.value || id.value === 'sample' || !navigator.sendBeacon) return;
+  var sent = false, timer = null;
+  function arm() {
+    clearTimeout(timer);
+    if (sent || document.visibilityState !== 'visible') return;
+    timer = setTimeout(function () {
+      if (sent || document.visibilityState !== 'visible') return;
+      sent = true;
+      var d = new FormData(); d.append('id', id.value); d.append('t', tk.value);
+      navigator.sendBeacon('/api/viewed', d);
+    }, 4000);
+  }
+  document.addEventListener('visibilitychange', arm);
+  arm();
 })();
 </script>
 </body>
