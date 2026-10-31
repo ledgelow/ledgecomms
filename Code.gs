@@ -559,7 +559,7 @@ function releaseAudit_(l) {
     logEvent_(l.id, l.email, 'ready_to_send', '');
     return true;
   }
-  if (!inWindow_(7, 21)) return false;
+  if (!inWindow_(7, 21, true)) return false;
   sendLeadEmail_(l, 'inbound_audit');
   updateLead_(l, { status: 'audit_sent', touches: 1, next_touch: addBusinessDays_(new Date(), 2) });
   return true;
@@ -779,7 +779,7 @@ function deliverProposals_() {
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
     if (l.status !== 'quote_requested' || !l.proposal_slug) return;
     if (reviewsLeft_('proposal') > 0) { requestProposalReview_(l); return; }
-    if (inWindow_(7, 21)) sendProposal_(l);
+    if (inWindow_(7, 21, true)) sendProposal_(l);
   });
 }
 
@@ -3298,7 +3298,7 @@ var EMAILS = {
     body: 'Hi {first},\n\n{more_para}\n\nIf you\'d like one, just reply and let me know.{booking_line}\n\nAll the best,\n{sign}'
   },
   cold_4: {
-    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to check it out down the road:\n{audit_url}\n\n' +
+    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not clogging up your inbox. Your audit will stay up if you want to review when the timing is better: {audit_url}\n\n' +
       'If the timing is better later, just let me know when and I\'ll check back then.\n\nAll the best,\n{sign}'
   },
   cold_ads_1: {
@@ -3317,7 +3317,7 @@ var EMAILS = {
       'If you\'d like the details, just reply and let me know.{booking_line}\n\nAll the best,\n{sign}'
   },
   cold_ads_4: {
-    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not cluttering your inbox. Your audit will stay up if you want to check it out down the road:\n{audit_url}\n\n' +
+    body: 'Hi {first},\n\nI\'ll leave it here so I\'m not clogging up your inbox. Your audit will stay up if you want to review when the timing is better: {audit_url}\n\n' +
       'If the timing is better later, just let me know when and I\'ll check back then.\n\nAll the best,\n{sign}'
   },
   check_back: {
@@ -4010,11 +4010,13 @@ function token_(id) {
   return Utilities.base64EncodeWebSafe(sig).replace(/=+$/, '').slice(0, 22);
 }
 
-function inWindow_(fromHour, toHour) {
+// Weekdays only, unless anyDay: replies to someone who asked (their audit, their proposal) go out on weekends too;
+// cold email and follow-ups stay on weekdays.
+function inWindow_(fromHour, toHour, anyDay) {
   var now = new Date();
   var dow = Number(Utilities.formatDate(now, tz_(), 'u'));
   var hour = Number(Utilities.formatDate(now, tz_(), 'H'));
-  return dow <= 5 && hour >= fromHour && hour < toHour;
+  return (anyDay || dow <= 5) && hour >= fromHour && hour < toHour;
 }
 
 function startOfDay_() {

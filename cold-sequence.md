@@ -66,10 +66,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to check it out down the road:
-> {audit_url}
+> I'll leave it here so I'm not clogging up your inbox. Your audit will stay up if you want to review when the timing is better: {audit_url}
 >
-> If the timing is better later, just let me know when and I'll check back then.
+> If you'd like me to check back down the road, just let me know when.
 >
 > All the best,
 > {sign}
@@ -128,10 +127,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to check it out down the road:
-> {audit_url}
+> I'll leave it here so I'm not clogging up your inbox. Your audit will stay up if you want to review when the timing is better: {audit_url}
 >
-> If the timing is better later, just let me know when and I'll check back then.
+> If you'd like me to check back down the road, just let me know when.
 >
 > All the best,
 > {sign}

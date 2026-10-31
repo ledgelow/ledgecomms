@@ -19,7 +19,25 @@ Your Squarespace site stays up on ledgecommunications.com until step 9, so you c
 
 Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected, with online payments), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
-**Ship this update (Oct 31, round two: your last email edits, 5 minutes)**
+**Ship this update (Oct 31, last one before launch, 5 minutes)**
+1. **Apps Script:** replace `Code.gs`, save, then deploy a new version.
+2. **GitHub:** upload `Code.gs`, `cold-sequence.md`, and `SETUP.md`.
+
+What changed: cold email 4 in your final words, and weekends. Anything that answers someone who asked (their audit, a
+proposal, the note after a yes) now goes out any day, 7 am to 9 pm. Cold first emails and every follow-up stay on
+weekdays. Promises still count business days ("by end of day Monday").
+
+**Launch checklist**
+1. Site-form trial (fine on a weekend now): the form on ledgecommunications.com as `ledgelow+trial1@gmail.com` with a
+   real Calgary shop's website. Check the confirmation, the "Add a personal line and send" link in the "Check this
+   audit" email (within a couple of hours), your line under "Hi" in the audit email, `audit_opened` on the Leads tab
+   after the audit's been on screen a few seconds, and a "Not right now, maybe in the spring" reply landing in the
+   5 pm email with check-back links. Then set that row's status to `skipped`.
+2. Approve the rebuilt audits as they come in. Approved cold shops queue for the first sends.
+3. Set `COLD_EMAIL_ON` to yes. The first 5 go out Monday morning, then 5 a day, rising by 5 a week to 10.
+4. Monday's weekly digest, then the first real read after about 100 first emails (three to four weeks).
+
+**Oct 31, round two (done): your last email edits**
 1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then deploy a new version. No rebuild needed this time.
 2. **GitHub:** upload `Code.gs`, `Templates.gs`, `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md`.
 3. A new `SENDER_TITLE` setting (Founder) goes in the signature: "Logan Edgelow | Founder, Ledge Communications".
