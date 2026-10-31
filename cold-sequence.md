@@ -20,18 +20,16 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 ## Day 0
 
-**Subject:** {business}: {search_hook}
+**Subject:** {search_subject}
 
 > Hi {first},
 >
-> Hope you're keeping busy. I'm {sender}, and I run Ledge Communications here in Alberta. I help local businesses show up when people search for them on Google.
+> {search_line} The biggest opportunity: {top_finding}
 >
-> {search_line} No cost and nothing to sign up for:
+> {value_para}Wanted to share it with you in case it's helpful (no cost and nothing to sign up for):
 > {audit_url}
 >
-> {value_para}The short version: {top_finding}
->
-> If you'd like to see what a small Google Ads budget aimed at those searches would look like, reply "yes" and I'll put together a starting plan.{booking_line}
+> I'm {sender}, and I run Ledge Communications here in Alberta. {intro_line} If it'd help, I'm happy to put together a plan for where you could start. Just reply and let me know.
 >
 > Thanks,
 > {sign}
@@ -42,10 +40,11 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Following up on the audit I sent. If you only do one thing, I'd start here: {fix_1}.
+> Following up on the audit I sent. If you only take one thing away from it, I'd start here: {fix_1}.
 >
-> Happy to set it up for you. Reply "yes" and I'll send a starting plan with a fixed price.
+> Happy to set it up for you. Just reply and let me know, and I'll send a starting plan with a fixed price.
 >
+> All the best,
 > {sign}
 
 ## 4 business days later
@@ -54,10 +53,11 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> I'll keep this one short. If you want to be in front of the people searching {keyword_q} before things get busier, a starting plan usually takes two to three weeks to set up, and you choose the budget.
+> {more_para}
 >
-> Reply "yes" and I'll send the details.{booking_line}
+> If you'd like one, just reply and let me know.{booking_line}
 >
+> All the best,
 > {sign}
 
 ## 5 business days later
@@ -69,6 +69,8 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to look at it later:
 > {audit_url}
 >
+> If the timing is better later in the year, just reply and say when, and I'll check back then.
+>
 > All the best,
 > {sign}
 
@@ -78,18 +80,16 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 ## Day 0
 
-**Subject:** {business}: {ads_hook}
+**Subject:** {ads_subject}
 
 > Hi {first},
 >
-> Hope you're keeping busy. I'm {sender}, and I run Ledge Communications here in Alberta. I manage Google Ads for local businesses.
+> {search_line} It includes where your ads showed up. The biggest thing that stood out: {top_finding}
 >
-> {search_line} It includes where your ads showed up. No cost and nothing to sign up for:
+> {value_para}Wanted to share it with you in case it's helpful (no cost and nothing to sign up for):
 > {audit_url}
 >
-> {value_para}The biggest thing that stood out: {top_finding}
->
-> If you'd like me to look inside the account and show you where the budget is going, reply "yes" and I'll send the details.{booking_line}
+> I'm {sender}, and I run Ledge Communications here in Alberta. {intro_line} If it'd help, I'm happy to look inside the account and show you where the budget is going. Just reply and let me know.
 >
 > Thanks,
 > {sign}
@@ -104,8 +104,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > {audit_price_line}
 >
-> Reply "yes" and I'll send how it works.
+> If you'd like the details, just reply and let me know.
 >
+> All the best,
 > {sign}
 
 ## 4 business days later
@@ -114,10 +115,11 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> One more thought on your audit. If you only tackle one thing, I'd start here: {fix_1}.
+> One more thought on your audit. If you only take one thing away from it, I'd start here: {fix_1}.
 >
-> Reply "yes" and I'll send the details.{booking_line}
+> If you'd like the details, just reply and let me know.{booking_line}
 >
+> All the best,
 > {sign}
 
 ## 5 business days later
@@ -128,6 +130,8 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > I'll leave it here so I'm not cluttering your inbox. Your audit will stay up if you want to look at it later:
 > {audit_url}
+>
+> If the timing is better later in the year, just reply and say when, and I'll check back then.
 >
 > All the best,
 > {sign}

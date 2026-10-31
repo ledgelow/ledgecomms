@@ -38,8 +38,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > It starts with what a customer sees when they search on a phone, then the three things I'd do first. The biggest finding: {top_finding}
 >
-> {value_para}If you'd like a hand, there's a short form at the bottom of the page, or just reply "yes".{booking_line}
+> {value_para}If you'd like a hand, there's a short form at the bottom of the page, or just let me know by replying here.{booking_line}
 >
+> All the best,
 > {sign}
 
 ## 2 business days later
@@ -52,6 +53,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > {offer_line}
 >
+> All the best,
 > {sign}
 
 ## 3 business days later
@@ -60,7 +62,11 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Last note from me. Your audit will stay up here whenever you want it:
+> Just checking in to see if you've had a chance to review the audit I shared previously and if there were any questions that came up if you did.
+>
+> Some of it is easier to talk through than to read, so if a short call would help, I'm happy to walk you through it.{call_line}
+>
+> Your audit still lives here either way in case there's anything helpful to pull from it:
 > {audit_url}
 >
 > All the best,
@@ -78,6 +84,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > I'll put together {offer_noun} and send it over by end of day {next_day}.{booking_line}
 >
+> All the best,
 > {sign}
 
 ## When they use the form on the audit page
@@ -86,8 +93,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Got it. I'll send {offer_noun} by end of day {next_day}.
+> Got it, thanks. I'll send {offer_noun} by end of day {next_day}.
 >
+> All the best,
 > {sign}
 
 ## The proposal (after your OK for the first few)
@@ -99,8 +107,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > {proposal_intro}
 > {proposal_url}
 >
-> It covers what's included, the price, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
+> {proposal_hook}It covers what's included, the price, and what I need from you. If it looks good, you can approve it right on the page. Any questions, just reply here.
 >
+> All the best,
 > {sign}
 
 ## If they haven't approved
@@ -112,6 +121,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > Just checking whether you had any questions. Happy to adjust the budget or the scope if something doesn't fit:
 > {proposal_url}
 >
+> All the best,
 > {sign}
 
 ## When they approve
@@ -126,6 +136,7 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 >
 > I'll keep you posted along the way.
 >
+> All the best,
 > {sign}
 
 ---
@@ -140,11 +151,12 @@ When a reply says "not now", the needs-you email offers a check-back date (in a 
 
 > Hi {first},
 >
-> Checking back like I said I would. Your audit is still up here:
+> Hope you're doing well. Checking back in, as promised. Your audit is still up here:
 > {audit_url}
 >
-> If now is a better time to look at Google Ads, just reply and I'll put together a plan for where you could start.
+> If now is a better time to look at Google Ads, just let me know and I'll put together a plan for where you could start.
 >
+> All the best,
 > {sign}
 
 ---
@@ -159,6 +171,7 @@ When a reply says "not now", the needs-you email offers a check-back date (in a 
 >
 > Thanks, that's all I need. A link request from Ledge Communications ({manager_id}) will show up in your Google Ads account shortly, under Admin > Access and security > Managers. Once you approve it, I'll get started, and you'll have the audit within about a week.
 >
+> All the best,
 > {sign}
 
 ## When the report is ready (after your OK)
@@ -175,6 +188,7 @@ When a reply says "not now", the needs-you email offers a check-back date (in a 
 > {report_value_para}It ends with what I'd change first. I've also put together a plan for running your ads month to month, priced on what you spend now:
 > {proposal_url}
 >
-> Happy to walk through both on a call.{booking_line}
+> Happy to walk through both on a call.{call_line}
 >
+> All the best,
 > {sign}

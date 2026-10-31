@@ -19,7 +19,21 @@ Your Squarespace site stays up on ledgecommunications.com until step 9, so you c
 
 Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected, with online payments), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
-**Online payments on invoices (Oct 30, late afternoon, 5 minutes)**
+**Ship this update (Oct 31): the final email copy (10 minutes, then a rebuild)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save, then deploy a new version.
+2. **GitHub:** upload `Code.gs`, `Templates.gs`, `sample-audit.html`, `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md`.
+3. **Ledge > Rebuild audits that haven't gone out** (once). The audit write-ups now open with one big job, so audits
+   written before today need fresh ones. Roughly 80 US cents each; they come back for your OK over a few hours.
+4. Read the **Final emails** tab in the email worksheet and tick its box.
+5. Monday: the site-form trial run. When it checks out, set `COLD_EMAIL_ON` to yes.
+
+What's new: every email in its final wording (your edits, "just reply and let me know" as the ask, "All the best,"
+sign-offs, the shorter subject lines, no booking link in the first cold email). Audits and emails lead with one big job,
+and the yearly range follows. Claude sorts replies (yes, no, later, other) with a small model (`REPLY_MODEL`), so
+"Yes, we already have someone" comes to you instead of getting a proposal; the word lists are the fallback. Proposals
+still quiet 5 business days after their nudge show up in your 5 pm email. Test invoices go to your `+fbtest` alias.
+
+**Online payments on invoices (Oct 30, late afternoon, done)**
 Invoices the hub makes through FreshBooks' API don't get a pay-online button on their own. The hub now copies your
 default online payment options onto each invoice before FreshBooks emails it.
 1. **Apps Script:** replace `Code.gs`, save, then deploy a new version. **GitHub:** upload `Code.gs` and `SETUP.md`.
