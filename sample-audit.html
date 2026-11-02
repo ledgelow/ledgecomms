@@ -94,12 +94,12 @@ h2 { font-size: 1.55rem; }
 .opp-q b { color: var(--ink); font-weight: 600; }
 .tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .tiles li { background: var(--snow); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: grid; gap: 2px; align-content: start; min-width: 0; }
-.tiles b { font-family: var(--display); font-weight: var(--display-weight); font-size: clamp(1.25rem, 3.6vw, 1.6rem); line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tiles b { font-family: var(--display); font-weight: var(--display-weight); font-size: clamp(1.25rem, 3.6vw, 1.6rem); line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tiles span { font-size: 0.86rem; color: var(--muted); line-height: 1.35; }
 @media (max-width: 560px) {
   .tiles { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .tiles li { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 10px; padding: 10px 12px; }
-  .tiles li b { order: 2; font-size: 1.2rem; text-align: right; } .tiles li span { order: 1; font-size: 0.9rem; }
+  .tiles li b { order: 2; font-size: 1.15rem; text-align: right; } .tiles li span { order: 1; font-size: 0.9rem; min-width: 0; }
 }
 .takeaway { background: var(--spruce); color: var(--on-dark); border-radius: 8px; padding: 16px 18px; font-size: 1.12rem; line-height: 1.45; font-weight: 500; }
 .takeaway strong { color: var(--accent); font-weight: 700; }
@@ -217,6 +217,7 @@ details.how ul { margin: 10px 0 0; padding-left: 1.1rem; display: grid; gap: 5px
 .ask .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
 .ask .btn { background: var(--accent); color: var(--accent-ink); }
 .ask .free { font-size: 0.9rem; color: var(--on-dark-muted); }
+.ask a { color: var(--on-dark); }
 .ask .err { color: #FFB4A6; font-weight: 500; }
 .pick { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 38rem; min-width: 0; }
 .pick legend { font-size: 0.9rem; font-weight: 600; padding: 0; margin-bottom: 4px; }
@@ -371,14 +372,14 @@ details.sources p { margin-top: 10px; }
         <li>Where the budget goes that doesn't bring work in</li>
       </ul>
       <ol class="steps">
-        <li>Send this. Nothing to pay and nothing to sign.</li>
-        <li>You'll get the details by email: what we'd look at, the price (from $500 + GST), and how to give us view-only access.</li>
-        <li>Only if you say go ahead do we send an invoice. Nothing in your account changes.</li>
+        <li><span>Send this form for the details on our Google Ads audit and how we'd get you started.</span></li>
+        <li><span>You'll get a plan built for your account: what we'd look at first, what we'd recommend, and a custom quote. <a href="/pricing/" target="_blank" rel="noopener">See our pricing</a> for a general idea of costs.</span></li>
+        <li><span>Then it's your call. Nothing is locked in, and we move at the pace and budget that suit you.</span></li>
       </ol>
       <fieldset class="pick" >
         <legend>Which would you like the details on?</legend>
-        <label for="a-pick-1"><input type="radio" id="a-pick-1" name="addons" value=""> <span><b>Google Ads audit</b><span>Where your ad budget goes and what to change first. $500 + GST.</span></span></label>
-        <label for="a-pick-2"><input type="radio" id="a-pick-2" name="addons" value="site_audit" checked> <span><b>Google Ads and site audit <span class="tag">Suggested</span></b><span>The same, plus your website checked the way a customer on a phone sees it, with each fix priced. Your audit found things to fix on both. $1,000 + GST.</span></span></label>
+        <label for="a-pick-1"><input type="radio" id="a-pick-1" name="addons" value=""> <span><b>Google Ads audit</b><span>Where your ad budget goes and what to change first.</span></span></label>
+        <label for="a-pick-2"><input type="radio" id="a-pick-2" name="addons" value="site_audit" checked> <span><b>Google Ads and site audit <span class="tag">Suggested</span></b><span>The same, plus your website checked the way a customer on a phone sees it. Your audit found things to fix on both.</span></span></label>
       </fieldset>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
@@ -386,10 +387,10 @@ details.sources p { margin-top: 10px; }
       <label for="a-notes"><span>Anything we should know? <span class="opt">(optional)</span></span>
         <textarea id="a-notes" name="notes" placeholder="For example: we spend about $1,500 a month and most calls come from Airdrie."></textarea></label>
       <p class="err" role="alert" hidden></p>
-      <div class="row"><button class="btn" type="submit">Send me the details</button><span class="free">Free to ask.</span></div>
+      <div class="row"><button class="btn" type="submit">Send me the details</button><span class="free">We'll reply within one business day.</span></div>
     </form>
     <div id="ask-audit-done" hidden>
-      <p><strong>Got it.</strong> Nothing to pay yet. You'll have the details, including the price and how to give us view-only access, by the end of the next business day.</p>
+      <p><strong>Got it.</strong> You'll have the details and a plan for your account by the end of the next business day.</p>
     </div>
   </div>
 
@@ -398,9 +399,9 @@ details.sources p { margin-top: 10px; }
     <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-setup-done" data-label="Send me a starting plan">
       <p class="lead">We'd set up a small Google Ads campaign for searches like &ldquo;furnace repair calgary&rdquo; around Calgary, and tell you plainly what it costs to run.</p>
       <ol class="steps">
-        <li>Pick a monthly ad budget you'd be comfortable testing and send this. It's free.</li>
-        <li>You'll get a starting plan by email: the searches, the budget, and a fixed price for the setup.</li>
-        <li>Nothing starts and nothing is billed until you approve it.</li>
+        <li><span>Pick a monthly ad budget you'd be comfortable testing, and send this form.</span></li>
+        <li><span>You'll get a starting plan built for your business: the searches, the budget, and a custom quote for the setup. <a href="/pricing/" target="_blank" rel="noopener">See our pricing</a> for a general idea of costs.</span></li>
+        <li><span>Then it's your call. Nothing is locked in, and we move at the pace and budget that suit you.</span></li>
       </ol>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
@@ -418,17 +419,17 @@ details.sources p { margin-top: 10px; }
       <label for="s-notes"><span>Anything we should know? <span class="opt">(optional)</span></span>
         <textarea id="s-notes" name="notes" placeholder="For example: we want more furnace replacements, not service calls."></textarea></label>
       <p class="err" role="alert" hidden></p>
-      <div class="row"><button class="btn" type="submit">Send me a starting plan</button><span class="free">Free, with nothing to sign.</span></div>
+      <div class="row"><button class="btn" type="submit">Send me a starting plan</button><span class="free">We'll reply within one business day.</span></div>
     </form>
     <div id="ask-setup-done" hidden>
-      <p><strong>Got it.</strong> Your starting plan will be in your inbox by the end of the next business day. Nothing starts until you approve it.</p>
+      <p><strong>Got it.</strong> Your starting plan will be in your inbox by the end of the next business day.</p>
     </div>
   </div>
 
   <div class="ask" id="ask-general" hidden>
     <h2>Want a hand with any of this?</h2>
     <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-general-done" data-label="Send me the details">
-      <p class="lead">Tell us where you are with Google Ads and you'll get a straight answer on what we'd do first and what it costs. Free, with nothing to sign.</p>
+      <p class="lead">Tell us where you are with Google Ads and you'll get a straight answer on what we'd do first, with a custom quote. <a href="/pricing/" target="_blank" rel="noopener">See our pricing</a> for a general idea of costs.</p>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
       <input type="hidden" name="offer" value="details">
