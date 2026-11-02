@@ -45,7 +45,8 @@ var HEAD = {
     // audit_opened: first time the audit page was read after it went out (audit_opens counts every time).
     // check_back: the date a "try me later" lead gets its one note. personal_line: Logan's line atop a site-form audit email.
     'audit_opened', 'audit_opens', 'check_back', 'personal_line'],
-  audits: ['slug', 'lead_id', 'created', 'business', 'spec_json'],
+  // qa: what the check found before the audit reached Logan (pass, rewritten: [...], or flagged: ...).
+  audits: ['slug', 'lead_id', 'created', 'business', 'spec_json', 'qa'],
   // One row per phone screenshot of a Google search in the Ledge search screenshots folder, as Claude read it.
   shots: ['file_id', 'query', 'captured', 'read', 'lsa_json', 'ads_json', 'map_json', 'note', 'link'],
   // price_sprint is the one-time amount and price_care the monthly fee, whatever the offer.
@@ -66,12 +67,12 @@ var HEAD = {
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '14';
+var SCHEMA_VERSION = '15';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
   PRICE_PAGE_FIXES: ['400', '500'], PRICE_LANDING_PAGE: ['900', '1000'], PRICE_SITE_SUPPORT: ['100'],
-  COLD_PER_DAY_MAX: ['20'], PROSPECTS_PER_WEEK: ['15'], REVIEW_PROPOSALS_FIRST: ['3'],
+  COLD_PER_DAY_MAX: ['20'], PROSPECTS_PER_WEEK: ['15'], REVIEW_PROPOSALS_FIRST: ['3'], REVIEW_AUDITS_FIRST: ['5'],
   TRADES: ['heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair']
 };
 var SETTINGS_DEFAULTS = [
@@ -87,10 +88,14 @@ var SETTINGS_DEFAULTS = [
   ['PRICE_CARE', '250', 'Old lead-handling care plan. Only used for proposals made before the switch to Google Ads.'],
   ['GST_REGISTERED', 'yes', 'yes adds "+ GST" to prices.'],
   ['PAYMENT_URL', '', 'Optional payment link (Stripe or Wave) sent after a proposal is approved.'],
-  ['REVIEW_AUDITS_FIRST', '5', 'Hold the first N audits for your one-click OK. 0 turns it off.'],
+  ['REVIEW_AUDITS_FIRST', '20', 'Hold the first N audits for your one-click OK. 0 turns it off. Audits the check flags always wait for you.'],
   ['REVIEW_PROPOSALS_FIRST', '10', 'Hold the first N proposals for your one-click OK. 0 turns it off.'],
   ['REPLY_MODEL', 'claude-haiku-5-5', 'Claude model that sorts replies into yes, no, later, and other. Small and cheap on purpose.'],
   ['SEARCH_SHOT_DAYS', '14', 'How many days a phone screenshot of a search stays in use on audits. Ads change, so keep it short.'],
+  ['REQUIRE_SHOTS', 'yes', 'yes holds each cold audit until every search it uses has a phone screenshot, and emails you the searches to check. no builds without them (the audit then says nothing about who advertises on those searches).'],
+  ['SHOT_WAIT_HOURS', '4', 'How long a site-form audit waits for your phone screenshots before it\'s built without them, so it still goes out on the day promised.'],
+  ['QA_ON', 'yes', 'yes has Claude read each audit the way the owner would before it reaches you. Anything confusing, contradictory, or unsupported gets rewritten once; if it still isn\'t right, the audit comes to you with the problems listed.'],
+  ['QA_MODEL', 'claude-sonnet-5-5', 'Claude model for that check.'],
   ['INBOUND_HOLD_HOURS', '3', 'Site-form audits wait this many hours for your OK, so you can add a personal line, then go out on their own. 0 sends them as soon as they\'re ready.'],
   ['COLD_EMAIL_ON', 'no', 'yes starts cold emails. Leave it at no until you\'re happy with the first audits.'],
   ['COLD_PER_DAY_START', '5', 'Cold emails per weekday in the first week.'],
@@ -209,6 +214,7 @@ function onOpen() {
     .addItem('Read new search screenshots now', 'readSearchShotsNow')
     .addItem('Re-read screenshots that didn\'t match', 'rereadUnmatchedShots')
     .addItem('Rebuild audits that now have screenshots', 'rebuildForNewShots')
+    .addItem('Check the waiting audits again', 'recheckWaitingAudits')
     .addItem('Connect FreshBooks', 'connectFreshBooks')
     .addItem('Send a test invoice to myself', 'testFreshBooksInvoice')
     .addItem('Send me the weekly digest now', 'sendDigest')
@@ -240,7 +246,7 @@ function checkOneShop() {
     created: new Date(), updated: new Date(), est_cost_usd: ev.cost, detail: 'Check one shop: ' + site });
   var text = evidenceText_(ev) + '\n\nSearch data cost: US$' + ev.cost.toFixed(3);
   ui.showModalDialog(HtmlService.createHtmlOutput('<pre style="white-space:pre-wrap;font:13px/1.5 monospace">' + esc_(text) + '</pre>')
-    .setWidth(900).setHeight(620), 'What a customer sees: ' + site);
+    .setWidth(900).setHeight(620), 'What a prospective customer sees: ' + site);
 }
 
 function checkSettings_() {
@@ -269,6 +275,8 @@ function ensureSchema_(force) {
   _settings = null;
   props_().setProperty('SCHEMA_VERSION', SCHEMA_VERSION);
   if (from > 0 && from < 4) rebuildLegacyAudits_();
+  // The check arrived in 15: audits written before it (approved ones too, since none has gone out) get checked before they go.
+  if (from > 0 && from < 15) recheckWaitingAudits_();
 }
 
 function refreshSettingDefaults_(st) {
@@ -481,6 +489,7 @@ function runHourly() {
     step_('gatherEvidence', gatherEvidence_);
     step_('gatherSiteChecks', gatherSiteChecks_);
     step_('submitJobs', submitJobs_);
+    step_('askForShots', askForShots_);
     step_('deliverAudits', deliverAudits_);
     step_('deliverProposals', deliverProposals_);
     step_('monthlyRun', monthlyRun_);
@@ -517,7 +526,10 @@ function deliverAudits_() {
     // Approved (or released) outside sending hours: it goes at the next chance, without being held again.
     if (l.status === 'audit_approved') { releaseAudit_(l); return; }
     if (l.status !== 'audit_ready') return;
-    if (reviewsLeft_('audit') > 0 || inboundHoldHours_(l) > 0) { toReview.push(l); return; }
+    // The check reads each audit first. One it flagged always waits for Logan, however many reviews are left.
+    var qa = qaState_(l);
+    if (qa === 'waiting') return;
+    if (qa === 'flagged' || reviewsLeft_('audit') > 0 || inboundHoldHours_(l) > 0) { toReview.push(l); return; }
     releaseAudit_(l);
   });
   if (toReview.length === 1) requestAuditReview_(toReview[0]);
@@ -552,6 +564,7 @@ function requestAuditReviews_(list) {
     return (i + 1) + '. ' + l.business + ' (' + (l.source === 'cold' ? 'cold prospect' : 'asked on the site') + ', ' + (l.area || '') + ', ' +
       (adsLabel[l.segment] || adsLabel.unknown) + ')\n' +
       '   Audit: ' + auditUrl_(l) + '\n' +
+      qaLines_(l, '   ') +
       '   Biggest finding: ' + l.top_finding + '\n' +
       (l.source === 'cold' ? '   Email found: ' + l.email + ' (' + String(l.consent_proof || '').split(' | ')[0] + ')\n' : '') +
       '   Looks right: ' + ownerLink_('approve_audit', l) + '\n' + holdLines_(l, until) +
@@ -590,6 +603,7 @@ function requestAuditReview_(l) {
     (reviewsLeft_('audit') > 0 ? 'It\'s one of the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so it waits for your OK (' + reviewsLeft_('audit') + ' left).\n\n'
       : 'It waits a few hours in case you want to add a personal line.\n\n') +
     'Audit: ' + auditUrl_(l) + '\n' +
+    qaLines_(l, '') +
     'Google Ads: ' + ({ running_ads: 'running ads, so the page offers the $' + money_(setting_('PRICE_ACCOUNT_AUDIT') || 500) + ' account audit',
       no_ads: 'no ads found, so the page offers a starting plan' }[l.segment] || 'couldn\'t tell, so the page asks where they are with ads') + '\n' +
     'Biggest finding: ' + l.top_finding + '\n' +
@@ -1827,10 +1841,15 @@ function evidenceText_(ev) {
       (q.lsa.length ? list(q.lsa) : q.shot ? 'none on the screenshot' : 'none captured. Our search data usually misses these, so never say there were none'));
     L.push('  Sponsored' + (from.ads === 'screenshot' ? pic : '') + ': ' +
       (q.ads.length ? list(q.ads) : q.shot ? 'none on the screenshot' : 'none captured. Our search data usually misses ads, so never say there were none'));
-    L.push('  Map pack: ' + list(q.map_pack));
-    L.push('  Google Maps: ' + (q.you.maps ? 'this shop is #' + q.you.maps + ' of ' + q.maps_total : 'this shop is not in the first ' + q.maps_total) +
-      '. Top: ' + list(q.maps_top) + (q.maps_ads.length ? '. Sponsored in Maps: ' + list(q.maps_ads) : ''));
-    L.push('  Websites: ' + list(q.organic) + (q.you.organic ? '' : ' (this shop is not in the first 20)'));
+    // One map position per search. The three map spots on the search page and Google Maps' own list can disagree (different
+    // checks, minutes apart); the owner sees one map, so the evidence gives one number.
+    var pack = (q.map_pack || []).length ? q.map_pack : (q.maps_top || []).slice(0, 3);
+    L.push('  Map, the three spots on the search page' + (from.map_pack === 'screenshot' ? pic : '') + ': ' + list(pack));
+    L.push('  This shop on the map: ' + (q.you.map_pack ? '#' + q.you.map_pack + ', one of the three on the search page'
+      : q.you.maps ? '#' + q.you.maps + ', below the three on the search page (people see it only if they open the full map)'
+      : 'not in the first ' + (q.maps_total || 20) + ' on the map') + '. This is the only map position to use for this search.');
+    if (q.maps_ads.length) L.push('  Sponsored spots in Google Maps: ' + list(q.maps_ads));
+    L.push('  Websites below the map: ' + list(q.organic) + (q.you.organic ? '' : ' (this shop\'s website is not in the first 20)'));
   });
   if (ev.errors.length) L.push('', 'Could not check: ' + ev.errors.join('; ') + '.');
   return L.join('\n');
@@ -1862,6 +1881,14 @@ function shareForPage_(file) {
 }
 
 function normQuery_(q) { return String(q || '').toLowerCase().replace(/[“”"]/g, '').replace(/\s+/g, ' ').trim(); }
+
+// The search a file is named after, if its name holds one of the searches we expect ("Electrician Chestermere 2.pdf",
+// "hot-water-tank-replacement-calgary.jpg"). The longest match wins, so "furnace replacement calgary" isn't read as a shorter search.
+function searchFromName_(name, expected) {
+  var n = ' ' + normQuery_(String(name || '').replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[_+\-.()]+/g, ' ')) + ' ', hit = '';
+  (expected || []).forEach(function (k) { if (n.indexOf(' ' + k + ' ') > -1 && k.length > hit.length) hit = k; });
+  return hit;
+}
 
 // Hourly, and from the menu: each new picture in the folder, read once by Claude.
 function readSearchShotsNow() {
@@ -1902,6 +1929,8 @@ function readSearchShots_(max, budget, hints) {
     var units;
     try { units = shotUnits_(f); } catch (err) { units = [{ id: f.getId(), error: 'Couldn\'t open: ' + String(err && err.message || err).slice(0, 90) }]; }
     var finished = true;
+    // A file named after its search ("electrician chestermere.pdf") is read as that search. A batch of pages can't be.
+    var named = units.length === 1 ? searchFromName_(f.getName(), expected) : '';
     for (var k = 0; k < units.length; k++) {
       var u = units[k];
       if (done[u.id]) continue;
@@ -1909,6 +1938,7 @@ function readSearchShots_(max, budget, hints) {
       var row = { file_id: u.id, captured: f.getDateCreated(), read: new Date(), query: '', lsa_json: '[]', ads_json: '[]', map_json: '[]',
         note: [u.label, u.note].filter(Boolean).join('. '), link: shotLink_(u.id) };
       if (hints[u.id]) u.hint = hints[u.id];
+      else if (named) { u.hint = named; u.hint_from = 'name'; }
       if (u.error || !u.kind) row.note = u.error || u.note;
       else {
         try { lastQuery = readShotUnit_(u, row, expected, lastQuery); } catch (err) { row.note = 'Couldn\'t read: ' + String(err && err.message || err).slice(0, 100); }
@@ -1931,8 +1961,12 @@ function shotUnits_(f) {
   var raw = blob.getBytes();
   if (type === 'application/pdf') {
     if (raw.length > 60000000) throw new Error('PDF over 60 MB');
-    var jpegs = pdfJpegs_(u8_(raw));
-    if (!jpegs.length) return [{ id: id, kind: 'pdf', data: Utilities.base64Encode(raw) }];
+    // Two kinds of PDF land here. Photos makes one from screenshots: no text, each page one tall picture. A browser
+    // makes one from the results page itself: real text, with the small pictures on the page (business photos, the map)
+    // inside it. That kind is read whole, as a document, never cut into its little pictures.
+    var u8 = u8_(raw), jpegs = pdfJpegs_(u8);
+    var screenshots = jpegs.length && !pdfHasText_(u8) && jpegs.every(function (j) { var sz = imageSize_(j); return sz && sz.h > sz.w * 1.3; });
+    if (!screenshots) return [{ id: id, kind: 'pdf', data: Utilities.base64Encode(raw) }];
     return jpegs.map(function (j, i) {
       var u = jpegUnit_(jpegs.length > 1 ? id + '#' + (i + 1) : id, j);
       if (jpegs.length > 1) u.label = 'Page ' + (i + 1) + ' of ' + jpegs.length + ' in this PDF';
@@ -1994,6 +2028,16 @@ function pdfJpegs_(u8) {
   }
   return out;
 }
+// Whether a PDF has text in it (fonts), the mark of a page saved from a browser rather than screenshots saved from Photos.
+function pdfHasText_(u8) {
+  var pat = [47, 70, 111, 110, 116]; // "/Font"
+  outer: for (var k = 0; k <= u8.length - pat.length; k++) {
+    if (u8[k] !== 47) continue;
+    for (var j = 1; j < pat.length; j++) if (u8[k + j] !== pat[j]) continue outer;
+    return true;
+  }
+  return false;
+}
 function u8_(bytes) { var u = new Uint8Array(bytes.length); for (var i = 0; i < bytes.length; i++) u[i] = bytes[i] & 255; return u; }
 function signed_(u8) { var a = new Array(u8.length); for (var i = 0; i < u8.length; i++) a[i] = u8[i] > 127 ? u8[i] - 256 : u8[i]; return a; }
 
@@ -2047,7 +2091,7 @@ function readShotUnit_(u, row, expected, lastQuery) {
     });
   };
   row.query = normQuery_(u.hint || j.query);
-  if (u.hint) row.note = (row.note ? row.note + '. ' : '') + 'Search typed in by you';
+  if (u.hint) row.note = (row.note ? row.note + '. ' : '') + (u.hint_from === 'name' ? 'Search taken from the file name' : 'Search typed in by you');
   else if (!row.query) row.note = (row.note ? row.note + '. ' : '') + 'Couldn\'t tell which search: type it in the query column';
   else if (j.query_from === 'guess' || expected.indexOf(row.query) < 0) row.note = (row.note ? row.note + '. ' : '') + 'Best guess at the search: check the query column, and correct it if it\'s wrong';
   else if (j.query_from === 'page') row.note = (row.note ? row.note + '. ' : '') + 'Search matched from the page (the box was blank or hidden)';
@@ -2149,20 +2193,24 @@ function applySearchShot_(s, domain, name) {
 // From the menu: where each audit being built has got to, and anything that went wrong in the last day.
 function showAuditStatus() {
   ensureSchema_();
-  var jobs = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) { return j.kind === 'audit'; });
-  var count = { gathering: 0, ready: 0, writing: 0 };
+  var all = readRows_(TAB.jobs, HEAD.jobs), jobs = all.filter(function (j) { return j.kind === 'audit'; });
+  var want = shotsWanted_(), held = shotsHeld_(want);
+  var count = { gathering: 0, shots: 0, ready: 0, writing: 0 };
   var batchStart = null;
   jobs.forEach(function (j) {
-    if (j.status === 'queued') count[freshEvidence_(j.lead_id) ? 'ready' : 'gathering']++;
+    if (j.status === 'queued') count[held[j.lead_id] ? 'shots' : freshEvidence_(j.lead_id) ? 'ready' : 'gathering']++;
     else if (j.status === 'submitted') { count.writing++; var u = new Date(j.updated); if (!batchStart || u < batchStart) batchStart = u; }
   });
-  var review = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.status === 'awaiting_review' || l.status === 'audit_ready'; }).length;
+  var checking = all.filter(function (j) { return j.kind === 'qa' && (j.status === 'queued' || j.status === 'submitted'); }).length;
+  var review = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.status === 'awaiting_review' || (l.status === 'audit_ready' && qaState_(l) !== 'waiting'); }).length;
   var since = Date.now() - 864e5;
   var errors = readRows_(TAB.events, HEAD.events).filter(function (e) { return e.event === 'error' && new Date(e.timestamp).getTime() > since; }).slice(-5);
   var lines = [
     'Gathering searches: ' + count.gathering + (count.gathering ? ' (6 shops a run)' : ''),
+    'Waiting for your phone screenshots: ' + count.shots + (count.shots ? ' (' + Object.keys(want).sort().join(', ') + ')' : ''),
     'Searches done, waiting to go to Claude: ' + count.ready + (count.ready ? ' (the next run sends them)' : ''),
     'With Claude now: ' + count.writing + (count.writing ? ' (sent ' + Utilities.formatDate(batchStart, tz_(), 'h:mm a') + '; batches usually take 10 to 60 minutes, and each run checks)' : ''),
+    'Being checked before they come to you: ' + checking,
     'Back and waiting for your review: ' + review,
     'Engine spend this month: US$' + monthSpend_().toFixed(2) + ' of ' + setting_('MONTHLY_ENGINE_BUDGET_USD')
   ];
@@ -2232,10 +2280,236 @@ function rebuildForNewShots() {
   ui.alert('Queued ' + list.length + '. They go to Claude on the next run and come back for review within the hour or so.');
 }
 
+/* ── audits wait for Logan's phone screenshots ── */
+
+// The searches that have a usable phone screenshot right now (the same test as searchShotFor_), read once.
+function shotQueries_() {
+  var days = Number(setting_('SEARCH_SHOT_DAYS') || 14), out = {};
+  readRows_(TAB.shots, HEAD.shots).forEach(function (r) {
+    if (!r.query || Date.now() - new Date(r.captured).getTime() >= days * 864e5) return;
+    if (['lsa_json', 'ads_json', 'map_json'].some(function (k) { try { return JSON.parse(r[k] || '[]').length > 0; } catch (err) { return false; } })) out[r.query] = true;
+  });
+  return out;
+}
+
+// Audits waiting on a phone check: search -> the shops waiting on it. Without a screenshot an audit can't say who advertises
+// on a search, which is most of what it's for. A site-form audit stops waiting SHOT_WAIT_HOURS after they asked, so it's on time.
+function shotsWanted_() {
+  var want = {};
+  if (!yes_(setting_('REQUIRE_SHOTS'))) return want;
+  var have = shotQueries_(), waitMs = Number(setting_('SHOT_WAIT_HOURS') || 4) * 3600e3, leads = {};
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) { leads[l.id] = l; });
+  readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) {
+    var l = leads[j.lead_id];
+    if (j.kind !== 'audit' || j.status !== 'queued' || !l) return;
+    if (l.source !== 'cold' && Date.now() - new Date(l.created || j.created).getTime() > waitMs) return;
+    var ev = freshEvidence_(j.lead_id);
+    if (!ev) return;
+    (ev.searches || []).forEach(function (s) {
+      var k = normQuery_(s.keyword);
+      if (!s.ran || have[k]) return;
+      var w = want[k] = want[k] || { shops: [], leads: [], site_form: false };
+      if (w.leads.indexOf(l.id) < 0) { w.leads.push(l.id); w.shops.push(l.business || domainOf_(l.website) || l.id); }
+      if (l.source !== 'cold') w.site_form = true;
+    });
+  });
+  return want;
+}
+function shotsHeld_(want) {
+  var held = {};
+  Object.keys(want).forEach(function (k) { want[k].leads.forEach(function (id) { held[id] = true; }); });
+  return held;
+}
+
+// Hourly, any day 7am to 9pm: the searches audits are waiting on. Sent when the list gets something new (right away for a
+// site-form audit, otherwise at most every two hours), and once a day while anything is still waiting.
+function askForShots_() {
+  var want = shotsWanted_(), keys = Object.keys(want).sort();
+  if (!keys.length) { props_().deleteProperty('SHOTS_ASKED'); return; }
+  if (!inWindow_(7, 21, true)) return;
+  var last = {};
+  try { last = JSON.parse(prop_('SHOTS_ASKED') || '{}'); } catch (err) {}
+  var since = Date.now() - Number(last.at || 0);
+  var fresh = keys.filter(function (k) { return (last.keys || []).indexOf(k) < 0; });
+  var siteForm = fresh.some(function (k) { return want[k].site_form; });
+  if (!(fresh.length && (siteForm || since > 2 * 3600e3)) && since < 22 * 3600e3) return;
+  var shops = {};
+  keys.forEach(function (k) { want[k].shops.forEach(function (b) { shops[b] = true; }); });
+  var n = Object.keys(shops).length;
+  ownerMail_('Phone screenshots needed: ' + keys.length + ' search' + (keys.length > 1 ? 'es' : ''),
+    n + ' audit' + (n > 1 ? 's are' : ' is') + ' waiting for a phone check of ' + (keys.length > 1 ? 'these searches' : 'this search') + ' before Claude writes ' + (n > 1 ? 'them' : 'it') + ':\n\n' +
+    keys.map(function (k) { return '  ' + k + '  (' + want[k].shops.join(', ') + ')'; }).join('\n') + '\n\n' +
+    'Search each one on your phone and save the whole results page as a PDF (Share, then Print or Create PDF), or take normal screenshots from the top down. ' +
+    'Drop them in the "Ledge search screenshots" Drive folder. Naming each file after its search ("electrician chestermere.pdf") makes the match certain; ' +
+    'otherwise it\'s worked out from the page. The next run reads them and writes the audits, and they come to you after the check.' +
+    (keys.some(function (k) { return want[k].site_form; }) ? '\n\nOne of these is for someone who asked on the site. It goes ahead without the phone check ' +
+      Number(setting_('SHOT_WAIT_HOURS') || 4) + ' hours after they asked, so it still goes out on time.' : '') +
+    '\n\nTo build cold audits without phone checks, set REQUIRE_SHOTS to no on the Settings tab.');
+  props_().setProperty('SHOTS_ASKED', JSON.stringify({ keys: keys, at: Date.now() }));
+}
+
+/* ── the check: each audit read the way the owner would, before it reaches Logan ── */
+
+// Where an audit stands with the check: 'off', 'waiting', 'pass', or 'flagged'. An audit from before the check (or one whose
+// check went missing) gets one queued.
+function qaState_(l) {
+  if (!yes_(setting_('QA_ON'))) return 'off';
+  var row = l.audit_slug ? findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug) : null;
+  if (!row) return 'off';
+  var qa = String(row.qa || '');
+  if (qa === 'pass') return 'pass';
+  if (/^flagged/.test(qa)) return 'flagged';
+  if (!qa) queueJob_('qa', l.id, l.audit_slug);
+  return 'waiting';
+}
+
+// For the review email: what the check found.
+function qaLines_(l, pad) {
+  var row = l.audit_slug ? findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug) : null, qa = String((row || {}).qa || '');
+  if (qa === 'pass') return pad + 'The check: reads clearly and matches the searches.\n';
+  if (!/^flagged/.test(qa)) return '';
+  return pad + 'Before you approve, the check flagged:\n' + qa.replace(/^flagged:\s*/, '').split(' | ').filter(String)
+    .map(function (t) { return pad + '  - ' + t; }).join('\n') + '\n';
+}
+
+// The audit as plain text, top of the page down to the ask, the way the check reads it.
+function auditPageText_(spec) {
+  var html = renderAuditSpec_(spec, { lead_id: '', token: '', sender_name: '', price_audit: setting_('PRICE_ACCOUNT_AUDIT') || 500, price_full: 0,
+    credit_days: 0, gst: false, addon_prices: addonPrices_(), site_shot: 'x' });
+  var main = html.split(/<div class="ask"/)[0]
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(section|ul|ol|p|div)\b[^>]*\shidden(?=[\s>])[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<\/(h1|h2|h3|p|li|summary|div|section|header)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '- ').replace(/<[^>]+>/g, ' ')
+    .replace(/&middot;/g, '·').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#0?39;|&#x27;|&apos;/g, '\'')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return main.split('\n').map(function (t) { return t.replace(/\s+/g, ' ').trim(); }).filter(function (t) { return t && t !== '-'; }).join('\n');
+}
+
+// The lines Claude wrote, which a rewrite can change (everything else on the page comes from our data).
+function writtenLines_(spec, l) {
+  var L = [];
+  (spec.highlights || []).forEach(function (h, i) { L.push('Short version ' + (i + 1) + ': ' + h); });
+  (spec.checks || []).forEach(function (c, i) { L.push('Check "' + CHECK_NAMES[i] + '" (' + c.status + '): ' + c.note); });
+  (spec.site_points || []).forEach(function (x) { L.push('Website point (' + x.status + '): ' + x.text); });
+  (spec.moves || []).forEach(function (m, i) { L.push('Move ' + (i + 1) + ': ' + m.title + '. ' + m.why + (m.effort ? ' What it takes: ' + m.effort : '')); });
+  (spec.later || []).forEach(function (t) { L.push('Also worth a look: ' + t); });
+  if (l && l.top_finding) L.push('Biggest finding, for the email (it follows a line naming the search and the town): ' + l.top_finding);
+  if (l && l.fix_1) L.push('First fix, for the email (reads after "I\'d start here:"): ' + l.fix_1);
+  return L.join('\n');
+}
+
+function qaParams_(job) {
+  var l = findLead_('id', job.lead_id);
+  if (!l || !job.area || l.audit_slug !== job.area) return null;
+  var spec;
+  try { spec = JSON.parse(findRow_(TAB.audits, HEAD.audits, 'slug', job.area).spec_json); } catch (err) { return null; }
+  var ev = withShots_(evidenceFor_(l.id), l);
+  return {
+    model: setting_('QA_MODEL') || 'claude-sonnet-5-5', max_tokens: 3000, system: PROMPT_QA,
+    messages: [{ role: 'user', content: 'Business: ' + spec.business + ', ' + (l.trade || 'local service business') + ', ' + spec.area + '\n' +
+      'Google Ads: ' + ({ running_ads: 'running ads', no_ads: 'no ads found' }[spec.segment] || 'couldn\'t tell') + '\n\n' +
+      'THE PAGE, top to bottom, as the owner reads it:\n' + auditPageText_(spec) + '\n\n' +
+      'THE LINES CLAUDE WROTE (a rewrite can change these; the rest of the page comes from our data):\n' + writtenLines_(spec, l) + '\n\n' +
+      (ev ? evidenceText_(ev) : 'EVIDENCE: none saved for this shop.') }]
+  };
+}
+
+// What the check found. Problems in the written lines get one rewrite with them spelled out, while Logan hasn't seen the
+// audit yet. Anything left after that, or anything only Logan can fix, comes to him with the problems listed.
+function applyQa_(job, q) {
+  var l = findLead_('id', job.lead_id), row = findRow_(TAB.audits, HEAD.audits, 'slug', job.area);
+  if (!l || !row || l.audit_slug !== job.area) return 'stale';
+  var problems = (Array.isArray(q.problems) ? q.problems : []).filter(function (p) { return p && p.problem; }).slice(0, 8)
+    .map(function (p) { return { where: String(p.where || '').slice(0, 160), part: p.part === 'data' ? 'data' : 'written', problem: String(p.problem), fix: String(p.fix || '') }; });
+  var ask = String(q.for_logan || '').trim();
+  if (!problems.length && !ask) {
+    updateRow_(TAB.audits, HEAD.audits, row, { qa: 'pass' });
+    logEvent_(l.id, l.email, 'qa_pass', job.area);
+    return 'pass';
+  }
+  var said = problems.map(function (p) { return (p.where ? p.where + ': ' : '') + p.problem; });
+  if (problems.some(function (p) { return p.part === 'written'; }) && !qaRewrites_(l.id) && l.status === 'audit_ready') {
+    updateRow_(TAB.audits, HEAD.audits, row, { qa: 'rewritten: ' + JSON.stringify(problems) });
+    updateLead_(l, { status: l.source === 'cold' ? 'researching' : 'requested', audit_slug: '' });
+    queueJob_('audit', l.id, '');
+    logEvent_(l.id, l.email, 'qa_rewrite', said.join(' | ').slice(0, 900));
+    return 'rewrite';
+  }
+  var flags = (ask ? ['For you: ' + ask] : []).concat(said);
+  updateRow_(TAB.audits, HEAD.audits, row, { qa: 'flagged: ' + flags.join(' | ').replace(/\s*\n\s*/g, ' ').slice(0, 2000) });
+  logEvent_(l.id, l.email, 'qa_flagged', flags.join(' | ').slice(0, 900));
+  return 'flagged';
+}
+
+// How many times the check has sent this shop's audit back in the last three days.
+function qaRewrites_(leadId) {
+  return readRows_(TAB.audits, HEAD.audits).filter(function (r) {
+    return r.lead_id === leadId && /^rewritten/.test(r.qa || '') && Date.now() - new Date(r.created).getTime() < 3 * 864e5;
+  }).length;
+}
+
+// For a rewrite: what the check (or a flagged audit Logan sent back) found in the last version.
+function qaNotesFor_(leadId) {
+  var rows = readRows_(TAB.audits, HEAD.audits).filter(function (r) { return r.lead_id === leadId; }), last = rows[rows.length - 1];
+  var qa = String((last || {}).qa || ''), lines = [];
+  if (/^rewritten: /.test(qa)) {
+    try { lines = JSON.parse(qa.replace(/^rewritten: /, '')).map(function (p) { return (p.where ? p.where + ': ' : '') + p.problem + (p.fix ? ' Better: ' + p.fix : ''); }); } catch (err) {}
+  } else if (/^flagged: /.test(qa) && !/couldn't run/.test(qa)) {
+    lines = qa.replace(/^flagged: /, '').split(' | ').filter(function (t) { return t && !/^For you: /.test(t); });
+  }
+  if (!lines.length) return '';
+  return '\n\nA careful reader went through the last version of this audit the way the owner would, and flagged these. Fix every one, ' +
+    'and keep what was right:\n' + lines.map(function (t) { return '- ' + t; }).join('\n');
+}
+
+// Audits that haven't gone out, approved ones included, go through the check (again). Runs once when the check arrives,
+// and from the menu after a change to how audits are written.
+function recheckWaitingAudits_() {
+  if (!yes_(setting_('QA_ON'))) return 0;
+  var n = 0;
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (['awaiting_review', 'audit_ready', 'audit_approved', 'ready_to_send'].indexOf(l.status) < 0 || Number(l.touches || 0) || !l.audit_slug) return;
+    var row = findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug), spec = {};
+    if (!row) return;
+    try { spec = JSON.parse(row.spec_json); } catch (err) {}
+    n++;
+    // A cold audit written without a phone check of one of its searches is written again, after the screenshots.
+    if (l.source === 'cold' && yes_(setting_('REQUIRE_SHOTS')) && (spec.searches || []).some(function (s) { return !s.shot; })) {
+      updateLead_(l, { status: 'researching', audit_slug: '', next_touch: '' });
+      queueJob_('audit', l.id, '');
+      logEvent_(l.id, l.email, 'rebuild', 'written without a phone check: waits for screenshots');
+      return;
+    }
+    updateRow_(TAB.audits, HEAD.audits, row, { qa: '' });
+    updateLead_(l, { status: 'audit_ready', next_touch: '' });
+    queueJob_('qa', l.id, l.audit_slug);
+    logEvent_(l.id, l.email, 'recheck', l.status);
+  });
+  if (n) logEvent_('', '', 'recheck', n + ' waiting audits sent through the check');
+  return n;
+}
+function recheckWaitingAudits() {
+  ensureSchema_();
+  var ui = SpreadsheetApp.getUi();
+  if (!yes_(setting_('QA_ON'))) { ui.alert('QA_ON is no on the Settings tab, so there\'s no check to run.'); return; }
+  var list = readRows_(TAB.leads, HEAD.leads).filter(function (l) {
+    return ['awaiting_review', 'audit_ready', 'audit_approved', 'ready_to_send'].indexOf(l.status) > -1 && !Number(l.touches || 0) && l.audit_slug;
+  });
+  if (!list.length) { ui.alert('No audits are waiting. Nothing to check.'); return; }
+  if (ui.alert('Check ' + list.length + ' audit' + (list.length > 1 ? 's' : '') + ' again?', 'None of these have gone out. Each is read again the way the owner would; ' +
+    'anything confusing gets rewritten, and they come back to you for review (approved ones too). About US$' + Math.max(1, Math.round(list.length * 0.05)) + ' in Claude.',
+    ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
+  var n = recheckWaitingAudits_();
+  ui.alert('Sent ' + n + ' through the check. They come back for review over the next hour or two.');
+}
+
 // From the menu: the searches the audits in the pipeline use, and which have a current screenshot.
 function showSearchShotsNeeded() {
   ensureSchema_();
-  var need = pipelineSearches_();
+  var need = pipelineSearches_(), want = shotsWanted_();
+  // The searches audits are held for (from their own evidence) are always on the list, the same as the email.
+  Object.keys(want).forEach(function (k) { need[k] = Math.max(need[k] || 0, want[k].leads.length); });
   var keys = Object.keys(need).filter(function (k) { return need[k] > 0; }).sort();
   if (!keys.length) { SpreadsheetApp.getUi().alert('No audits waiting, so no searches to screenshot.'); return; }
   var have = keys.filter(function (k) { return searchShotFor_(k); });
@@ -2244,7 +2518,8 @@ function showSearchShotsNeeded() {
     (miss.length ? 'Need a screenshot (' + miss.length + '):\n' + miss.map(function (k) { return '  ' + k + '  (' + need[k] + ' shop' + (need[k] > 1 ? 's' : '') + ')'; }).join('\n') : 'Every search has a current screenshot.') +
     (have.length ? '\n\nAlready have one: ' + have.join(', ') : '') +
     '\n\nSearch each on your phone and save the whole results page as a PDF (Share, then Print or Create PDF), or take normal screenshots ' +
-    '(the top of the results, then a scroll or two). Put them in the "Ledge search screenshots" Drive folder, no renaming needed. ' +
+    '(the top of the results, then a scroll or two). Put them in the "Ledge search screenshots" Drive folder, each named after its search ' +
+    '("electrician chestermere.pdf") so the match is certain. ' +
     'Then use "Read new search screenshots now", and rebuild the audits that should use them.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
@@ -2362,7 +2637,7 @@ function addProspect_(s, area) {
 
 function queueJob_(kind, leadId, area) {
   var open = readRows_(TAB.jobs, HEAD.jobs).some(function (j) {
-    return j.kind === kind && j.lead_id === leadId && ((kind !== 'find' && kind !== 'monthly_report') || j.area === area) && ['queued', 'submitted'].indexOf(j.status) > -1;
+    return j.kind === kind && j.lead_id === leadId && ((kind !== 'find' && kind !== 'monthly_report' && kind !== 'qa') || j.area === area) && ['queued', 'submitted'].indexOf(j.status) > -1;
   });
   if (open) return;
   appendRow_(TAB.jobs, HEAD.jobs, {
@@ -2381,9 +2656,9 @@ function submitJobs_() {
     }
     return;
   }
-  // Audits wait for current evidence (gatherEvidence_ runs just before this).
-  var withEvidence = {};
-  readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) { if (j.kind === 'audit' && j.status === 'queued' && freshEvidence_(j.lead_id)) withEvidence[j.lead_id] = true; });
+  // Audits wait for current evidence (gatherEvidence_ runs just before this), and for Logan's phone screenshots of their searches.
+  var withEvidence = {}, held = shotsHeld_(shotsWanted_());
+  readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) { if (j.kind === 'audit' && j.status === 'queued' && !held[j.lead_id] && freshEvidence_(j.lead_id)) withEvidence[j.lead_id] = true; });
   // Account reports with a site audit wait for the site checks (gatherSiteChecks_ runs just before this too).
   var siteWaiting = {};
   readRows_(TAB.exports, HEAD.exports).forEach(function (e) { if (e.status === 'report_queued' && yes_(e.site) && !e.site_json) siteWaiting[e.lead_id] = true; });
@@ -2396,6 +2671,7 @@ function submitJobs_() {
   jobs.forEach(function (j) {
     var params = jobParams_(j);
     if (params) requests.push({ custom_id: j.job_id, params: params });
+    else if (j.kind === 'qa') updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'done', detail: 'The audit was replaced before the check', updated: new Date() });
     else updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'error', detail: j.kind === 'account_report' ? 'Lead or export missing' : 'Lead missing', updated: new Date() });
   });
   if (!requests.length) return;
@@ -2413,6 +2689,7 @@ function submitJobs_() {
 function jobParams_(job) {
   if (job.kind === 'account_report') return reportParams_(job);
   if (job.kind === 'monthly_report') return monthlyParams_(job);
+  if (job.kind === 'qa') return qaParams_(job);
   var model = setting_('MODEL') || 'claude-opus-5-5';
   var loc = { type: 'approximate', city: 'Calgary', region: 'Alberta', country: 'CA', timezone: 'America/Edmonton' };
   var today = Utilities.formatDate(new Date(), tz_(), 'EEEE, MMMM d, yyyy');
@@ -2445,7 +2722,7 @@ function jobParams_(job) {
       'Town: ' + (ev.where || lead.area || 'Calgary') + ', Alberta\n' +
       (lead.owner_says ? 'What the owner told us on the form: ' + lead.owner_says + '\n' : '') +
       'Purpose: ' + (lead.source === 'cold' ? 'cold' : 'inbound (they asked for it, no contact details needed)') + '\n\n' +
-      evidenceText_(ev) }]
+      evidenceText_(ev) + qaNotesFor_(lead.id) }]
   };
 }
 
@@ -2484,7 +2761,11 @@ function handleResult_(job, result) {
   if (!data) {
     var retry = attempts < 3;
     updateRow_(TAB.jobs, HEAD.jobs, job, { status: retry ? 'queued' : 'error', attempts: attempts, est_cost_usd: totalCost, detail: why, updated: new Date() });
-    if (!retry && (job.kind === 'account_report' || job.kind === 'monthly_report')) {
+    if (!retry && job.kind === 'qa') {
+      // The check couldn't run: the audit goes to Logan rather than waiting forever.
+      var qr = findRow_(TAB.audits, HEAD.audits, 'slug', job.area);
+      if (qr && !qr.qa) updateRow_(TAB.audits, HEAD.audits, qr, { qa: 'flagged: The check couldn\'t run (' + why + '), so read this one closely.' });
+    } else if (!retry && (job.kind === 'account_report' || job.kind === 'monthly_report')) {
       var rl = findLead_('id', job.lead_id) || {};
       ownerMail_((job.kind === 'monthly_report' ? 'Monthly report failed: ' : 'Account audit report failed: ') + (rl.business || job.lead_id),
         'The report for ' + (rl.business || job.lead_id) + ' failed three times: ' + why + '\n\nThe export is saved. ' +
@@ -2499,7 +2780,7 @@ function handleResult_(job, result) {
     return;
   }
   var outcome = job.kind === 'find' ? applyFind_(job, data) : job.kind === 'account_report' ? applyAccountReport_(job, data) :
-    job.kind === 'monthly_report' ? applyMonthlyReport_(job, data) : applyAudit_(job, data);
+    job.kind === 'monthly_report' ? applyMonthlyReport_(job, data) : job.kind === 'qa' ? applyQa_(job, data) : applyAudit_(job, data);
   if (outcome === 'retry' && attempts < 3) {
     updateRow_(TAB.jobs, HEAD.jobs, job, { status: 'queued', attempts: attempts, est_cost_usd: totalCost, detail: 'Incomplete ' + (job.kind === 'account_report' ? 'report' : 'audit') + ', retrying', updated: new Date() });
     return;
@@ -2573,6 +2854,7 @@ function applyAudit_(job, a) {
   if (!l.business) fields.business = spec.business;
   updateLead_(l, fields);
   logEvent_(l.id, fields.email || l.email, 'audit_built', slug);
+  if (fields.status === 'audit_ready' && yes_(setting_('QA_ON'))) queueJob_('qa', l.id, slug);
   return 'audit ' + slug;
 }
 
@@ -3723,18 +4005,18 @@ function searchCard_(s, spec) {
     var list = pack.slice(0, 3).map(function (e, i) { return place(e, e.rank || i + 1, !!e.you); });
     if (!mine && rank > pack.length) list.push('<li class="gap-row"><span class="gapline">&middot; &middot; &middot;</span></li>',
       place({ name: me.name || spec.business || 'Your shop', rating: me.rating, reviews: me.reviews }, rank, true));
-    html += blk('Map', y.maps ? 'Google Maps rank #' + y.maps + ' of ' + s.maps_total + ' for you' : '', '<ol class="places">' + list.join('') + '</ol>');
+    html += blk('Map', 'the top three', '<ol class="places">' + list.join('') + '</ol>');
   }
-  // The websites below the map are mostly directories and forums; where the shop ranks among them goes in the "You" line.
-  var hits = [], miss = [];
-  if (y.lsa) hits.push('#' + y.lsa + ' in Local Services Ads');
-  if (y.ads) hits.push('#' + y.ads + ' in the ads');
-  if (y.map_pack) hits.push('#' + y.map_pack + ' on the map');
-  else if (y.maps) hits.push('#' + y.maps + ' in Google Maps');
-  else if (s.maps_total) miss.push('the first ' + s.maps_total + ' map results');
-  if (y.organic) hits.push('#' + y.organic + ' in the websites'); else miss.push('the top 20 websites');
-  var line = hits.length ? 'You: ' + oxford_(hits) + '.' + (miss.length ? ' Not in ' + oxford_(miss, 'or') + '.' : '')
-    : 'You weren\'t in ' + oxford_(miss, 'or') + ' when we searched.';
+  // The "You" line: one map position per search (the three on the search page when the shop is in them, otherwise its
+  // spot further down the same map), plus the website among the results below. Never two map numbers side by side.
+  var parts = [];
+  if (y.lsa) parts.push('You\'re #' + y.lsa + ' in the Google Verified listings.');
+  if (y.ads) parts.push('Your ad showed #' + y.ads + ' in the sponsored results.');
+  if (y.map_pack) parts.push('You\'re #' + y.map_pack + ' on the map.');
+  else if (y.maps) parts.push('You\'re #' + y.maps + ' on the map, below the three that show here.');
+  else if (s.maps_total) parts.push('You\'re not in the first ' + s.maps_total + ' on the map.');
+  parts.push(y.organic ? 'Your website is #' + y.organic + ' in the results below the map.' : 'Your website isn\'t in the first 20 results below the map.');
+  var line = parts.join(' ');
   var meta = [];
   if (s.volume >= 20) meta.push('About ' + money_(s.volume) + ' searches a month in ' + (s.volume_where || s.where));
   // A search Logan checked on his phone says so; the screenshot itself stays off the page (it's his phone, dark mode and all).
