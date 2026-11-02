@@ -75,91 +75,164 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
 .fine { font-size: 0.86rem; color: var(--muted); }
 .foot { padding-block: 24px 40px; border-top: 1px solid var(--rule); font-size: 0.86rem; color: var(--muted); display: grid; gap: 6px; }
 
-/* Layout: a one-page report read on a phone. Photo strip and the shop's name, then the searches as a customer saw them
-   (the evidence, top of the page to the bottom), six checks, three moves, and one ask that fits where the shop is with ads. */
-.strip { background-image: url("/assets/elevators-1200.jpg"); background-position: center 64%; }
+/* Layout: a one-page report read on a phone, built to scan. The short version, what the searches are worth, six checks
+   with an icon each, the searches as a customer saw them, the website on a phone, three moves, and one ask. */
+.strip { background-image: url("/assets/elevators-1200.jpg"); background-position: center 64%; height: clamp(90px, 16vw, 150px); }
 .intro { color: var(--muted); max-width: 40rem; margin-bottom: 16px; }
+h2 { font-size: 1.55rem; }
+.ico { width: 1.25em; height: 1.25em; flex: 0 0 auto; display: block; }
+.ico.good { color: var(--good); } .ico.gap { color: var(--leak); } .ico.unknown { color: var(--unknown); }
 
-.searches { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
-.search { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px clamp(14px, 3vw, 22px) 14px; display: grid; gap: 12px; min-width: 0; }
-.q { display: grid; gap: 4px; }
-.q-text { font-family: var(--display); font-weight: var(--display-weight); font-size: 1.3rem; line-height: 1.2; letter-spacing: -0.01em; overflow-wrap: anywhere; }
-.q-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 0.88rem; color: var(--muted); }
-.serp { margin: 0; display: grid; border-top: 2px solid var(--ink); }
-.slot { display: grid; grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr); gap: 4px 14px; padding-block: 10px; border-bottom: 1px solid var(--rule); align-items: baseline; }
-.slot dt { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.slot dd { margin: 0; min-width: 0; }
-.slot ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.biz { display: flex; align-items: baseline; gap: 8px; font-size: 0.97rem; line-height: 1.4; min-width: 0; }
-.biz .r { flex: 0 0 1.3em; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
-.biz .b { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
-.biz .n { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
-.biz .m { color: var(--muted); font-size: 0.88rem; }
-.biz.you { background: var(--ice); margin-inline: -8px; padding: 3px 8px; border-radius: 4px; }
-.biz .tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--deep); color: var(--deep-ink); border-radius: 99px; padding: 1px 8px; }
-.slot .none, .slot .more { color: var(--muted); font-size: 0.92rem; }
-.slot .more { display: block; margin-top: 2px; padding-left: calc(1.3em + 8px); }
-.you-line { font-size: 0.97rem; font-weight: 500; }
-.estimates { margin-top: 14px; color: var(--muted); font-size: 0.95rem; max-width: 46rem; }
-@media (max-width: 560px) { .slot { grid-template-columns: minmax(0, 1fr); } }
+/* The short version */
+.short { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 10px; max-width: 42rem; }
+.short li { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: 10px; align-items: start; font-size: 1.06rem; line-height: 1.45; }
+.short li span:first-child { font-family: var(--display); font-weight: var(--display-weight); color: var(--accent-text); font-size: 1.05rem; line-height: 1.45; }
 
-.checks { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
-.checks li { display: grid; grid-template-columns: minmax(0, 11rem) auto minmax(0, 1fr); gap: 6px 16px; align-items: baseline; padding-block: 14px; border-bottom: 1px solid var(--rule); }
+/* What the searches are worth */
+.opp { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: clamp(18px, 3.5vw, 26px); display: grid; gap: 14px; margin-top: 10px; }
+.opp-q { font-size: 0.95rem; color: var(--muted); }
+.opp-q b { color: var(--ink); font-weight: 600; }
+.tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tiles li { background: var(--snow); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tiles b { font-family: var(--display); font-weight: var(--display-weight); font-size: clamp(1.25rem, 3.6vw, 1.6rem); line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tiles span { font-size: 0.86rem; color: var(--muted); line-height: 1.35; }
+@media (max-width: 560px) {
+  .tiles { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .tiles li { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 10px; padding: 10px 12px; }
+  .tiles li b { order: 2; font-size: 1.2rem; text-align: right; } .tiles li span { order: 1; font-size: 0.9rem; }
+}
+.takeaway { background: var(--spruce); color: var(--on-dark); border-radius: 8px; padding: 16px 18px; font-size: 1.12rem; line-height: 1.45; font-weight: 500; }
+.takeaway strong { color: var(--accent); font-weight: 700; }
+details.how { font-size: 0.93rem; color: var(--muted); }
+details.how summary { cursor: pointer; font-weight: 600; color: var(--ink); width: fit-content; }
+details.how ul { margin: 10px 0 0; padding-left: 1.1rem; display: grid; gap: 5px; max-width: 44rem; }
+
+/* Six checks */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.checks li { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-content: start; }
+.checks .ico { grid-row: span 2; width: 1.6rem; height: 1.6rem; margin-top: 1px; }
+.checks .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .checks b { font-weight: 600; }
-.pill { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 99px; padding: 1px 9px; white-space: nowrap; justify-self: start; }
-.pill.good { color: var(--good); } .pill.gap, .pill.leak { color: var(--leak); } .pill.unknown { color: var(--unknown); }
-.checks .note { color: var(--muted); font-size: 0.97rem; line-height: 1.5; min-width: 0; }
-@media (max-width: 640px) { .checks li { grid-template-columns: minmax(0, 1fr) auto; } .checks .note { grid-column: 1 / -1; } }
+.checks .st { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.checks .st.good { color: var(--good); } .checks .st.gap { color: var(--leak); } .checks .st.unknown { color: var(--unknown); }
+.checks .note { color: var(--muted); font-size: 0.95rem; line-height: 1.45; }
+@media (max-width: 640px) { .checks { grid-template-columns: minmax(0, 1fr); } }
 
-.moves { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: move; }
-.moves li { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 18px 20px; display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 4px 12px; counter-increment: move; }
-.moves li::before { content: counter(move); font-family: var(--display); font-weight: var(--display-weight); font-size: 1.6rem; line-height: 1; color: var(--accent-text); grid-row: span 4; }
-.moves h3 { font-family: var(--body); font-weight: 600; font-size: 1.08rem; line-height: 1.35; }
-.moves p { color: var(--muted); font-size: 0.97rem; }
+/* What a customer sees */
+.searches { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.search { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px clamp(12px, 3vw, 20px) 16px; display: grid; gap: 12px; min-width: 0; }
+.qbar { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--rule); border-radius: 99px; padding: 9px 16px; box-shadow: 0 1px 2px rgb(15 26 46 / 0.06); min-width: 0; }
+.qbar svg { width: 1.05rem; height: 1.05rem; color: var(--muted); flex: 0 0 auto; }
+.q-text { font-size: 1.05rem; font-weight: 600; overflow-wrap: anywhere; }
+.q-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 0.86rem; color: var(--muted); margin-top: -4px; padding-inline: 4px; }
+.blk { display: grid; gap: 6px; }
+.blk-h { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+.blk-h small { font-size: 0.74rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.cards li { background: #fff; border: 1px solid var(--rule); border-radius: 8px; padding: 9px 11px; display: grid; gap: 2px; min-width: 0; }
+.cards .n { font-weight: 600; font-size: 0.93rem; line-height: 1.3; overflow-wrap: anywhere; }
+.verified { display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; font-weight: 600; color: var(--good); }
+.verified svg { width: 0.9rem; height: 0.9rem; }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rows li { background: #fff; border: 1px solid var(--rule); border-radius: 8px; padding: 8px 11px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.rows .sp { font-size: 0.72rem; font-weight: 700; color: var(--ink); }
+.rows .d { font-weight: 600; font-size: 0.95rem; overflow-wrap: anywhere; min-width: 0; }
+.places { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.places li { display: grid; grid-template-columns: 1.7rem minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 8px 11px; border-top: 1px solid var(--rule); }
+.places li > span:last-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; min-width: 0; }
+.places li:first-child { border-top: 0; }
+.places .pin { width: 1.45rem; height: 1.45rem; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #C5372C; display: grid; place-items: center; }
+.places .pin span { transform: rotate(45deg); color: #fff; font-size: 0.72rem; font-weight: 700; }
+.places .n { font-weight: 600; font-size: 0.95rem; line-height: 1.3; overflow-wrap: anywhere; }
+.places .gapline { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: 0.8rem; letter-spacing: 0.3em; padding: 0; line-height: 1; }
+.places li.gap-row { padding: 4px 11px; background: var(--snow); }
+.places li.you { background: var(--ice); }
+.places li.you .pin { background: var(--deep); }
+.rate { display: inline-flex; align-items: center; gap: 4px; font-size: 0.86rem; color: var(--muted); }
+.rate svg { width: 0.85rem; height: 0.85rem; color: #E8A317; }
+.tag { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--deep); color: var(--deep-ink); border-radius: 99px; padding: 1px 8px; margin-left: 4px; vertical-align: 1px; }
+.you-line { display: flex; gap: 10px; align-items: flex-start; background: #fff; border-left: 3px solid var(--deep); border-radius: 4px; padding: 9px 12px; font-size: 0.97rem; font-weight: 500; }
+.you-line .ico { color: var(--deep); margin-top: 2px; }
+.estimates { margin-top: 14px; color: var(--muted); font-size: 0.93rem; max-width: 46rem; }
+
+/* Who runs Google ads around you */
+.adrec { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.adrec li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 12px; padding: 11px clamp(12px, 3vw, 18px); border-top: 1px solid var(--rule); }
+.adrec li:first-child { border-top: 0; }
+.adrec li.you { background: var(--ice); }
+.adrec .n { font-weight: 600; font-size: 0.95rem; overflow-wrap: anywhere; min-width: 0; }
+.adrec .n small { display: block; font-weight: 400; color: var(--muted); font-size: 0.82rem; }
+.chip { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 99px; padding: 3px 10px; white-space: nowrap; }
+.chip.on { background: #DCEBE2; color: var(--good); } .chip.off { background: var(--snow); color: var(--muted); border: 1px solid var(--rule); }
+
+/* Reviews next to the shops at the top of the map */
+.revs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px clamp(12px, 3vw, 20px); }
+.revs li { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); gap: 4px 14px; align-items: center; }
+.revs .n { font-weight: 600; font-size: 0.93rem; line-height: 1.3; overflow-wrap: anywhere; }
+.revs .bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.revs .bar i { display: block; height: 14px; border-radius: 3px; background: #9AA6BE; min-width: 4px; }
+.revs li.you .bar i { background: var(--accent); }
+.revs .bar span { font-size: 0.86rem; color: var(--muted); white-space: nowrap; }
+@media (max-width: 520px) { .revs li { grid-template-columns: minmax(0, 1fr); } }
+
+/* The website on a phone */
+.site { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 22px; align-items: start; }
+.phone { border: 9px solid var(--ink); border-radius: 26px; overflow: hidden; background: #fff; box-shadow: 0 6px 18px rgb(15 26 46 / 0.16); max-width: 15rem; }
+.phone img { display: block; width: 100%; height: auto; }
+.points { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.points li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 11px 13px; font-size: 0.97rem; line-height: 1.4; }
+.points .ico { margin-top: 1px; }
+@media (max-width: 600px) { .site { grid-template-columns: minmax(0, 1fr); } .phone { margin-inline: auto; max-width: 13.5rem; } }
+
+/* Three moves */
+.moves { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: move; }
+.moves li { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 18px; display: grid; grid-template-columns: 1.8rem minmax(0, 1fr); gap: 3px 12px; counter-increment: move; }
+.moves li::before { content: counter(move); font-family: var(--display); font-weight: var(--display-weight); font-size: 1.45rem; line-height: 1.1; color: var(--accent-text); grid-row: span 4; }
+.moves h3 { font-family: var(--body); font-weight: 600; font-size: 1.04rem; line-height: 1.35; }
+.moves p { color: var(--muted); font-size: 0.95rem; line-height: 1.45; }
 .moves .effort { color: var(--ink); font-size: 0.9rem; }
-.moves .offer { justify-self: start; margin-top: 4px; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--deep); }
-.moves .offer.free { color: var(--good); }
-.later { margin-top: 18px; padding: 16px 20px; border-left: 3px solid var(--rule); display: grid; gap: 6px; }
-.later h3 { font-family: var(--body); font-weight: 600; font-size: 1rem; }
-.later ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 4px; color: var(--muted); font-size: 0.95rem; }
+.moves .offer { justify-self: start; margin-top: 4px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--deep); background: var(--ice); border-radius: 99px; padding: 2px 10px; }
+.moves .offer.free { color: var(--good); background: #DCEBE2; }
+.later { margin-top: 14px; padding: 12px 16px; border-left: 3px solid var(--rule); display: grid; gap: 6px; }
+.later h3 { font-family: var(--body); font-weight: 600; font-size: 0.98rem; }
+.later ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 4px; color: var(--muted); font-size: 0.93rem; }
 
-.ask { background: var(--spruce); color: var(--on-dark); border-radius: 8px; padding: clamp(22px, 4vw, 34px); display: grid; gap: 14px; margin-block: 18px; }
+/* The ask */
+.ask { background: var(--spruce); color: var(--on-dark); border-radius: 10px; padding: clamp(22px, 4vw, 32px); display: grid; gap: 14px; margin-block: 18px; }
 .ask h2 { margin: 0; }
-.ask p { max-width: 36rem; }
-.ask .price { font-weight: 600; }
-.ask .price small { font-weight: 400; color: var(--on-dark-muted); font-size: 0.95rem; }
+.ask p { max-width: 38rem; }
+.ask .lead { color: var(--on-dark-muted); }
+.ask ul.looks { margin: 0; padding-left: 1.1rem; display: grid; gap: 4px; max-width: 38rem; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; counter-reset: step; }
+.steps li { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 8px; padding: 12px 14px; font-size: 0.93rem; line-height: 1.4; counter-increment: step; display: grid; gap: 4px; align-content: start; }
+.steps li::before { content: "Step " counter(step); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+@media (max-width: 640px) { .steps { grid-template-columns: minmax(0, 1fr); } }
 .ask label { font-size: 0.9rem; font-weight: 600; display: grid; gap: 6px; }
 .ask label .opt { font-weight: 400; opacity: 0.8; }
 .ask textarea, .ask select { width: 100%; font: inherit; font-size: 1rem; font-weight: 400; color: var(--ink); background: var(--surface); border: 1.5px solid var(--rule); border-radius: 6px; padding: 0.6em 0.7em; }
-.ask textarea { min-height: 84px; resize: vertical; }
-.ask .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-width: 36rem; }
+.ask textarea { min-height: 76px; resize: vertical; }
+.ask .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-width: 38rem; }
 @media (max-width: 560px) { .ask .pair { grid-template-columns: minmax(0, 1fr); } }
 .ask-form { display: grid; gap: 14px; }
-.ask .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.ask .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
 .ask .btn { background: var(--accent); color: var(--accent-ink); }
+.ask .free { font-size: 0.9rem; color: var(--on-dark-muted); }
 .ask .err { color: #FFB4A6; font-weight: 500; }
-
-.value { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: clamp(18px, 3.5vw, 28px); display: grid; gap: 10px; margin-top: 8px; }
-.value .label { margin: 0; }
-.value-big { font-family: var(--display); font-weight: var(--display-weight); font-size: clamp(1.9rem, 6vw, 2.6rem); line-height: 1.05; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.value-big small { font-family: var(--body); font-weight: 500; font-size: 0.95rem; color: var(--muted); letter-spacing: 0; }
-.value p { max-width: 40rem; }
-.value .fine { max-width: 44rem; }
-
-.pick { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 36rem; min-width: 0; }
+.pick { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 38rem; min-width: 0; }
 .pick legend { font-size: 0.9rem; font-weight: 600; padding: 0; margin-bottom: 4px; }
 .pick label { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; font-weight: 400; background: rgba(255, 255, 255, 0.06);
   border: 1.5px solid rgba(255, 255, 255, 0.18); border-radius: 6px; padding: 12px 14px; cursor: pointer; }
 .pick label:has(input:checked) { border-color: var(--accent); background: rgba(255, 255, 255, 0.1); }
 .pick input { margin-top: 0.3em; accent-color: var(--accent); }
 .pick b { display: block; font-weight: 600; }
-.pick .tag { display: inline-block; margin-left: 6px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--accent);
-  color: var(--accent-ink); border-radius: 99px; padding: 1px 8px; vertical-align: 2px; }
+.pick .tag { background: var(--accent); color: var(--accent-ink); }
 .pick span span { color: var(--on-dark-muted); font-size: 0.93rem; }
 
-.sources { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; color: var(--muted); font-size: 0.95rem; }
-.sources a { color: var(--ink); overflow-wrap: anywhere; }
-.method { margin-top: 12px; }
+details.sources { font-size: 0.93rem; color: var(--muted); }
+details.sources summary { cursor: pointer; font-weight: 600; color: var(--ink); width: fit-content; }
+details.sources ul { margin: 10px 0 0; padding-left: 1.2rem; display: grid; gap: 6px; }
+details.sources a { color: var(--ink); overflow-wrap: anywhere; }
+details.sources p { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -172,98 +245,163 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
   <div class="hero">
     <p class="label">Prepared for</p>
     <h1>Example Heating &amp; Plumbing (sample)</h1>
-    <p class="meta"><span>Airdrie</span><span>Checked Oct 28, 2026</span><span>Public information only</span></p>
-    <p class="lede">This is a made-up shop to show what an audit looks like. It has strong reviews, but someone in Airdrie searching for furnace repair on their phone sees three other companies in Local Services Ads and two in the search ads before they reach it, sixth on the map. Landing one furnace replacement from those searches would cover about three months of ads and our fee, and right now other shops are getting them.</p>
-    <div class="value" >
-      <p class="label">What these searches are worth</p>
-      <p class="value-big" >$5,000 to $8,000 <small>for one furnace replacement, roughly*</small></p>
-      <p>Landing one furnace replacement from these searches would cover about three months of a $1,500 a month ad budget and our fee. Google estimates about 910 searches a month in Airdrie for heating and cooling. At typical rates for Google Ads, a business showing up on them could book about one job a month from them, at $250 to $700 for a furnace repair. In all, roughly $3,000 to $8,400 a year in work. </p>
-      <p class="fine">* An estimate, not a promise: Google&#39;s monthly search estimates in Airdrie, times typical Google Ads rates for heating and cooling (6 in 100 searches click an ad at about $13 a click, and 7 in 100 clicks call or send a form), times about 1 in 3 of those booked, at typical Calgary-area prices. It assumes your ads show on these searches. The big job is a typical Calgary-area price range for that work. Your prices, service area, and how fast you answer the phone will change it.</p>
-    </div>
+    <p class="meta"><span>Calgary</span><span>Checked Nov 1, 2026</span><span>Public information only</span></p>
+    <ul class="short" >
+      <li><span>1</span><span>Someone searching furnace repair in Calgary sees three Google Verified shops and two ads before the map.</span></li>
+      <li><span>2</span><span>You&#39;re #9 in Google Maps for that search, and your profile is set up as a plumber.</span></li>
+      <li><span>3</span><span>Your reviews hold up, so Local Services Ads is where we&#39;d start.</span></li>
+    </ul>
+    <p class="lede" hidden></p>
   </div>
 
-  <section aria-labelledby="searches-title" >
-    <h2 id="searches-title">What a customer sees</h2>
-    <p class="intro">We searched the way your customers do, on a phone in Airdrie. Here's what came up, from the top of the page down.</p>
-    <ol class="searches">
-    <li class="search">
-      <p class="q"><span class="q-text">“furnace repair airdrie”</span><span class="q-meta">On a phone in Airdrie<span>About 170 searches a month in Airdrie</span></span></p>
-      <dl class="serp">
-        <div class="slot"><dt>Local Services Ads</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">Larchmere Heating &amp; Air</span><span class="m">4.9 stars, 61 reviews</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">Copperjack Mechanical</span><span class="m">4.8 stars, 233 reviews</span></span></li><li class="biz"><span class="r">3</span><span class="b"><span class="n">Tamarack Furnace Co.</span><span class="m">4.7 stars, 48 reviews</span></span></li></ul></dd></div>
-        <div class="slot"><dt>Sponsored</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">kestrelridgehvac.example</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">bramblewoodcomfort.example</span></span></li></ul></dd></div>
-        <div class="slot"><dt>Map</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">Larchmere Heating &amp; Air</span><span class="m">4.9 stars, 61 reviews</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">Quillfeather Plumbing &amp; Gas</span><span class="m">4.6 stars, 140 reviews</span></span></li><li class="biz"><span class="r">3</span><span class="b"><span class="n">Copperjack Mechanical</span><span class="m">4.8 stars, 233 reviews</span></span></li></ul></dd></div>
-        <div class="slot"><dt>Websites</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">homestars.com</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">larchmereheating.example</span></span></li><li class="biz you"><span class="r">3</span><span class="b"><span class="n">exampleheating.example</span><span class="tag">You</span></span></li></ul><span class="more">and 2 more</span></dd></div>
-      </dl>
-      <p class="you-line">You showed up #6 in Google Maps and #3 in the websites. Not in Local Services Ads or the ads.</p>
-    </li>
-    <li class="search">
-      <p class="q"><span class="q-text">“furnace replacement near me”</span><span class="q-meta">On a phone in Airdrie<span>About 90 searches a month in Airdrie</span></span></p>
-      <dl class="serp">
-        <div class="slot"><dt>Local Services Ads</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">Copperjack Mechanical</span><span class="m">4.8 stars, 233 reviews</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">Larchmere Heating &amp; Air</span><span class="m">4.9 stars, 61 reviews</span></span></li><li class="biz"><span class="r">3</span><span class="b"><span class="n">Westerly Home Comfort</span><span class="m">4.6 stars, 312 reviews</span></span></li></ul></dd></div>
-        <div class="slot"><dt>Sponsored</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">kestrelridgehvac.example</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">copperjack.example</span></span></li><li class="biz"><span class="r">3</span><span class="b"><span class="n">bramblewoodcomfort.example</span></span></li></ul></dd></div>
-        <div class="slot"><dt>Map</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">Copperjack Mechanical</span><span class="m">4.8 stars, 233 reviews</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">Westerly Home Comfort</span><span class="m">4.6 stars, 312 reviews</span></span></li><li class="biz"><span class="r">3</span><span class="b"><span class="n">Larchmere Heating &amp; Air</span><span class="m">4.9 stars, 61 reviews</span></span></li></ul></dd></div>
-        <div class="slot"><dt>Websites</dt><dd><ul><li class="biz"><span class="r">1</span><span class="b"><span class="n">westerly.example</span></span></li><li class="biz"><span class="r">2</span><span class="b"><span class="n">copperjack.example</span></span></li><li class="biz"><span class="r">3</span><span class="b"><span class="n">homestars.com</span></span></li></ul><span class="more">and 2 more</span></dd></div>
-      </dl>
-      <p class="you-line">You showed up #9 in Google Maps. Not in Local Services Ads, the ads, or the top 20 websites.</p>
-    </li>
-    </ol>
-    <p class="estimates" >Google estimates about 910 searches a month in Airdrie across 34 searches about this work, including “furnace repair airdrie” (170), “furnace airdrie” (110), “hvac airdrie” (90), and “furnace replacement airdrie” (70).</p>
+  <section aria-labelledby="opp-title" >
+    <h2 id="opp-title">What these searches are worth</h2>
+    <div class="opp">
+      <p class="opp-q">Searches for <b>furnace replacement</b> in Calgary</p>
+      <ul class="tiles">
+        <li><b>$5,000–$8,000</b><span>A typical furnace replacement in the Calgary area</span></li>
+        <li><b>1,240</b><span>Searches a month in Calgary</span></li>
+        <li><b>$20</b><span>A click, going by Google</span></li>
+      </ul>
+      <p class="takeaway">About <strong>$1,500 a month</strong> in Google Ads could book about <strong>two furnace replacements a month</strong>: roughly <strong>$10,000 to $16,000</strong> in work.</p>
+      <details class="how">
+        <summary>How we worked this out</summary>
+        <ul>
+          <li>Searches: about 1,240 a month in Calgary for furnace replacement and searches like it, going by Google&#39;s estimates. The biggest: “furnace replacement calgary” (260), “new furnace calgary” (170), and “furnace installation calgary” (140).</li>
+          <li>Clicks: at about $20 a click (Google&#39;s figure for these searches), $1,500 a month buys about 75.</li>
+          <li>Calls and forms: about 7 in 100 clicks call or send a form, which is typical for heating and cooling ads. That&#39;s about five.</li>
+          <li>Booked jobs: about 1 in 3 of those turn into a booked job, which is typical for trades. That&#39;s about two furnace replacements.</li>
+          <li>Price: $5,000 to $8,000 is a typical Calgary-area range for a furnace replacement.</li>
+          <li>It&#39;s an estimate, not a promise. Your prices, service area, and how fast you answer the phone will change it.</li>
+        </ul>
+      </details>
+    </div>
   </section>
 
   <section aria-labelledby="checks-title">
     <h2 id="checks-title">Six checks</h2>
-    <ol class="checks">
-      <li><b>Map results</b><span class="pill gap">Needs work</span><span class="note">You&#39;re #6 in Google Maps for &quot;furnace repair airdrie&quot; and #9 for &quot;furnace replacement near me&quot;. Your profile&#39;s main category is Plumber, which makes Google less sure you&#39;re the right pick for furnace searches.</span></li>
-      <li><b>Local Services Ads</b><span class="pill gap">Needs work</span><span class="note">Three shops sit in the Local Services Ads at the very top of both searches, with Google Verified badges. Customers can call them in one tap without scrolling. You&#39;re not there yet.</span></li>
-      <li><b>Search ads</b><span class="pill gap">Needs work</span><span class="note">Google&#39;s Ads Transparency Center shows no ads for your website in the last 30 days. Two shops advertise on &quot;furnace repair airdrie&quot; and three on &quot;furnace replacement near me&quot;.</span></li>
-      <li><b>Reviews</b><span class="pill good">Looks good</span><span class="note">4.8 stars from 180 Google reviews. That&#39;s more reviews than two of the three shops above you on the map.</span></li>
-      <li><b>Call and form tracking</b><span class="pill gap">Needs work</span><span class="note">Your site has Google Analytics, but nothing that counts phone calls. It doesn&#39;t matter much yet, but it has to be in place before any ad money is spent.</span></li>
-      <li><b>Where clicks land</b><span class="pill gap">Needs work</span><span class="note">Your home page shows the phone number as plain text with no tap-to-call link, and there&#39;s no way to book online. On a phone, people have to copy the number to call.</span></li>
+    <ul class="checks">
+      <li><svg class="ico gap" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.9L19.1 17.6H.9z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 7.4v4.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/><circle cx="10" cy="14.7" r="1.15" fill="#fff"/></svg><p class="head"><b>Map results</b><span class="st gap">Needs work</span></p><p class="note">#9 in Google Maps for furnace repair. Your profile&#39;s main category is Plumber.</p></li>
+      <li><svg class="ico gap" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.9L19.1 17.6H.9z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 7.4v4.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/><circle cx="10" cy="14.7" r="1.15" fill="#fff"/></svg><p class="head"><b>Local Services Ads</b><span class="st gap">Needs work</span></p><p class="note">Three Google Verified shops sit at the very top. You&#39;re not one of them.</p></li>
+      <li><svg class="ico gap" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.9L19.1 17.6H.9z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 7.4v4.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/><circle cx="10" cy="14.7" r="1.15" fill="#fff"/></svg><p class="head"><b>Search ads</b><span class="st gap">Needs work</span></p><p class="note">No Google ads from you in the last 30 days. Three of the four shops at the top of the map run them.</p></li>
+      <li><svg class="ico good" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M6 10.3l2.7 2.7L14.2 7.4" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg><p class="head"><b>Reviews</b><span class="st good">Looks good</span></p><p class="note">4.8 stars from 96 reviews, in line with the shops above you.</p></li>
+      <li><svg class="ico unknown" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M7.6 7.7a2.45 2.45 0 1 1 3.4 2.25c-.75.33-1 .85-1 1.55v.35" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="10" cy="14.7" r="1.15" fill="#fff"/></svg><p class="head"><b>Call and form tracking</b><span class="st unknown">Couldn&#39;t check</span></p><p class="note">No Google Ads tag on the home page, but Tag Manager is installed, so it may be inside.</p></li>
+      <li><svg class="ico gap" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.9L19.1 17.6H.9z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 7.4v4.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/><circle cx="10" cy="14.7" r="1.15" fill="#fff"/></svg><p class="head"><b>Where clicks land</b><span class="st gap">Needs work</span></p><p class="note">No tap-to-call button or form on the first screen of your home page.</p></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="searches-title" >
+    <h2 id="searches-title">What a customer sees</h2>
+    <p class="intro">We searched the way your customers do, from Calgary. Here's what came up, top of the page down.</p>
+    <ol class="searches">
+    <li class="search">
+      <p class="qbar"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12.8 12.8l4.4 4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="q-text">furnace repair calgary</span></p>
+      <p class="q-meta"><span>About 1,300 searches a month in Calgary</span><span>Checked on a phone in Calgary, Nov 1</span></p>
+      <div class="blk"><p class="blk-h">Google Verified <small>Local Services Ads</small></p><ul class="cards"><li><span class="verified"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5l2.1 1.6 2.6-.2.9 2.5 2.3 1.3-.5 2.6 1.2 2.3-1.9 1.8-.2 2.6-2.6.5L12.4 18.5 10 17.4l-2.4 1.1-1.5-2.2-2.6-.5-.2-2.6-1.9-1.8 1.2-2.3-.5-2.6 2.3-1.3.9-2.5 2.6.2z" fill="currentColor"/><path d="M6.6 10.2l2.2 2.2 4.6-4.6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Google Verified</span><span class="n">Larchmere Heating &amp; Air</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.9 (61)</span></li><li><span class="verified"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5l2.1 1.6 2.6-.2.9 2.5 2.3 1.3-.5 2.6 1.2 2.3-1.9 1.8-.2 2.6-2.6.5L12.4 18.5 10 17.4l-2.4 1.1-1.5-2.2-2.6-.5-.2-2.6-1.9-1.8 1.2-2.3-.5-2.6 2.3-1.3.9-2.5 2.6.2z" fill="currentColor"/><path d="M6.6 10.2l2.2 2.2 4.6-4.6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Google Verified</span><span class="n">Copperjack Mechanical</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.8 (233)</span></li><li><span class="verified"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5l2.1 1.6 2.6-.2.9 2.5 2.3 1.3-.5 2.6 1.2 2.3-1.9 1.8-.2 2.6-2.6.5L12.4 18.5 10 17.4l-2.4 1.1-1.5-2.2-2.6-.5-.2-2.6-1.9-1.8 1.2-2.3-.5-2.6 2.3-1.3.9-2.5 2.6.2z" fill="currentColor"/><path d="M6.6 10.2l2.2 2.2 4.6-4.6" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Google Verified</span><span class="n">Tamarack Furnace Co.</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.7 (48)</span></li></ul></div>
+      <div class="blk"><p class="blk-h">Sponsored</p><ul class="rows"><li><span class="sp">Sponsored</span><span class="d">kestrelridgehvac.example</span></li><li><span class="sp">Sponsored</span><span class="d">bramblewoodcomfort.example</span></li></ul></div>
+      <div class="blk"><p class="blk-h">Map <small>Google Maps rank #9 of 40 for you</small></p><ol class="places"><li><span class="pin"><span>1</span></span><span><span class="n">Larchmere Heating &amp; Air</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.9 (61)</span></span></li><li><span class="pin"><span>2</span></span><span><span class="n">Quillfeather Plumbing &amp; Gas</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.6 (140)</span></span></li><li><span class="pin"><span>3</span></span><span><span class="n">Copperjack Mechanical</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.8 (233)</span></span></li><li class="gap-row"><span class="gapline">&middot; &middot; &middot;</span></li><li class="you"><span class="pin"><span>9</span></span><span><span class="n">Example Heating &amp; Plumbing<span class="tag">You</span></span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.8 (96)</span></span></li></ol></div>
+      <p class="you-line"><svg class="ico" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3.6" fill="currentColor"/><path d="M3.2 17.5c.9-3.4 3.6-5.2 6.8-5.2s5.9 1.8 6.8 5.2z" fill="currentColor"/></svg><span>You: #9 in Google Maps. Not in the top 20 websites.</span></p>
+    </li>
+    <li class="search">
+      <p class="qbar"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12.8 12.8l4.4 4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="q-text">furnace replacement calgary</span></p>
+      <p class="q-meta"><span>About 260 searches a month in Calgary</span><span>Searched from Calgary, Nov 1, 2026</span></p>
+      <div class="blk"><p class="blk-h">Map <small>Google Maps rank #12 of 40 for you</small></p><ol class="places"><li><span class="pin"><span>1</span></span><span><span class="n">Copperjack Mechanical</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.8 (233)</span></span></li><li><span class="pin"><span>2</span></span><span><span class="n">Larchmere Heating &amp; Air</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.9 (61)</span></span></li><li><span class="pin"><span>3</span></span><span><span class="n">Foothills Furnace Pros</span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.7 (312)</span></span></li><li class="gap-row"><span class="gapline">&middot; &middot; &middot;</span></li><li class="you"><span class="pin"><span>12</span></span><span><span class="n">Example Heating &amp; Plumbing<span class="tag">You</span></span><span class="rate"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L10 14.9l-5.4 2.9 1.2-5.9L1.4 7.8l6-.7z" fill="currentColor"/></svg>4.8 (96)</span></span></li></ol></div>
+      <p class="you-line"><svg class="ico" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3.6" fill="currentColor"/><path d="M3.2 17.5c.9-3.4 3.6-5.2 6.8-5.2s5.9 1.8 6.8 5.2z" fill="currentColor"/></svg><span>You: #12 in Google Maps and #14 in the websites.</span></p>
+    </li>
     </ol>
+    <p class="estimates" hidden>Google estimates about 6,200 searches a month in Calgary across 41 searches about this work, including “furnace repair calgary” (1,300), “furnace calgary” (880), “hvac calgary” (720), and “furnace replacement calgary” (260).</p>
+  </section>
+
+  <section aria-labelledby="ads-title" >
+    <h2 id="ads-title">Who runs Google ads around you</h2>
+    <p class="intro">The shops at the top of the map, and you, going by Google's public record of every advertiser's search ads over the last 30 days.</p>
+    <ul class="adrec">
+      <li><span class="n">Larchmere Heating &amp; Air<small>larchmereheating.example</small></span><span class="chip on">Ran 18 ads in 30 days</span></li>
+      <li><span class="n">Quillfeather Plumbing &amp; Gas<small>quillfeather.example</small></span><span class="chip off">No ads found in 30 days</span></li>
+      <li><span class="n">Copperjack Mechanical<small>copperjack.example</small></span><span class="chip on">Ran 40+ ads in 30 days</span></li>
+      <li><span class="n">Foothills Furnace Pros<small>foothillsfurnace.example</small></span><span class="chip on">Ran 7 ads in 30 days</span></li>
+      <li class="you"><span class="n">Example Heating &amp; Plumbing<span class="tag">You</span><small>exampleheating.example</small></span><span class="chip off">No ads found in 30 days</span></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="reviews-title" >
+    <h2 id="reviews-title">Your reviews next to the top of the map</h2>
+    <ul class="revs">
+      <li><span class="n">Larchmere Heating &amp; Air</span><span class="bar"><i style="width:26.2%"></i><span>61 reviews, 4.9 stars</span></span></li>
+      <li><span class="n">Quillfeather Plumbing &amp; Gas</span><span class="bar"><i style="width:60.1%"></i><span>140 reviews, 4.6 stars</span></span></li>
+      <li><span class="n">Copperjack Mechanical</span><span class="bar"><i style="width:100%"></i><span>233 reviews, 4.8 stars</span></span></li>
+      <li class="you"><span class="n">Example Heating &amp; Plumbing<span class="tag">You</span></span><span class="bar"><i style="width:41.2%"></i><span>96 reviews, 4.8 stars</span></span></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="site-title" >
+    <h2 id="site-title">Your website on a phone</h2>
+    <div class="site">
+      <div class="phone"><img src="/assets/sample-site.jpg" alt="The top of exampleheating.example on a phone, captured Nov 1, 2026" loading="lazy"></div>
+      <ul class="points">
+        <li><svg class="ico gap" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.9L19.1 17.6H.9z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 7.4v4.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/><circle cx="10" cy="14.7" r="1.15" fill="#fff"/></svg><span>No tap-to-call button. The number is small text at the bottom of the first screen.</span></li>
+        <li><svg class="ico gap" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.9L19.1 17.6H.9z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 7.4v4.6" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/><circle cx="10" cy="14.7" r="1.15" fill="#fff"/></svg><span>No form or booking button without scrolling.</span></li>
+        <li><svg class="ico good" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M6 10.3l2.7 2.7L14.2 7.4" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg><span>It&#39;s clear you do heating and plumbing in Calgary.</span></li>
+      </ul>
+    </div>
   </section>
 
   <section aria-labelledby="moves-title">
     <h2 id="moves-title">What we&#39;d do first</h2>
     <ol class="moves">
-      <li><h3>Get into Local Services Ads for furnace and plumbing calls</h3><p>It&#39;s the first thing people see on both searches, and you pay for each lead it sends, not each click. Your reviews would put you level with the shops there now.</p><p class="offer setup">Part of the starting plan</p></li>
-      <li><h3>Run a small search campaign on furnace repair in Airdrie</h3><p>Google estimates about 170 searches a month for &quot;furnace repair airdrie&quot; alone, and only two shops advertise on it. A modest budget aimed at Airdrie would put you above the map.</p><p class="offer setup">Part of the starting plan</p></li>
-      <li><h3>Set your main Google category to HVAC contractor</h3><p>Most of the searches above are about furnaces, and your profile leads with plumbing. Plumber can stay on as a second category.</p><p class="effort">What it takes: About five minutes in your Google Business Profile.</p><p class="offer free">Quick win, included in any Ledge plan</p></li>
+      <li><h3>Get into Local Services Ads for furnace and plumbing calls</h3><p>It&#39;s the first thing people see, and you pay for each lead, not each click.</p><p class="offer setup">Part of the starting plan</p></li>
+      <li><h3>Put a tap-to-call button and a short form at the top of your home page</h3><p>Ads and the map send people here, and right now calling takes a scroll and a long press.</p><p class="offer page_fixes">Page fixes add-on, $750. We make the changes, or guide whoever runs your site</p></li>
+      <li><h3>Change your profile&#39;s main category to HVAC contractor</h3><p>Google leans on it to decide who shows for furnace searches.</p><p class="effort">What it takes: About five minutes in your Google Business Profile</p><p class="offer free">Quick win, included in any Ledge plan</p></li>
     </ol>
     <div class="later" >
       <h3>Also worth a look</h3>
       <ul>
-        <li>There&#39;s no page about furnace replacement on your site. If you advertise it later, a page of its own will turn more clicks into calls than the home page.</li>
+        <li>There&#39;s no page about furnace replacement on your site. If you advertise it, a page of its own will turn more clicks into calls.</li>
       </ul>
     </div>
   </section>
 
   <div class="ask" id="ask-audit" hidden>
-    <h2>Want a look inside your ad account?</h2>
-    <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-audit-done" data-label="Book the audit">
-      <p>From the outside we can see where you show up. Inside your Google Ads account we can see why: which searches you're paying for, what each call costs you, and where the budget goes. You'd link your account to our Google Ads manager account. We only look, nothing changes without your OK, and you can remove our access at any time. <a href="/report/sample/" target="_blank" rel="noopener">See a sample report</a>.</p>
+    <h2>Want a closer look inside your ad account?</h2>
+    <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-audit-done" data-label="Send me the details">
+      <p class="lead">From the outside we can see where you show up. Inside your Google Ads account we can see why:</p>
+      <ul class="looks">
+        <li>Which searches you're paying for, and which ones bring calls</li>
+        <li>What each call or form costs you</li>
+        <li>Where the budget goes that doesn't bring work in</li>
+      </ul>
+      <ol class="steps">
+        <li>Send this. Nothing to pay and nothing to sign.</li>
+        <li>You'll get the details by email: what we'd look at, the price (from $500 + GST), and how to give us view-only access.</li>
+        <li>Only if you say go ahead do we send an invoice. Nothing in your account changes.</li>
+      </ol>
       <fieldset class="pick" >
-        <legend>Pick one</legend>
-        <label for="a-pick-1"><input type="radio" id="a-pick-1" name="addons" value=""> <span><b>Google Ads audit, $500 + GST</b><span>Where your ad budget goes and what to change first.</span></span></label>
-        <label for="a-pick-2"><input type="radio" id="a-pick-2" name="addons" value="site_audit" checked> <span><b>Google Ads and site audit, $1,000 + GST <span class="tag">Suggested</span></b><span>The same, plus your website checked the way a customer on a phone sees it, with each fix priced. Your audit found things to fix on both.</span></span></label>
+        <legend>Which would you like the details on?</legend>
+        <label for="a-pick-1"><input type="radio" id="a-pick-1" name="addons" value=""> <span><b>Google Ads audit</b><span>Where your ad budget goes and what to change first. $500 + GST.</span></span></label>
+        <label for="a-pick-2"><input type="radio" id="a-pick-2" name="addons" value="site_audit" checked> <span><b>Google Ads and site audit <span class="tag">Suggested</span></b><span>The same, plus your website checked the way a customer on a phone sees it, with each fix priced. Your audit found things to fix on both. $1,000 + GST.</span></span></label>
       </fieldset>
-      <p class="price"><span hidden>$500 + GST for the Google Ads audit. </span><small >Either way, $500 comes off setup or monthly management if you go ahead within 30 days.</small></p>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
       <input type="hidden" name="offer" value="account_audit">
       <label for="a-notes"><span>Anything we should know? <span class="opt">(optional)</span></span>
         <textarea id="a-notes" name="notes" placeholder="For example: we spend about $1,500 a month and most calls come from Airdrie."></textarea></label>
       <p class="err" role="alert" hidden></p>
-      <div class="row"><button class="btn" type="submit">Book the audit</button></div>
+      <div class="row"><button class="btn" type="submit">Send me the details</button><span class="free">Free to ask.</span></div>
     </form>
     <div id="ask-audit-done" hidden>
-      <p><strong>Got it.</strong> You'll have the next steps, including how to link your account, by the end of the next business day.</p>
+      <p><strong>Got it.</strong> Nothing to pay yet. You'll have the details, including the price and how to give us view-only access, by the end of the next business day.</p>
     </div>
   </div>
 
   <div class="ask" id="ask-setup" >
     <h2>Want to show up in these searches?</h2>
     <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-setup-done" data-label="Send me a starting plan">
-      <p>We'd set up a small Google Ads campaign for searches like &ldquo;furnace repair airdrie&rdquo; around Airdrie, and tell you plainly what it costs to run. Pick a monthly ad budget you'd be comfortable testing, and you'll get a starting plan with a fixed price for the setup.</p>
+      <p class="lead">We'd set up a small Google Ads campaign for searches like &ldquo;furnace repair calgary&rdquo; around Calgary, and tell you plainly what it costs to run.</p>
+      <ol class="steps">
+        <li>Pick a monthly ad budget you'd be comfortable testing and send this. It's free.</li>
+        <li>You'll get a starting plan by email: the searches, the budget, and a fixed price for the setup.</li>
+        <li>Nothing starts and nothing is billed until you approve it.</li>
+      </ol>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
       <input type="hidden" name="offer" value="starting_plan">
@@ -280,17 +418,17 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
       <label for="s-notes"><span>Anything we should know? <span class="opt">(optional)</span></span>
         <textarea id="s-notes" name="notes" placeholder="For example: we want more furnace replacements, not service calls."></textarea></label>
       <p class="err" role="alert" hidden></p>
-      <div class="row"><button class="btn" type="submit">Send me a starting plan</button></div>
+      <div class="row"><button class="btn" type="submit">Send me a starting plan</button><span class="free">Free, with nothing to sign.</span></div>
     </form>
     <div id="ask-setup-done" hidden>
-      <p><strong>Got it.</strong> Your starting plan will be in your inbox by the end of the next business day.</p>
+      <p><strong>Got it.</strong> Your starting plan will be in your inbox by the end of the next business day. Nothing starts until you approve it.</p>
     </div>
   </div>
 
   <div class="ask" id="ask-general" hidden>
     <h2>Want a hand with any of this?</h2>
     <form class="ask-form" method="post" action="/api/quote-request" data-done="ask-general-done" data-label="Send me the details">
-      <p>Tell us where you are with Google Ads and you'll get a straight answer on what we'd do first and what it costs.</p>
+      <p class="lead">Tell us where you are with Google Ads and you'll get a straight answer on what we'd do first and what it costs. Free, with nothing to sign.</p>
       <input type="hidden" name="id" value="sample">
       <input type="hidden" name="t" value="sample">
       <input type="hidden" name="offer" value="details">
@@ -320,13 +458,15 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
     </div>
   </div>
 
-  <section aria-labelledby="sources-title">
-    <h2 id="sources-title">What we looked at</h2>
-    <ul class="sources">
+  <section aria-label="What we looked at">
+    <details class="sources">
+      <summary>What we looked at</summary>
+      <ul>
       <li><a href="https://ledgecommunications.com/" rel="nofollow noopener" target="_blank">Your home page (sample)</a></li>
       <li><a href="https://adstransparency.google.com/" rel="nofollow noopener" target="_blank">Google Ads Transparency Center</a></li>
-    </ul>
-    <p class="fine method" >Searches were run Oct 28, 2026 the way a phone in Airdrie would see them. Results shift through the day, so treat the positions as a snapshot.</p>
+      </ul>
+      <p >Searches were run Nov 1, 2026 at 2:15 PM from Calgary, on a phone and on a computer. Results shift through the day, and ads change by the hour, so treat positions as a snapshot.</p>
+    </details>
   </section>
 </main>
 <footer class="wrap foot">
@@ -345,7 +485,7 @@ h2 { font-size: 1.7rem; margin-bottom: 14px; }
         .then(function () { form.hidden = true; document.getElementById(form.getAttribute('data-done')).hidden = false; })
         .catch(function () {
           btn.disabled = false; btn.textContent = form.getAttribute('data-label');
-          err.textContent = "That didn't go through. Reply to the email with \"yes\" and we'll take it from there.";
+          err.textContent = "That didn't go through. Reply to the email and we'll take it from there.";
           err.hidden = false;
         });
     });

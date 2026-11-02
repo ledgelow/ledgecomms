@@ -20,6 +20,7 @@ export default {
     const path = url.pathname.replace(/\/+$/, "") || "/";
 
     if (path.startsWith("/api/")) return handleApi(request, env, path);
+    if (path.startsWith("/img/") && request.method === "GET") return auditImage(url, env, ctx);
 
     const page = path.match(/^\/(audit|proposal|report)\/([^/]+)$/);
     if (page && page[2] !== "sample" && request.method === "GET") {
@@ -31,6 +32,32 @@ export default {
     return fillPageValues(await env.ASSETS.fetch(request), env, pricing);
   },
 };
+
+/* ───────────── /img/<id>: pictures on audit pages ───────────── */
+
+// Phone screenshots of searches and home pages live in the hub owner's Google Drive. The hub signs each picture it puts
+// on a page (an HMAC of the file ID with HUB_KEY), so this only ever serves pictures the hub chose. Cached for a week.
+async function auditImage(url, env, ctx) {
+  const id = decodeURIComponent(url.pathname.slice("/img/".length));
+  const k = url.searchParams.get("k") || "";
+  if (!/^[\w-]{20,80}$/.test(id) || !env.HUB_KEY || k !== (await imgSig(id, env.HUB_KEY))) return new Response("Not found", { status: 404 });
+  const cache = caches.default;
+  const key = url.origin + "/img/" + id;
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const res = await fetch(`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1200`, { redirect: "follow" }).catch(() => null);
+  const type = res && res.ok ? res.headers.get("content-type") || "" : "";
+  if (!type.startsWith("image/")) return new Response("Not found", { status: 404 });
+  const out = new Response(res.body, { headers: { "content-type": type, "cache-control": "public, max-age=604800", "x-robots-tag": "noindex" } });
+  ctx.waitUntil(cache.put(key, out.clone()));
+  return out;
+}
+
+async function imgSig(id, secret) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode("img:" + id)));
+  return btoa(String.fromCharCode(...sig)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "").slice(0, 22);
+}
 
 /* ───────────── live prices ───────────── */
 
