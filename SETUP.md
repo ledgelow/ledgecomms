@@ -15,7 +15,48 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Oct 30, evening): mailbox address, worksheet decisions built
+## Where you are (Nov 1): audits rebuilt around real evidence
+
+Your review of the first audits found two data problems, and the page needed to scan better:
+- **Ads and Local Services Ads:** our search data almost never includes them (Google holds ads back from automated
+  searches; confirmed with the Diag check on phone and computer, by map point and by city name). Audits no longer say
+  "no ads on this search". Instead: your phone screenshots of each search (read by Claude, shown on the page), and
+  Google's Ads Transparency record for the shop and the shops at the top of the map, shown right on the page.
+- **"google.com" websites:** Google now hands most results out as redirect links. The site name comes from the result itself.
+- **Layout:** the short version (three lines), the value box built on one big-ticket job (price, searches a month, cost
+  per click, then what a month of Google Ads could book; no fee; the working-out in a dropdown), six checks with icons,
+  the phone screenshot beside each search, reviews against the top of the map, the home page on a phone, and an ask
+  that says plainly nothing is paid or signed until they say go.
+
+**Ship it (about 15 minutes, then the rebuild runs on its own)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, add a new script file called `Jpeg` and paste in `Jpeg.gs`,
+   delete the `Diag` file, save.
+2. **Authorize Drive:** in the Sheet, Ledge menu > **Read new search screenshots now**. Google asks for Drive access
+   (the hub keeps the screenshots and home page pictures there). Allow it. Then **deploy a new version** of the web app.
+3. **GitHub:** upload `worker.js`, `sample-audit.html`, `sample-proposal.html`, `sample-site.jpg`, `Jpeg.gs`, and `SETUP.md`.
+4. **Screenshots:** Ledge menu > **Searches that need a phone screenshot**. Search each one on your phone and take a
+   full-page screenshot, or normal ones (the top of the results, then a scroll or two). Full-page JPEGs, and PDFs saved
+   from Photos (one picture or a whole batch in one PDF), all work: the hub cuts each full page into screen-sized pieces.
+   A full-page PNG doesn't; save it as a PDF from Photos first. Put them in the `Ledge search screenshots` folder in Drive
+   (ledgecommunications@gmail.com), no renaming needed, then **Read new search screenshots now**. A full page takes a
+   while, so run it again until it says everything is read. Each search lands in the Search screenshots tab with what
+   Claude read: if your search box is blacked out, it matches the page to the searches your audits need and says so in
+   the note. Check the `query` column once. Audit pages never show the screenshots, only what was on them.
+5. **Rebuild:** Ledge menu > **Rebuild audits that haven't gone out**, then **Run now** three or four times a few
+   minutes apart (each run gathers 6 shops). The audits come back for review over the next hour or two.
+6. Keep `COLD_EMAIL_ON` off until you've approved the rebuilt audits.
+
+If a screenshot's search didn't match (blank or "best guess" in the `query` column): **Re-read screenshots that didn't
+match** clears those rows and any doubled ones and reads the files again. If a row is still blank, open its `link`
+(for a batch PDF, the `#4` on the file ID means page 4), type the search into `query`, and run it once more: that page
+is read again as the search you typed. Then **Rebuild audits that now have screenshots** rewrites only the waiting audits that gained screenshot data,
+keeping their searches, so it's quick. When a shop has several "Check this audit" emails, use the newest one.
+
+Screenshots stay in use for `SEARCH_SHOT_DAYS` (14). One screenshot covers every shop in that trade and town, so
+it's roughly 10 a week once the pipeline settles. An audit whose search has no screenshot still builds; it just
+makes no claim about who's in the ads, and marks the Local Services Ads check "Couldn't check".
+
+## Where you were (Oct 30, evening): mailbox address, worksheet decisions built
 
 Live: site, pricing page, hub, DataForSEO, PageSpeed, FreshBooks (connected, with online payments), the manager account (871-805-0188), and the export script (authorized through ledgelow@gmail.com, hourly).
 
