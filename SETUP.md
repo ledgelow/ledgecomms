@@ -15,7 +15,98 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 1): audits rebuilt around real evidence
+## Where you are (Nov 2, night): the check fixes what it finds; you only see what needs you
+
+From the first batch of 14 "Check these audits" (the flags listed problems for you to fix, which was backwards):
+- **The check is now an editor.** It reads each audit as the owner would, rewrites every line with a problem in place,
+  opens the shop's website itself to confirm what the writer said about it (hours, buttons, what the page says) and drops
+  anything it can't confirm, and takes the value box off when its numbers don't hold up. Then it reads the edited audit
+  a second time to make sure the fixes hold. No new audit is written, so it's quick.
+- **Your review email shows the finished audit.** Each block says "The check: fixed 4 lines before it reached you"
+  (and "left the value box off (why)" when it did). "NEEDS YOU before you approve" appears only for what a rewrite can't
+  settle: the website looks like a different business, the town or trade looks wrong, a search needs a fresh screenshot.
+  Most audits have none, and a flagged one always waits for you.
+- **"600 searches a month" in small towns was a bug.** Google reports every small search as about 10 a month, and the
+  tool was adding up dozens of rewordings. Totals are now capped at four times the three biggest searches, and the
+  audits already written use the corrected numbers on their next view. Expect the Chestermere and Airdrie boxes to
+  show per-job costs instead of monthly totals.
+- **"#3 on the map, below the three that show here"** was a wording bug when the shop was one of the three on the card.
+  The map line now always matches the card.
+- **"Who runs Google ads around you"** now says "Shops high on the map whose websites we could look up", which is
+  what it is (it was claiming to be the three map spots).
+- **The writer** only states what it saw on the shop's site when it fetched that page, keeps seasonal lines true to
+  the date, and calls reviews good only when they're in line with the shops above.
+
+On the first run after the update, the audits the old check flagged (approved ones too, since none has gone out) go
+through the editor and come back finished. Priorities are re-scored on the corrected numbers.
+
+Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now**.
+
+## Where you were (Nov 2, evening): the value box only when the money adds up, strongest prospects first
+
+- **No losing math on the page.** The value box ("About $1,500 a month in Google Ads could book…") now shows only when
+  the work it books starts at no less than the ad spend and its middle is at least twice it (`VALUE_MIN_RETURN`, 2).
+  Appliance repair at typical rates ($1,500 of ads for $600 to $1,350 of work) fails that, so those audits have no box
+  and no dollar line in the emails, and the audit is told the numbers don't pay for that work: it points at the profile,
+  reviews, and Local Services Ads (per lead, not per click) instead of pitching search ads. Big jobs (furnaces, panels,
+  water heaters, garage doors, roofs) pass.
+- **The check** now flags money that doesn't add up too, and has room to reply (the "couldn't run" note was it running
+  out of space; that limit is in the code, not the Sheet).
+- **On the first run after the update:** audits waiting for your review whose box no longer adds up (the two appliance
+  repair ones) are rewritten without it, and ones whose check couldn't run are checked again. Approved audits stay approved.
+
+**Only trades we can help, strongest prospects first**
+- **Appliance repair is off** (`TRADES` is now heating and cooling, plumbing, electrical, garage doors). Cold prospects in
+  a trade that isn't in `TRADES` are held: status `held`, nothing written or sent, no search costs. Roofing prospects
+  found before it went off for the winter are held the same way, and come back with fresh searches when you add roofing
+  back in March. Someone who asked on the site is never held.
+- **Low fits are held too:** a cold prospect whose work search ads can't pay for at typical rates isn't written up.
+- **Every prospect gets a priority out of 100**, from its searches, in two new Leads columns (`priority`, `priority_why`):
+  what the work is worth (up to 40: the work a month of ads could book), room to grow on Google (up to 30: below the top
+  three on the map, rivals advertising when they don't, Google Verified listings without them), and how likely ads are
+  to work (up to 30: rating and reviews, a site with tap-to-call or a form, a claimed profile). 65 and up is high.
+- **Highest first, everywhere:** searches are gathered for the most valuable trades first, audits go to Claude
+  strongest first, review emails list them strongest first with "Priority: 82 of 100 (high)" and the reasons, and
+  approved cold emails go out strongest first. Sort the Leads tab by `priority` to see the whole pipeline that way.
+- The first hourly run after the update ranks everything already in the pipeline and holds what's off.
+
+Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now** once. Then `COLD_EMAIL_ON` can go to yes.
+
+## Where you were (Nov 2): a check before audits reach you
+
+From your review of The Urban Electrician audit:
+- **One map position per search.** The page and Claude's lines no longer set "#2 on the map" beside "#7 of 40 in Google
+  Maps" (two different Google lists that often disagree). The shop gets one spot on the map per search, and the "You"
+  line reads in sentences: "You're #2 on the map. Your website isn't in the first 20 results below the map."
+- **Plainer moves.** Each "why" is a full sentence or two, the way you'd say it ("None of the shops at the top of the map
+  have run search ads lately, so we'd start by testing ads on panel upgrade searches.").
+- **"What a prospective customer sees"** is the new heading for the searches.
+- **The check (`QA_ON`).** After Claude writes an audit, a second Claude read goes through it the way the owner
+  would: anything confusing, two numbers for the same thing, parts that disagree, or claims the evidence doesn't back.
+  Problems in Claude's lines get one rewrite with the problems spelled out. If it still isn't right, or the fix needs
+  you, it comes to you with "Before you approve, the check flagged:" at the top of the review email. A flagged audit
+  always waits for you. Adds about an hour and a few cents per audit.
+- **Phone screenshots before writing (`REQUIRE_SHOTS`).** A cold audit now waits until every search it uses has a
+  phone screenshot, and you get a "Phone screenshots needed" email listing the searches and the shops waiting on them
+  (when the list grows, and once a day while anything waits). A site-form audit waits at most `SHOT_WAIT_HOURS` (4),
+  then builds without, so it's still on time. **Where the audits are** shows both.
+- **`REVIEW_AUDITS_FIRST` is now 20**, so the next 15 or so come to you before any go out on their own.
+
+**Ship it (5 minutes)**
+1. **Apps Script:** replace `Code.gs` and `Templates.gs`, save. **GitHub:** upload `Code.gs`, `Templates.gs`,
+   `sample-audit.html`, and `SETUP.md`.
+2. Nothing else to run. On the next run, every audit that hasn't gone out (the ones you approved too) goes through the
+   check. Those that pass come back to you to approve, and the rest are rewritten first or wait for screenshots.
+3. Watch for the "Phone screenshots needed" email: Chestermere and any other town without screenshots will be on it.
+   The same list is under Ledge menu > **Searches that need a phone screenshot**. Name each file after its search
+   ("electrician chestermere.pdf"; a number after it is fine) and it's read as that search, no guessing. A batch PDF
+   with several searches in it is still matched page by page.
+4. Approve from the new "Check this audit" emails, then turn on `COLD_EMAIL_ON`.
+
+After a change to how audits are written, Ledge menu > **Check the waiting audits again** puts the unsent ones through
+the check once more.
+
+## Where you were (Nov 1): audits rebuilt around real evidence
 
 Your review of the first audits found two data problems, and the page needed to scan better:
 - **Ads and Local Services Ads:** our search data almost never includes them (Google holds ads back from automated
@@ -53,8 +144,8 @@ is read again as the search you typed. Then **Rebuild audits that now have scree
 keeping their searches, so it's quick. When a shop has several "Check this audit" emails, use the newest one.
 
 Screenshots stay in use for `SEARCH_SHOT_DAYS` (14). One screenshot covers every shop in that trade and town, so
-it's roughly 10 a week once the pipeline settles. An audit whose search has no screenshot still builds; it just
-makes no claim about who's in the ads, and marks the Local Services Ads check "Couldn't check".
+it's roughly 10 a week once the pipeline settles. Since Nov 2, a cold audit waits for its screenshots (see above); a
+site-form audit that builds without one makes no claim about who's in the ads, and marks the Local Services Ads check "Couldn't check".
 
 ## Where you were (Oct 30, evening): mailbox address, worksheet decisions built
 

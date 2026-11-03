@@ -44,7 +44,9 @@ var HEAD = {
     'booked_at', 'notes', 'owner_says', 'segment', 'budget', 'ads_customer_id', 'report_slug',
     // audit_opened: first time the audit page was read after it went out (audit_opens counts every time).
     // check_back: the date a "try me later" lead gets its one note. personal_line: Logan's line atop a site-form audit email.
-    'audit_opened', 'audit_opens', 'check_back', 'personal_line'],
+    'audit_opened', 'audit_opens', 'check_back', 'personal_line',
+    // priority: how strong a prospect is, 0 to 100 (priorityOf_); priority_why: the reasons, or why it's held.
+    'priority', 'priority_why'],
   // qa: what the check found before the audit reached Logan (pass, rewritten: [...], or flagged: ...).
   audits: ['slug', 'lead_id', 'created', 'business', 'spec_json', 'qa'],
   // One row per phone screenshot of a Google search in the Ledge search screenshots folder, as Claude read it.
@@ -67,13 +69,13 @@ var HEAD = {
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '15';
+var SCHEMA_VERSION = '18';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
   PRICE_PAGE_FIXES: ['400', '500'], PRICE_LANDING_PAGE: ['900', '1000'], PRICE_SITE_SUPPORT: ['100'],
   COLD_PER_DAY_MAX: ['20'], PROSPECTS_PER_WEEK: ['15'], REVIEW_PROPOSALS_FIRST: ['3'], REVIEW_AUDITS_FIRST: ['5'],
-  TRADES: ['heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair']
+  TRADES: ['heating and cooling, plumbing, electrical, roofing and eavestroughs, garage doors, appliance repair', 'heating and cooling, plumbing, electrical, garage doors, appliance repair']
 };
 var SETTINGS_DEFAULTS = [
   ['OWNER_EMAIL', '', 'Where your notifications go (your everyday inbox).'],
@@ -102,8 +104,8 @@ var SETTINGS_DEFAULTS = [
   ['COLD_PER_DAY_MAX', '10', 'Ceiling after adding 5 a week. Raise it once replies look healthy.'],
   ['PROSPECTS_PER_WEEK', '40', 'New shops to look for each Monday. Keep it about one and a half times the week\'s cold emails: 40 at 5 a day, 75 at 10. Each one gets an audit, so engine spend rises with it.'],
   ['AREAS', 'Calgary NE, Calgary NW, Calgary SE, Calgary SW, Airdrie, Chestermere, Cochrane, Okotoks', 'Areas to work through, in order.'],
-  ['TRADES', 'heating and cooling, plumbing, electrical, garage doors, appliance repair',
-    'Kinds of business to look for, comma separated. Each one gets its own Google searches. Roofing and eavestroughs are off for the winter; add them back in March.'],
+  ['TRADES', 'heating and cooling, plumbing, electrical, garage doors',
+    'Kinds of business to look for, comma separated. Each one gets its own Google searches. Cold prospects in a trade that isn\'t here are held (and come back if it\'s added again). Roofing and eavestroughs are off for the winter; add them back in March. Appliance repair is off: its jobs are too small for search ads to pay.'],
   ['MODEL', 'claude-opus-5-5', 'Claude model for finding shops and writing audits. claude-sonnet-5-5 costs about half.'],
   ['MONTHLY_ENGINE_BUDGET_USD', '60', 'The engine pauses for the rest of the month once estimated spend passes this (Claude and search data together).'],
   ['PRICE_ACCOUNT_AUDIT', '500', 'Paid Google Ads account audit, CAD before GST. Shown on audits for shops already running ads.'],
@@ -123,6 +125,7 @@ var SETTINGS_DEFAULTS = [
   ['VALUE_CLICK_RATE', '6', 'For the dollar estimate in audits: percent of searches that click an ad. Used for kinds of business without their own benchmark (most trades have one in the code).'],
   ['VALUE_LEAD_RATE', '7', 'For the dollar estimate: percent of ad clicks that call or send a form. Used for kinds of business without their own benchmark.'],
   ['VALUE_CPC', '12', 'For the dollar estimate: typical cost per click in CAD, for kinds of business without their own benchmark.'],
+  ['VALUE_MIN_RETURN', '2', 'The value box shows only when the work a month of ads could book starts at no less than the ad spend and, in the middle of its range, is at least this many times it. Below that the box stays off, since the numbers would argue against the ads.'],
   ['VALUE_BOOK_RATE', '35', 'For the dollar estimate: percent of calls and forms that turn into booked jobs (trade surveys put it around 25 to 45). Change it to your own number once you know it.']
 ];
 // Legacy (Lead Handling Audit) rows, still used to show audits built before the switch.
@@ -276,7 +279,47 @@ function ensureSchema_(force) {
   props_().setProperty('SCHEMA_VERSION', SCHEMA_VERSION);
   if (from > 0 && from < 4) rebuildLegacyAudits_();
   // The check arrived in 15: audits written before it (approved ones too, since none has gone out) get checked before they go.
+  // Ranking the pipeline reads every prospect's searches, so it waits for the next hourly run rather than a page view.
+  if (from > 0 && from < 18) props_().setProperty('RANK_PENDING', '1'); // 18: again, on the corrected search totals
   if (from > 0 && from < 15) recheckWaitingAudits_();
+  else if (from > 0 && from < 16) reviseForValueRule_();
+  if (from >= 15 && from < 18) recheckFlagged_();
+}
+
+// Once, when the check became an editor (18): audits it flagged under the old check, approved ones included (none has gone
+// out), are read again and fixed in place, so Logan reviews the finished version.
+function recheckFlagged_() {
+  if (!yes_(setting_('QA_ON'))) return;
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (['awaiting_review', 'audit_ready', 'audit_approved', 'ready_to_send'].indexOf(l.status) < 0 || Number(l.touches || 0) || !l.audit_slug) return;
+    var row = findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug);
+    if (!row || !/^(flagged|rewritten)/.test(String(row.qa || ''))) return;
+    updateRow_(TAB.audits, HEAD.audits, row, { qa: '' });
+    updateLead_(l, { status: 'audit_ready', next_touch: '' });
+    queueJob_('qa', l.id, l.audit_slug);
+    logEvent_(l.id, l.email, 'recheck', 'the check now fixes what it finds');
+  });
+}
+
+// Once, when the value rule arrived (16): audits waiting for review whose value box no longer adds up are written again
+// without it, and ones whose check couldn't run go through it again. Approved audits stay as Logan approved them.
+function reviseForValueRule_() {
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (['awaiting_review', 'audit_ready'].indexOf(l.status) < 0 || Number(l.touches || 0) || !l.audit_slug) return;
+    var row = findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug), spec = {};
+    if (!row) return;
+    try { spec = JSON.parse(row.spec_json); } catch (err) {}
+    if (spec.opp && !oppPays_(oppSane_(spec.opp))) {
+      updateLead_(l, { status: l.source === 'cold' ? 'researching' : 'requested', audit_slug: '', next_touch: '' });
+      queueJob_('audit', l.id, '');
+      logEvent_(l.id, l.email, 'rebuild', 'value box no longer adds up');
+    } else if (/couldn't run/.test(row.qa || '') && yes_(setting_('QA_ON'))) {
+      updateRow_(TAB.audits, HEAD.audits, row, { qa: '' });
+      updateLead_(l, { status: 'audit_ready', next_touch: '' });
+      queueJob_('qa', l.id, l.audit_slug);
+      logEvent_(l.id, l.email, 'recheck', 'the check hadn\'t run');
+    }
+  });
 }
 
 function refreshSettingDefaults_(st) {
@@ -486,6 +529,8 @@ function runHourly() {
     step_('checkBounces', checkBounces_);
     step_('checkCalendar', checkCalendar_);
     step_('pollBatches', pollBatches_);
+    step_('holdOffTrades', holdOffTrades_);
+    step_('rankWaiting', function () { if (prop_('RANK_PENDING')) { rankWaitingLeads_(); props_().deleteProperty('RANK_PENDING'); } });
     step_('gatherEvidence', gatherEvidence_);
     step_('gatherSiteChecks', gatherSiteChecks_);
     step_('submitJobs', submitJobs_);
@@ -532,6 +577,7 @@ function deliverAudits_() {
     if (qa === 'flagged' || reviewsLeft_('audit') > 0 || inboundHoldHours_(l) > 0) { toReview.push(l); return; }
     releaseAudit_(l);
   });
+  toReview.sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); });
   if (toReview.length === 1) requestAuditReview_(toReview[0]);
   else if (toReview.length > 1) requestAuditReviews_(toReview);
 }
@@ -564,6 +610,7 @@ function requestAuditReviews_(list) {
     return (i + 1) + '. ' + l.business + ' (' + (l.source === 'cold' ? 'cold prospect' : 'asked on the site') + ', ' + (l.area || '') + ', ' +
       (adsLabel[l.segment] || adsLabel.unknown) + ')\n' +
       '   Audit: ' + auditUrl_(l) + '\n' +
+      priorityLine_(l, '   ') +
       qaLines_(l, '   ') +
       '   Biggest finding: ' + l.top_finding + '\n' +
       (l.source === 'cold' ? '   Email found: ' + l.email + ' (' + String(l.consent_proof || '').split(' | ')[0] + ')\n' : '') +
@@ -603,6 +650,7 @@ function requestAuditReview_(l) {
     (reviewsLeft_('audit') > 0 ? 'It\'s one of the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so it waits for your OK (' + reviewsLeft_('audit') + ' left).\n\n'
       : 'It waits a few hours in case you want to add a personal line.\n\n') +
     'Audit: ' + auditUrl_(l) + '\n' +
+    priorityLine_(l, '') +
     qaLines_(l, '') +
     'Google Ads: ' + ({ running_ads: 'running ads, so the page offers the $' + money_(setting_('PRICE_ACCOUNT_AUDIT') || 500) + ' account audit',
       no_ads: 'no ads found, so the page offers a starting plan' }[l.segment] || 'couldn\'t tell, so the page asks where they are with ads') + '\n' +
@@ -877,7 +925,8 @@ function sendColdEmails_() {
   var perRun = Math.max(1, Math.ceil(cap / 9));
   var room = Math.min(cap - sentToday, perRun);
   if (room <= 0) return;
-  readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.status === 'ready_to_send'; }).slice(0, room).forEach(function (l) {
+  readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.status === 'ready_to_send'; })
+    .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); }).slice(0, room).forEach(function (l) { // strongest first
     if (isDnc_(l.email)) { stopLead_(l, 'skipped', 'On do-not-contact list'); return; }
     sendLeadEmail_(l, 'cold_1');
     updateLead_(l, { status: 'in_sequence', touches: 1, next_touch: addBusinessDays_(new Date(), 3) });
@@ -1247,11 +1296,32 @@ function opportunityFor_(trade, siteHint, townName, bigMk, mk) {
     return m && m.total ? opportunity_(Object.keys(base).reduce(function (o, k) { o[k] = base[k]; return o; },
       { kind: kind, job: job[0].replace(/^(a|an) /, ''), job_low: job[1], job_high: job[2], searches: m.total, top: m.top, cpc_usd: m.cpc_usd })) : null;
   };
-  var big = jv[3] ? make('big', jv[3], bigMk) : null;
-  if (big && big.jobs) return big;
-  var day = make('everyday', jv[2], mk);
-  if (big) return big;
-  return day;
+  var big = jv[3] ? make('big', jv[3], bigMk) : null, day = make('everyday', jv[2], mk);
+  // The big job first, then the everyday one, and only where the money adds up for the shop (oppPays_). When neither does,
+  // what's kept says so, so the audit leaves dollar figures off and leans on what pays for smaller jobs.
+  var pick = [big, day].filter(function (p) { return p && oppPays_(p); })[0];
+  if (pick) return pick;
+  var any = big || day;
+  return any ? { withheld: true, kind: any.kind, job: any.job, job_low: any.job_low, job_high: any.job_high, per_job: any.per_job, cpc: any.cpc,
+    work: any.work, where: any.where, searches: any.searches } : null;
+}
+
+// Whether the value box makes a sound case at typical rates: the work a month of ads books starts no lower than the ad
+// spend, and its middle is at least VALUE_MIN_RETURN times it (or, for one booked job, the same against its ad cost).
+// $1,500 of ads booking $600 to $1,350 of work argues against itself, so a box like that never shows.
+function oppPays_(p) {
+  if (!p || p.withheld) return false;
+  var need = Number(setting_('VALUE_MIN_RETURN') || 2) || 2;
+  var spend = p.jobs ? p.budget : p.per_job, low = p.jobs ? p.low : p.job_low, high = p.jobs ? p.high : p.job_high;
+  return spend > 0 && low >= spend && (low + high) / 2 >= need * spend;
+}
+
+// For the audit request when the box is left off: why, and what that means for what the audit recommends.
+function oppWithheld_(p) {
+  return 'OPPORTUNITY: left off the page. At typical click prices, one ' + p.job + ' booked from search ads costs about $' + money_(p.per_job) +
+    ' in ads, on a $' + money_(p.job_low) + ' to $' + money_(p.job_high) + ' job, so search ads alone don\'t pay for this work at typical rates. ' +
+    'Put no dollar figure on anything, and never suggest search ads would pay for themselves here. Lead with what costs little or nothing ' +
+    '(the Google Business Profile, reviews, the map) and, only where a phone screenshot shows them, Local Services Ads, which charge per lead rather than per click.';
 }
 
 // "furnace replacements", "new garage doors"; jobs whose names don't take an s read as "jobs like painting a room".
@@ -1264,7 +1334,8 @@ function jobsOf_(n, job) {
 // The estimate in words, for the audit page, the emails, and the audit request. Empty strings when there's no estimate.
 function oppWords_(p) {
   var out = { takeaway: '', takeaway_html: '', how: [], email: '', more: '', price: '', price_words: '', searches: '', cpc: '', cpc_label: '', evidence: '' };
-  if (!p) return out;
+  p = oppSane_(p);
+  if (!oppPays_(p)) return out; // no box, no email line, and nothing for the audit request (evidenceText_ says why)
   var price = '$' + money_(p.job_low) + ' to $' + money_(p.job_high), cpc = '$' + money_(p.cpc);
   out.price = '$' + money_(p.job_low) + '–$' + money_(p.job_high);
   out.price_words = price;
@@ -1329,7 +1400,7 @@ function bigMarketFor_(trade, siteHint, townName) {
 // Google's related searches for some seed searches in a town, kept when they're about the work (not jobs, how-tos, stores,
 // or other towns), with the total a month and the average cost per click (US dollars, weighted by searches). Kept 60 days.
 function kwMarket_(kind, seeds, keep, townName) {
-  var loc = townName + ',Alberta,Canada', key = kind + ': ' + seeds.join(' + ');
+  var loc = townName + ',Alberta,Canada', key = kind + ' v2: ' + seeds.join(' + '); // v2: variants merged, total capped
   var hit = readRows_(TAB.volumes, HEAD.volumes).filter(function (r) {
     return r.keyword === key && r.location === loc && Date.now() - new Date(r.fetched).getTime() < 60 * 864e5;
   }).pop();
@@ -1345,20 +1416,45 @@ function kwMarket_(kind, seeds, keep, townName) {
   var places = MARKET_PLACES.concat(Object.keys(TOWNS).map(function (k) { return TOWNS[k][2].toLowerCase(); }))
     .filter(function (p, i, all) { return p !== town && all.indexOf(p) === i; });
   var other = new RegExp('\\b(' + places.map(function (p) { return p.replace('.', '\\.'); }).join('|') + ')\\b');
+  // The same search reworded ("furnace replacements calgary", "calgary furnace replacement") counts once.
+  var variant = function (k) {
+    return k.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function (w) { return w && !/^(the|a|an|in|for|of|to)$/.test(w); })
+      .map(function (w) { return w.length > 3 && /[^s]s$/.test(w) ? w.slice(0, -1) : w; }).sort().join(' ');
+  };
   var seen = {};
-  var hits = d.result.filter(function (v) {
-    var k = String(v && v.keyword || '').toLowerCase();
-    if (!k || seen[k] || !(Number(v.search_volume) > 0)) return false;
-    seen[k] = true;
-    return keep(k) && !MARKET_SKIP.test(k) && !other.test(k);
-  }).sort(function (a, b) { return b.search_volume - a.search_volume; }).slice(0, 60);
-  var total = hits.reduce(function (n, v) { return n + Number(v.search_volume); }, 0);
+  var hits = d.result.filter(function (v) { return v && v.keyword && Number(v.search_volume) > 0; })
+    .sort(function (a, b) { return b.search_volume - a.search_volume; }).filter(function (v) {
+      var k = String(v.keyword).toLowerCase(), vk = variant(k);
+      if (seen[vk]) return false;
+      seen[vk] = true;
+      return keep(k) && !MARKET_SKIP.test(k) && !other.test(k);
+    }).slice(0, 60);
+  var total = marketTotal_(hits.map(function (v) { return Number(v.search_volume); }));
   var top = hits.slice(0, 6).map(function (v) { return [String(v.keyword).toLowerCase(), Number(v.search_volume)]; });
   var priced = hits.filter(function (v) { return Number(v.cpc) > 0; });
   var weight = priced.reduce(function (n, v) { return n + Number(v.search_volume); }, 0);
   var cpc = weight ? Math.round(priced.reduce(function (n, v) { return n + Number(v.cpc) * Number(v.search_volume); }, 0) / weight * 100) / 100 : 0;
   appendRow_(TAB.volumes, HEAD.volumes, { keyword: key, location: loc, volume: total, fetched: new Date(), detail: JSON.stringify({ count: hits.length, top: top, cpc_usd: cpc }) });
   return { total: total, count: hits.length, top: top, cpc_usd: cpc, where: townName, cost: d.cost };
+}
+
+// A town's searches a month from Google's figures. Google reports every small search as about 10 a month, so a small
+// town's long tail of rewordings adds up to far more than it's worth: the total stops at four times its three biggest.
+function marketTotal_(volumes) {
+  var v = volumes.slice().sort(function (a, b) { return b - a; });
+  var sum = v.reduce(function (n, x) { return n + x; }, 0), top3 = v.slice(0, 3).reduce(function (n, x) { return n + x; }, 0);
+  return Math.min(sum, 4 * top3);
+}
+
+// An estimate kept from before the total was capped is worked out again on the capped total.
+function oppSane_(p) {
+  if (!p || p.withheld || !(p.top || []).length) return p;
+  var top3 = p.top.slice(0, 3).reduce(function (n, t) { return n + Number(t[1] || 0); }, 0);
+  if (!top3 || p.searches <= 4 * top3) return p;
+  var q = opportunity_({ kind: p.kind, job: p.job, job_low: p.job_low, job_high: p.job_high, work: p.work, searches: 4 * top3, where: p.where, top: p.top,
+    cpc_usd: 0, rates: { click: p.click, lead: p.lead, book: p.book, cpc: p.cpc }, budget: p.plan_budget });
+  if (q) q.cpc_from = p.cpc_from;
+  return q;
 }
 
 function dfsConfigured_() { return !!(prop_('DATAFORSEO_LOGIN') && prop_('DATAFORSEO_PASSWORD')); }
@@ -1445,15 +1541,21 @@ function relatedKeywords_(kws, townName) {
 function gatherEvidence_() {
   var started = Date.now();
   if (monthSpend_() >= Number(setting_('MONTHLY_ENGINE_BUDGET_USD') || 20)) return;
-  var jobs = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) { return j.kind === 'audit' && j.status === 'queued'; });
+  var leads = {};
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) { leads[l.id] = l; });
+  // The trades whose jobs are worth the most go first, so the strongest prospects are researched first.
+  var jobs = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) { return j.kind === 'audit' && j.status === 'queued'; })
+    .sort(function (a, b) { return tradeWorth_((leads[b.lead_id] || {}).trade) - tradeWorth_((leads[a.lead_id] || {}).trade); });
   var done = 0;
   var budget = Math.min(150000, runLeft_() - 120000);
   for (var i = 0; i < jobs.length && done < 6 && Date.now() - started < budget; i++) {
-    var j = jobs[i], lead = findLead_('id', j.lead_id);
+    var j = jobs[i], lead = leads[j.lead_id];
     if (!lead) { updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'error', detail: 'Lead missing', updated: new Date() }); continue; }
+    if (lead.status === 'held') { updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'done', detail: 'Held: ' + lead.priority_why, updated: new Date() }); continue; }
     if (freshEvidence_(lead.id)) continue;
     var ev = buildEvidence_(lead);
     saveEvidence_(lead, ev);
+    rankLead_(lead, ev);
     updateRow_(TAB.jobs, HEAD.jobs, j, { est_cost_usd: Number(j.est_cost_usd || 0) + ev.cost, updated: new Date() });
     done++;
   }
@@ -1824,9 +1926,11 @@ function evidenceText_(ev) {
     ev.estimates.map(function (e) { return '"' + e.keyword + '" about ' + e.volume; }).join(', ') + '. Together about ' + ev.estimate_total + ' a month.');
   if (ev.market) L.push('The wider market in ' + ev.market.where + ': about ' + ev.market.total + ' searches a month across ' + ev.market.count +
     ' related searches about this work (biggest: ' + ev.market.top.map(function (t) { return '"' + t[0] + '" ' + t[1]; }).join(', ') + ').');
-  if (ev.opp) L.push(oppWords_(ev.opp).evidence);
+  var opp = oppSane_(ev.opp);
+  if (oppPays_(opp)) L.push(oppWords_(opp).evidence);
+  else if (opp && opp.per_job) L.push(oppWithheld_(opp));
   else L.push('OPPORTUNITY: none (no search estimate for the town, or no typical price for this kind of business). Don\'t give dollar figures.');
-  if ((ev.rivals || []).length) L.push('Google Ads Transparency Center, Google Search ads in Canada over the last 30 days for the shops at the top of the map: ' +
+  if ((ev.rivals || []).length) L.push('Google Ads Transparency Center, Google Search ads in Canada over the last 30 days for shops high on the map whose websites we could look up (not always the same three as the map spots; say "shops high on the map", never "the three at the top"): ' +
     ev.rivals.map(function (r) { return r.name + ' (' + r.domain + '): ' + (r.count ? r.count + (r.capped ? ' or more' : '') + ' ads' : 'none'); }).join('; ') + '.');
   ev.searches.forEach(function (q, i) {
     L.push('');
@@ -1845,9 +1949,10 @@ function evidenceText_(ev) {
     // checks, minutes apart); the owner sees one map, so the evidence gives one number.
     var pack = (q.map_pack || []).length ? q.map_pack : (q.maps_top || []).slice(0, 3);
     L.push('  Map, the three spots on the search page' + (from.map_pack === 'screenshot' ? pic : '') + ': ' + list(pack));
-    L.push('  This shop on the map: ' + (q.you.map_pack ? '#' + q.you.map_pack + ', one of the three on the search page'
-      : q.you.maps ? '#' + q.you.maps + ', below the three on the search page (people see it only if they open the full map)'
-      : 'not in the first ' + (q.maps_total || 20) + ' on the map') + '. This is the only map position to use for this search.');
+    var spot = mapSpot_(q);
+    L.push('  This shop on the map: ' + (spot.top ? '#' + spot.top + ', one of the three on the search page'
+      : spot.below ? '#' + spot.below + ', below the three on the search page (people see it only if they open the full map)'
+      : spot.outside ? 'not in the three on the search page' : 'not in the first ' + (q.maps_total || 20) + ' on the map') + '. This is the only map position to use for this search.');
     if (q.maps_ads.length) L.push('  Sponsored spots in Google Maps: ' + list(q.maps_ads));
     L.push('  Websites below the map: ' + list(q.organic) + (q.you.organic ? '' : ' (this shop\'s website is not in the first 20)'));
   });
@@ -2350,26 +2455,40 @@ function askForShots_() {
 
 /* ── the check: each audit read the way the owner would, before it reaches Logan ── */
 
-// Where an audit stands with the check: 'off', 'waiting', 'pass', or 'flagged'. An audit from before the check (or one whose
-// check went missing) gets one queued.
+// What the check recorded on an audit row: { state: 'edited' | 'pass' | 'flagged', round, fixed, box, logan: [...] }.
+// Rows from before the editor hold plain text ('pass', 'flagged: ...').
+function qaInfo_(row) {
+  var qa = String((row || {}).qa || '');
+  if (!qa) return {};
+  if (qa.charAt(0) === '{') { try { return JSON.parse(qa); } catch (err) { return {}; } }
+  if (qa === 'pass') return { state: 'pass' };
+  if (/^flagged/.test(qa)) return { state: 'flagged', logan: qa.replace(/^flagged:\s*/, '').split(' | ').filter(String) };
+  return { state: 'old' };
+}
+
+// Where an audit stands with the check: 'off', 'waiting', 'pass', or 'flagged'. An audit from before the check, or one
+// whose check went missing, gets one queued.
 function qaState_(l) {
   if (!yes_(setting_('QA_ON'))) return 'off';
   var row = l.audit_slug ? findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug) : null;
   if (!row) return 'off';
-  var qa = String(row.qa || '');
-  if (qa === 'pass') return 'pass';
-  if (/^flagged/.test(qa)) return 'flagged';
-  if (!qa) queueJob_('qa', l.id, l.audit_slug);
+  var info = qaInfo_(row);
+  if (info.state === 'pass' || info.state === 'flagged') return info.state;
+  if (!info.state || info.state === 'edited') queueJob_('qa', l.id, l.audit_slug);
   return 'waiting';
 }
 
-// For the review email: what the check found.
+// For the review email: anything that needs Logan first, then what the check already fixed.
 function qaLines_(l, pad) {
-  var row = l.audit_slug ? findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug) : null, qa = String((row || {}).qa || '');
-  if (qa === 'pass') return pad + 'The check: reads clearly and matches the searches.\n';
-  if (!/^flagged/.test(qa)) return '';
-  return pad + 'Before you approve, the check flagged:\n' + qa.replace(/^flagged:\s*/, '').split(' | ').filter(String)
-    .map(function (t) { return pad + '  - ' + t; }).join('\n') + '\n';
+  var row = l.audit_slug ? findRow_(TAB.audits, HEAD.audits, 'slug', l.audit_slug) : null, info = qaInfo_(row);
+  if (!info.state || info.state === 'old') return '';
+  var out = '';
+  if (info.state === 'flagged') out += pad + 'NEEDS YOU before you approve:\n' + (info.logan || []).map(function (t) { return pad + '  - ' + t; }).join('\n') + '\n';
+  var done = [];
+  if (info.fixed) done.push('fixed ' + info.fixed + ' line' + (info.fixed > 1 ? 's' : '') + ' before it reached you');
+  if (info.box) done.push('left the value box off (' + info.box.replace(/\.$/, '') + ')');
+  if (info.state === 'pass' || done.length) out += pad + 'The check: ' + (done.length ? oxford_(done) : 'nothing to fix') + '.\n';
+  return out;
 }
 
 // The audit as plain text, top of the page down to the ask, the way the check reads it.
@@ -2386,17 +2505,23 @@ function auditPageText_(spec) {
   return main.split('\n').map(function (t) { return t.replace(/\s+/g, ' ').trim(); }).filter(function (t) { return t && t !== '-'; }).join('\n');
 }
 
-// The lines Claude wrote, which a rewrite can change (everything else on the page comes from our data).
-function writtenLines_(spec, l) {
-  var L = [];
-  (spec.highlights || []).forEach(function (h, i) { L.push('Short version ' + (i + 1) + ': ' + h); });
-  (spec.checks || []).forEach(function (c, i) { L.push('Check "' + CHECK_NAMES[i] + '" (' + c.status + '): ' + c.note); });
-  (spec.site_points || []).forEach(function (x) { L.push('Website point (' + x.status + '): ' + x.text); });
-  (spec.moves || []).forEach(function (m, i) { L.push('Move ' + (i + 1) + ': ' + m.title + '. ' + m.why + (m.effort ? ' What it takes: ' + m.effort : '')); });
-  (spec.later || []).forEach(function (t) { L.push('Also worth a look: ' + t); });
-  if (l && l.top_finding) L.push('Biggest finding, for the email (it follows a line naming the search and the town): ' + l.top_finding);
-  if (l && l.fix_1) L.push('First fix, for the email (reads after "I\'d start here:"): ' + l.fix_1);
-  return L.join('\n');
+// The lines Claude wrote, as the JSON the check edits (everything else on the page comes from our data).
+function writtenJson_(spec, l) {
+  return {
+    highlights: (spec.highlights || []).slice(),
+    checks: (spec.checks || []).map(function (c, i) { return { check: CHECK_NAMES[i], status: c.status, note: c.note }; }),
+    site_points: (spec.site_points || []).map(function (x) { return { status: x.status, text: x.text }; }),
+    moves: (spec.moves || []).map(function (m) { return { title: m.title, why: m.why, offer: m.offer, effort: m.effort || '' }; }),
+    later: (spec.later || []).slice(),
+    top_finding: (l && l.top_finding) || '',
+    fix_1: (l && l.fix_1) || ''
+  };
+}
+
+// The writer's own rules, for the check's rewrites: from "Rules that never bend" up to the contact details.
+function writerRules_() {
+  var a = PROMPT_AUDIT.indexOf('# Rules that never bend'), b = PROMPT_AUDIT.indexOf('# Contact details');
+  return a > -1 ? PROMPT_AUDIT.slice(a, b > a ? b : undefined).trim() : '';
 }
 
 function qaParams_(job) {
@@ -2406,57 +2531,109 @@ function qaParams_(job) {
   try { spec = JSON.parse(findRow_(TAB.audits, HEAD.audits, 'slug', job.area).spec_json); } catch (err) { return null; }
   var ev = withShots_(evidenceFor_(l.id), l);
   return {
-    model: setting_('QA_MODEL') || 'claude-sonnet-5-5', max_tokens: 3000, system: PROMPT_QA,
-    messages: [{ role: 'user', content: 'Business: ' + spec.business + ', ' + (l.trade || 'local service business') + ', ' + spec.area + '\n' +
+    model: setting_('QA_MODEL') || 'claude-sonnet-5-5', max_tokens: 12000, system: PROMPT_QA.replace('%WRITER_RULES%', writerRules_()),
+    tools: [{ type: 'web_fetch_20250910', name: 'web_fetch', max_uses: 3, max_content_tokens: 8000 }],
+    messages: [{ role: 'user', content: 'Business: ' + spec.business + ', ' + (l.trade || 'local service business') + ', ' + spec.area +
+      (l.website ? '\nWebsite: ' + siteUrlOf_(l.website) : '') + '\n' +
       'Google Ads: ' + ({ running_ads: 'running ads', no_ads: 'no ads found' }[spec.segment] || 'couldn\'t tell') + '\n\n' +
       'THE PAGE, top to bottom, as the owner reads it:\n' + auditPageText_(spec) + '\n\n' +
-      'THE LINES CLAUDE WROTE (a rewrite can change these; the rest of the page comes from our data):\n' + writtenLines_(spec, l) + '\n\n' +
+      'THE LINES CLAUDE WROTE (rewrite these; the rest of the page comes from our data):\n' + JSON.stringify(writtenJson_(spec, l), null, 1) + '\n\n' +
       (ev ? evidenceText_(ev) : 'EVIDENCE: none saved for this shop.') }]
   };
 }
 
-// What the check found. Problems in the written lines get one rewrite with them spelled out, while Logan hasn't seen the
-// audit yet. Anything left after that, or anything only Logan can fix, comes to him with the problems listed.
+// A rewrite from the check, kept only if it's whole and well formed. Returns the spec fields and email lines, or null.
+function cleanRevision_(r, spec) {
+  if (!r || typeof r !== 'object') return null;
+  var str = function (v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); };
+  var st = function (v) { return ['good', 'gap', 'unknown'].indexOf(v) > -1; };
+  var hl = (Array.isArray(r.highlights) ? r.highlights : []).map(str).filter(String).slice(0, 3);
+  var checks = Array.isArray(r.checks) ? r.checks : [];
+  var moves = Array.isArray(r.moves) ? r.moves : [];
+  if (hl.length < 2 || checks.length !== CHECK_NAMES.length || moves.length !== (spec.moves || []).length) return null;
+  if (!checks.every(function (c) { return c && st(c.status) && str(c.note); })) return null;
+  if (!moves.every(function (m) { return m && str(m.title) && str(m.why); })) return null;
+  return {
+    highlights: hl,
+    checks: checks.map(function (c) { return { status: c.status, note: str(c.note) }; }),
+    moves: moves.map(function (m, i) {
+      var old = spec.moves[i] || {};
+      return { title: str(m.title), why: str(m.why), offer: fitOffer_(OFFERS[m.offer] ? m.offer : old.offer, spec.segment), effort: str(m.effort) };
+    }),
+    site_points: (Array.isArray(r.site_points) ? r.site_points : spec.site_points || []).filter(function (x) { return x && str(x.text) && st(x.status); })
+      .slice(0, 4).map(function (x) { return { status: x.status, text: str(x.text) }; }),
+    later: (Array.isArray(r.later) ? r.later : spec.later || []).map(str).filter(String).slice(0, 2),
+    top_finding: str(r.top_finding),
+    fix_1: str(r.fix_1).replace(/\.$/, '')
+  };
+}
+
+// What the check found, applied. The check edits the written lines in place and can take the value box off; then a second
+// pass reads the edited audit to make sure the fixes hold. Logan sees the finished audit, with only what needs him flagged.
 function applyQa_(job, q) {
   var l = findLead_('id', job.lead_id), row = findRow_(TAB.audits, HEAD.audits, 'slug', job.area);
   if (!l || !row || l.audit_slug !== job.area) return 'stale';
-  var problems = (Array.isArray(q.problems) ? q.problems : []).filter(function (p) { return p && p.problem; }).slice(0, 8)
-    .map(function (p) { return { where: String(p.where || '').slice(0, 160), part: p.part === 'data' ? 'data' : 'written', problem: String(p.problem), fix: String(p.fix || '') }; });
-  var ask = String(q.for_logan || '').trim();
-  if (!problems.length && !ask) {
-    updateRow_(TAB.audits, HEAD.audits, row, { qa: 'pass' });
-    logEvent_(l.id, l.email, 'qa_pass', job.area);
-    return 'pass';
+  var info = qaInfo_(row);
+  if (info.state === 'old') info = {};
+  var round = Number(info.round || 0) + 1, spec;
+  try { spec = JSON.parse(row.spec_json); } catch (err) { return 'bad spec'; }
+  var problems = (Array.isArray(q.problems) ? q.problems : []).filter(function (p) { return p && p.problem; }).slice(0, 8);
+  var logan = (Array.isArray(q.for_logan) ? q.for_logan : q.for_logan ? [q.for_logan] : []).map(function (t) { return String(t).replace(/\s+/g, ' ').trim(); })
+    .filter(String).slice(0, 4);
+  // Anything for Logan from the first read carries over to the second.
+  (info.logan || []).forEach(function (t) { if (logan.indexOf(t) < 0) logan.push(t); });
+  var changed = 0, leadFields = {};
+  if (q.drop_box && spec.opp) {
+    spec.opp = null;
+    info.box = String(q.box_reason || 'its numbers didn\'t hold up').replace(/\s+/g, ' ').trim().slice(0, 200);
+    changed++;
   }
-  var said = problems.map(function (p) { return (p.where ? p.where + ': ' : '') + p.problem; });
-  if (problems.some(function (p) { return p.part === 'written'; }) && !qaRewrites_(l.id) && l.status === 'audit_ready') {
-    updateRow_(TAB.audits, HEAD.audits, row, { qa: 'rewritten: ' + JSON.stringify(problems) });
-    updateLead_(l, { status: l.source === 'cold' ? 'researching' : 'requested', audit_slug: '' });
-    queueJob_('audit', l.id, '');
-    logEvent_(l.id, l.email, 'qa_rewrite', said.join(' | ').slice(0, 900));
-    return 'rewrite';
+  var rev = cleanRevision_(q.revised, spec);
+  if (rev) {
+    var was = writtenJson_(spec, l), n = 0;
+    var same = function (a, b) { return JSON.stringify(a) === JSON.stringify(b); };
+    n += rev.highlights.filter(function (h, i) { return h !== was.highlights[i]; }).length;
+    n += rev.checks.filter(function (c, i) { return !was.checks[i] || c.note !== was.checks[i].note || c.status !== was.checks[i].status; }).length;
+    n += rev.moves.filter(function (m, i) { return !was.moves[i] || m.title !== was.moves[i].title || m.why !== was.moves[i].why; }).length;
+    if (!same(rev.site_points, was.site_points)) n++;
+    if (!same(rev.later, was.later)) n++;
+    spec.highlights = rev.highlights; spec.checks = rev.checks; spec.moves = rev.moves; spec.site_points = rev.site_points; spec.later = rev.later;
+    if (rev.top_finding && rev.top_finding !== l.top_finding) { leadFields.top_finding = rev.top_finding; n++; }
+    if (rev.fix_1 && rev.fix_1 !== l.fix_1) { leadFields.fix_1 = rev.fix_1; n++; }
+    info.fixed = Number(info.fixed || 0) + n;
+    changed += n;
   }
-  var flags = (ask ? ['For you: ' + ask] : []).concat(said);
-  updateRow_(TAB.audits, HEAD.audits, row, { qa: 'flagged: ' + flags.join(' | ').replace(/\s*\n\s*/g, ' ').slice(0, 2000) });
-  logEvent_(l.id, l.email, 'qa_flagged', flags.join(' | ').slice(0, 900));
-  return 'flagged';
+  var unfixed = problems.filter(function (p) { return p.fixed_by !== 'logan'; });
+  info.round = round;
+  if (changed || logan.length) updateRow_(TAB.audits, HEAD.audits, row, { spec_json: JSON.stringify(spec) });
+  if (Object.keys(leadFields).length) updateLead_(l, leadFields);
+  // Edits get one more read, to make sure the fixes hold. Two rounds at most.
+  if ((changed || (unfixed.length && !rev)) && round < 2) {
+    info.state = 'edited';
+    if (logan.length) info.logan = logan;
+    updateRow_(TAB.audits, HEAD.audits, row, { qa: JSON.stringify(info) });
+    appendRow_(TAB.jobs, HEAD.jobs, { job_id: newId_('J'), kind: 'qa', lead_id: l.id, area: job.area, status: 'queued', attempts: 0, created: new Date(), updated: new Date(), est_cost_usd: 0 });
+    logEvent_(l.id, l.email, 'qa_edited', changed + ' change' + (changed === 1 ? '' : 's') + (info.box ? '; value box off: ' + info.box : ''));
+    return 'edited';
+  }
+  // Still wrong after two rounds with no rewrite to fix it: that goes to Logan too.
+  if (unfixed.length && !rev && !q.drop_box) logan = logan.concat(unfixed.slice(0, 3).map(function (p) { return 'Couldn\'t fix: ' + (p.where ? p.where + ': ' : '') + p.problem; }));
+  info.state = logan.length ? 'flagged' : 'pass';
+  if (logan.length) info.logan = logan;
+  updateRow_(TAB.audits, HEAD.audits, row, { qa: JSON.stringify(info) });
+  logEvent_(l.id, l.email, logan.length ? 'qa_flagged' : 'qa_pass', logan.length ? logan.join(' | ').slice(0, 900) : (info.fixed ? info.fixed + ' lines fixed' : 'clean'));
+  return info.state;
 }
 
-// How many times the check has sent this shop's audit back in the last three days.
-function qaRewrites_(leadId) {
-  return readRows_(TAB.audits, HEAD.audits).filter(function (r) {
-    return r.lead_id === leadId && /^rewritten/.test(r.qa || '') && Date.now() - new Date(r.created).getTime() < 3 * 864e5;
-  }).length;
-}
-
-// For a rewrite: what the check (or a flagged audit Logan sent back) found in the last version.
+// For a rebuild Logan asks for: what the check flagged on the last version.
 function qaNotesFor_(leadId) {
   var rows = readRows_(TAB.audits, HEAD.audits).filter(function (r) { return r.lead_id === leadId; }), last = rows[rows.length - 1];
   var qa = String((last || {}).qa || ''), lines = [];
   if (/^rewritten: /.test(qa)) {
     try { lines = JSON.parse(qa.replace(/^rewritten: /, '')).map(function (p) { return (p.where ? p.where + ': ' : '') + p.problem + (p.fix ? ' Better: ' + p.fix : ''); }); } catch (err) {}
-  } else if (/^flagged: /.test(qa) && !/couldn't run/.test(qa)) {
-    lines = qa.replace(/^flagged: /, '').split(' | ').filter(function (t) { return t && !/^For you: /.test(t); });
+  } else {
+    var info = qaInfo_(last);
+    if (info.state === 'flagged') lines = (info.logan || []).filter(function (t) { return !/couldn't run/.test(t); });
   }
   if (!lines.length) return '';
   return '\n\nA careful reader went through the last version of this audit the way the owner would, and flagged these. Fix every one, ' +
@@ -2520,7 +2697,7 @@ function showSearchShotsNeeded() {
     '\n\nSearch each on your phone and save the whole results page as a PDF (Share, then Print or Create PDF), or take normal screenshots ' +
     '(the top of the results, then a scroll or two). Put them in the "Ledge search screenshots" Drive folder, each named after its search ' +
     '("electrician chestermere.pdf") so the match is certain. ' +
-    'Then use "Read new search screenshots now", and rebuild the audits that should use them.', SpreadsheetApp.getUi().ButtonSet.OK);
+    'Then use "Read new search screenshots now". Audits waiting on a search carry on by themselves at the next run.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 // Hourly: a phone capture of each home page an audit is being built for, from Google's PageSpeed test, kept in Drive.
@@ -2570,6 +2747,122 @@ function siteShot_(leadId) {
 }
 
 /* ══════════════════════════ the engine (Claude API, batch) ══════════════════════════ */
+
+/* ── which prospects come first ── */
+
+// Whether a kind of business is one of the TRADES. One we have no searches for isn't held on that account.
+function tradeOn_(trade) {
+  var row = tradeRow_(trade, '');
+  if (row < 0) return true;
+  return String(setting_('TRADES') || '').split(',').some(function (t) { return t.trim() && tradeRow_(t.trim(), '') === row; });
+}
+// A rough worth for a kind of business before its searches are in: the middle of its biggest job's price.
+function tradeWorth_(trade) {
+  var jv = jobValueFor_(trade, '');
+  if (!jv) return 0;
+  var job = jv[3] || jv[2];
+  return (job[1] + job[2]) / 2;
+}
+function pluralJob_(job) { return /s$/.test(job) ? job : /\b(a|of|for)\b/.test(job) ? 'jobs like ' + job : job + 's'; }
+
+// How strong a prospect is, 0 to 100, from its evidence, with the reasons in plain words:
+//   what the work is worth (up to 40): the work a month of ads could book in the value box;
+//   room to grow on Google (up to 30): below the top three on the map, rivals advertising when they don't, Google Verified
+//     listings on their searches without them;
+//   how likely ads are to work (up to 30): rating and reviews, a website with tap-to-call or a form, a claimed profile.
+// Audits are written, reviewed, and emailed highest first.
+function priorityOf_(ev) {
+  if (!ev) return { score: 0, why: '' };
+  var lines = [], searches = (ev.searches || []).filter(function (s) { return s.ran; }), s0 = searches[0] || null, y = (s0 || {}).you || {};
+  var p = oppSane_(ev.opp), worth = 10;
+  if (p && p.withheld) worth = 0;
+  else if (oppPays_(p)) {
+    var month = p.jobs ? (p.low + p.high) / 2 : Math.max(1, p.year_jobs || 0) * (p.job_low + p.job_high) / 2 / 12;
+    worth = month >= 15000 ? 40 : month >= 8000 ? 32 : month >= 4000 ? 24 : month >= 2000 ? 16 : 8;
+    var job = pluralJob_(p.job);
+    lines.push(job.charAt(0).toUpperCase() + job.slice(1) + ' could bring about $' + money_(Math.round(month / 100) * 100) + ' a month in ' + p.where + ' at typical rates');
+  }
+  var room = 0, roomLines = [];
+  var spot = s0 ? mapSpot_(s0) : {};
+  if (s0 && !spot.top) { room += 12; roomLines.push(spot.below ? '#' + spot.below + ' on the map for "' + s0.keyword + '"' : 'not in the three map spots for "' + s0.keyword + '"'); }
+  else if (s0 && spot.top > 1) { room += 6; roomLines.push('#' + spot.top + ' on the map for "' + s0.keyword + '"'); }
+  var advertisers = (ev.rivals || []).filter(function (r) { return r.count; }).length;
+  if (ev.segment === 'no_ads') { room += advertisers ? 10 : 6; roomLines.push(advertisers ? 'no Google ads, while ' + word_(advertisers) + ' of the shops at the top of the map ' + (advertisers > 1 ? 'run' : 'runs') + ' them' : 'no Google ads'); }
+  else if (ev.segment === 'running_ads') {
+    var missed = s0 && (s0.from || {}).ads === 'screenshot' && !y.ads && !y.lsa;
+    room += missed ? 8 : 4; roomLines.push(missed ? 'runs Google ads, but they didn\'t show on "' + s0.keyword + '"' : 'already runs Google ads');
+  }
+  var lsaShown = searches.some(function (s) { return (s.lsa || []).length && (s.from || {}).lsa === 'screenshot'; });
+  if (lsaShown && !searches.some(function (s) { return (s.you || {}).lsa; })) { room += 8; roomLines.push('not in the Google Verified listings on their searches'); }
+  room = Math.min(30, room);
+  var pr = ev.profile || {}, st = ev.site || {}, fit = 0;
+  var rating = Number(pr.rating || 0), reviews = Number(pr.reviews || 0);
+  fit += rating >= 4.5 && reviews >= 50 ? 15 : rating >= 4.3 && reviews >= 20 ? 10 : reviews >= 10 ? 5 : 0;
+  fit += st.ok && (Number(st.tel_links || 0) > 0 || Number(st.forms || 0) > 0) ? 8 : st.ok ? 4 : 0;
+  fit += pr.claimed === false ? 0 : pr.claimed ? 4 : 2;
+  fit = Math.min(30, fit);
+  var score = worth + room + fit;
+  lines = lines.concat(roomLines.slice(0, 2));
+  if (pr.reviews != null) lines.push(rating + ' stars from ' + money_(reviews) + ' reviews');
+  return { score: score, tier: score >= 65 ? 'high' : score >= 45 ? 'medium' : 'low', why: lines.join('; ') };
+}
+function rankLead_(l, ev) {
+  var p = priorityOf_(withShots_(ev, l));
+  updateLead_(l, { priority: p.score, priority_why: p.why });
+  l.priority = p.score; l.priority_why = p.why;
+  return p;
+}
+// For the review emails.
+function priorityLine_(l, pad) {
+  if (l.priority === '' || l.priority == null) return '';
+  var n = Number(l.priority), tier = n >= 65 ? 'high' : n >= 45 ? 'medium' : 'low';
+  return pad + 'Priority: ' + n + ' of 100 (' + tier + ')' + (l.priority_why ? '. ' + l.priority_why : '') + '\n';
+}
+
+// A cold prospect is held (left in the Sheet, not written up or emailed) when its trade isn't in TRADES, or when search
+// ads don't pay for its work at typical rates. A site-form lead is never held: they asked. Returns true when held.
+function holdLead_(l, ev) {
+  if (l.source !== 'cold') return false;
+  var why = !tradeOn_(l.trade) ? 'Held (trade off): ' + (l.trade || 'this kind of business') + ' isn\'t in TRADES'
+    : ev && ev.opp && !oppPays_(oppSane_(ev.opp)) ? 'Held (low fit): search ads don\'t pay for ' + pluralJob_(ev.opp.job) + ' at typical rates' : '';
+  if (!why) return false;
+  updateLead_(l, { status: 'held', priority: 0, priority_why: why, audit_slug: '', next_touch: '' });
+  logEvent_(l.id, l.email, 'held', why);
+  return true;
+}
+
+// Hourly: cold prospects that haven't been emailed are held while their trade is off TRADES, and come back (with fresh
+// searches) once it's on again, the way roofing goes off for the winter and back in March.
+function holdOffTrades_() {
+  var waiting = ['researching', 'audit_ready', 'awaiting_review', 'audit_approved', 'ready_to_send'];
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (l.source !== 'cold' || Number(l.touches || 0)) return;
+    if (waiting.indexOf(l.status) > -1 && !tradeOn_(l.trade)) { holdLead_(l, null); return; }
+    if (l.status === 'held' && /^Held \(trade off\)/.test(l.priority_why || '') && tradeOn_(l.trade)) {
+      updateLead_(l, { status: 'researching', priority: '', priority_why: '' });
+      queueJob_('audit', l.id, '');
+      logEvent_(l.id, l.email, 'unheld', (l.trade || '') + ' is back in TRADES');
+    }
+  });
+}
+
+// Once, on the first hourly run after ranking arrived (17): prospects already in the pipeline are ranked from their searches, and the ones in a
+// trade that's off, or whose work search ads can't pay for, are held. Approved ones too: none has gone out.
+function rankWaitingLeads_() {
+  var waiting = ['researching', 'audit_ready', 'awaiting_review', 'audit_approved', 'ready_to_send'], evs = {};
+  readRows_(TAB.evidence, HEAD.evidence).forEach(function (r) { evs[r.lead_id] = r; }); // the latest for each shop
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (waiting.indexOf(l.status) < 0 || Number(l.touches || 0)) return;
+    var ev = null;
+    try { if (evs[l.id]) { ev = JSON.parse(evs[l.id].evidence_json); ev._created = evs[l.id].created; } } catch (err) {}
+    if (holdLead_(l, ev)) {
+      readRows_(TAB.jobs, HEAD.jobs).filter(function (j) { return j.lead_id === l.id && j.status === 'queued'; })
+        .forEach(function (j) { updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'done', detail: 'Held', updated: new Date() }); });
+      return;
+    }
+    if (ev) rankLead_(l, ev);
+  });
+}
 
 function weeklyProspects() {
   ensureSchema_();
@@ -2657,15 +2950,24 @@ function submitJobs_() {
     return;
   }
   // Audits wait for current evidence (gatherEvidence_ runs just before this), and for Logan's phone screenshots of their searches.
-  var withEvidence = {}, held = shotsHeld_(shotsWanted_());
-  readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) { if (j.kind === 'audit' && j.status === 'queued' && !held[j.lead_id] && freshEvidence_(j.lead_id)) withEvidence[j.lead_id] = true; });
+  var withEvidence = {}, held = shotsHeld_(shotsWanted_()), rank = {};
+  readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) {
+    if (j.kind !== 'audit' || j.status !== 'queued' || held[j.lead_id]) return;
+    var ev = freshEvidence_(j.lead_id), l = ev ? findLead_('id', j.lead_id) : null;
+    if (!ev || !l) return;
+    if (l.status === 'held') { updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'done', detail: 'Held', updated: new Date() }); return; }
+    // A cold prospect whose work search ads can't pay for isn't written up: the audit would have nothing to offer it.
+    if (holdLead_(l, ev)) { updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'done', detail: 'Held: low fit', updated: new Date() }); return; }
+    withEvidence[j.lead_id] = true;
+    rank[j.lead_id] = Number(l.priority || 0);
+  });
   // Account reports with a site audit wait for the site checks (gatherSiteChecks_ runs just before this too).
   var siteWaiting = {};
   readRows_(TAB.exports, HEAD.exports).forEach(function (e) { if (e.status === 'report_queued' && yes_(e.site) && !e.site_json) siteWaiting[e.lead_id] = true; });
   var jobs = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) {
     return j.status === 'queued' && (j.kind !== 'audit' || withEvidence[j.lead_id] || !findLead_('id', j.lead_id)) &&
       (j.kind !== 'account_report' || !siteWaiting[j.lead_id]);
-  }).slice(0, 25);
+  }).sort(function (a, b) { return (rank[b.lead_id] || 0) - (rank[a.lead_id] || 0); }).slice(0, 25); // the strongest prospects first
   if (!jobs.length) return;
   var requests = [];
   jobs.forEach(function (j) {
@@ -2764,7 +3066,12 @@ function handleResult_(job, result) {
     if (!retry && job.kind === 'qa') {
       // The check couldn't run: the audit goes to Logan rather than waiting forever.
       var qr = findRow_(TAB.audits, HEAD.audits, 'slug', job.area);
-      if (qr && !qr.qa) updateRow_(TAB.audits, HEAD.audits, qr, { qa: 'flagged: The check couldn\'t run (' + why + '), so read this one closely.' });
+      var qi = qaInfo_(qr);
+      if (qr && qi.state !== 'pass' && qi.state !== 'flagged') {
+        qi.state = 'flagged';
+        qi.logan = ['The check couldn\'t ' + (qi.round ? 'finish its second read' : 'run') + ' (' + why + '), so give this one a closer look.'];
+        updateRow_(TAB.audits, HEAD.audits, qr, { qa: JSON.stringify(qi) });
+      }
     } else if (!retry && (job.kind === 'account_report' || job.kind === 'monthly_report')) {
       var rl = findLead_('id', job.lead_id) || {};
       ownerMail_((job.kind === 'monthly_report' ? 'Monthly report failed: ' : 'Account audit report failed: ') + (rl.business || job.lead_id),
@@ -2835,7 +3142,7 @@ function applyAudit_(job, a) {
         shot: s.shot ? { captured: s.shot.captured } : null };
     }),
     estimates: ev.estimates || [], estimate_where: ev.estimate_where || '', estimate_total: ev.estimate_total || 0,
-    market: ev.market || null, opp: ev.opp || null, ads: ev.ads ? { count: ev.ads.count, capped: ev.ads.capped, domain: ev.ads.domain } : null,
+    market: ev.market || null, opp: oppPays_(oppSane_(ev.opp)) ? oppSane_(ev.opp) : null, ads: ev.ads ? { count: ev.ads.count, capped: ev.ads.capped, domain: ev.ads.domain } : null,
     rivals: ev.rivals || [], profile: ev.profile ? { name: ev.profile.name, rating: ev.profile.rating, reviews: ev.profile.reviews } : null,
     site_host: domainOf_((ev.site || {}).url),
     site_points: (Array.isArray(a.site_points) ? a.site_points : []).filter(function (x) { return x && x.text && ['good', 'gap', 'unknown'].indexOf(x.status) > -1; })
@@ -2847,6 +3154,9 @@ function applyAudit_(job, a) {
   };
   appendRow_(TAB.audits, HEAD.audits, { slug: slug, lead_id: l.id, created: new Date(), business: spec.business, spec_json: JSON.stringify(spec) });
   fields.audit_slug = slug;
+  var pri = priorityOf_(ev);
+  fields.priority = pri.score;
+  fields.priority_why = pri.why;
   fields.top_finding = a.top_finding;
   fields.fix_1 = String(a.fix_1).replace(/\.$/, '');
   // A lead that has moved on (booked the account audit, signed up) keeps its status; the audit is just stored.
@@ -3879,7 +4189,7 @@ function renderAuditSpec_(spec, o) {
   var seg = legacy ? 'unknown' : spec.segment;
   var searches = spec.searches || [];
   var price = money_(o.price_audit), credit = Number(o.credit_days || 0);
-  var ow = oppWords_(spec.opp);
+  var opp = oppPays_(oppSane_(spec.opp)) ? oppSane_(spec.opp) : null, ow = oppWords_(opp);
   var full = Number(o.price_full || 0) > Number(o.price_audit || 0) && siteFindings_(spec);
   var gst = o.gst ? ' + GST' : '';
   var shorts = (spec.highlights || []).filter(String);
@@ -3898,8 +4208,8 @@ function renderAuditSpec_(spec, o) {
       oxford_(spec.market.top.slice(0, 4).map(function (t) { return '“' + t[0] + '” (' + money_(t[1]) + ')'; })) + '.' :
       (spec.estimates || []).length > 1 ? 'Google estimates about ' + money_(spec.estimate_total) + ' searches a month in ' + spec.estimate_where +
       ' across searches like these: ' + oxford_(spec.estimates.map(function (e) { return '“' + e.keyword + '” (' + money_(e.volume) + ')'; })) + '.' : '',
-    opp_job: spec.opp ? spec.opp.job : '', opp_where: spec.opp ? spec.opp.where : '', opp_price: ow.price,
-    opp_price_label: spec.opp ? 'A typical ' + spec.opp.job + ' in the Calgary area' : '', opp_searches: ow.searches, opp_cpc: ow.cpc, opp_cpc_label: ow.cpc_label,
+    opp_job: opp ? opp.job : '', opp_where: opp ? opp.where : '', opp_price: ow.price,
+    opp_price_label: opp ? 'A typical ' + opp.job + ' in the Calgary area' : '', opp_searches: ow.searches, opp_cpc: ow.cpc, opp_cpc_label: ow.cpc_label,
     site_shot: shotUrl, site_host: spec.site_host || 'your home page',
     method_note: 'Searches were run ' + (spec.checked || spec.date) + (spec.checked_time ? ' at ' + spec.checked_time : '') + ' from ' + spec.area +
       ', on a phone and on a computer. Results shift through the day, and ads change by the hour, so treat positions as a snapshot.'
@@ -3907,12 +4217,12 @@ function renderAuditSpec_(spec, o) {
     short: shorts.map(function (h, i) { return '      <li><span>' + (i + 1) + '</span><span>' + esc_(h) + '</span></li>'; }).join('\n'),
     short_hidden: shorts.length ? '' : 'hidden',
     summary_hidden: shorts.length || !spec.summary ? 'hidden' : '',
-    opp_hidden: spec.opp ? '' : 'hidden',
+    opp_hidden: opp ? '' : 'hidden',
     opp_takeaway: ow.takeaway_html,
     opp_how: ow.how.map(function (t) { return '          <li>' + esc_(t) + '</li>'; }).join('\n'),
     searches: searches.map(function (s) { return searchCard_(s, spec); }).join('\n'),
     searches_hidden: searches.length ? '' : 'hidden',
-    estimates_hidden: spec.opp ? 'hidden' : (spec.market && spec.market.total) || ((spec.estimates || []).length > 1 && spec.estimate_total) ? '' : 'hidden',
+    estimates_hidden: opp ? 'hidden' : (spec.market && spec.market.total) || ((spec.estimates || []).length > 1 && spec.estimate_total) ? '' : 'hidden',
     checks: rows.map(function (r) {
       var st = PILL[r.status] ? r.status : 'unknown', key = st === 'leak' ? 'gap' : st;
       return '      <li>' + ICONS[key] + '<p class="head"><b>' + esc_(r.name) + '</b><span class="st ' + key + '">' + esc_(PILL[st]) + '</span></p>' +
@@ -3997,7 +4307,7 @@ function searchCard_(s, spec) {
   }).join('') + '</ul>');
   var pack = (s.map_pack || []).length ? s.map_pack : (s.maps_top || []).slice(0, 3);
   if (pack.length) {
-    var mine = pack.filter(function (e) { return e.you; })[0], rank = y.map_pack || y.maps;
+    var mine = pack.filter(function (e) { return e.you; })[0], rank = mapSpot_(s).below || 0;
     var place = function (e, n, you) {
       return '<li' + (you ? ' class="you"' : '') + '><span class="pin"><span>' + esc_(String(n)) + '</span></span><span><span class="n">' + esc_(e.name) +
         (you ? '<span class="tag">You</span>' : '') + '</span>' + rating_(e) + (e.paid ? '<span class="rate">Sponsored</span>' : '') + '</span></li>';
@@ -4012,9 +4322,11 @@ function searchCard_(s, spec) {
   var parts = [];
   if (y.lsa) parts.push('You\'re #' + y.lsa + ' in the Google Verified listings.');
   if (y.ads) parts.push('Your ad showed #' + y.ads + ' in the sponsored results.');
-  if (y.map_pack) parts.push('You\'re #' + y.map_pack + ' on the map.');
-  else if (y.maps) parts.push('You\'re #' + y.maps + ' on the map, below the three that show here.');
-  else if (s.maps_total) parts.push('You\'re not in the first ' + s.maps_total + ' on the map.');
+  var spot = mapSpot_(s);
+  if (spot.top) parts.push('You\'re #' + spot.top + ' on the map.');
+  else if (spot.below) parts.push('You\'re #' + spot.below + ' on the map, below the three that show here.');
+  else if (spot.outside) parts.push('You\'re not in the three map spots on this search.');
+  else if (spot.total) parts.push('You\'re not in the first ' + spot.total + ' on the map.');
   parts.push(y.organic ? 'Your website is #' + y.organic + ' in the results below the map.' : 'Your website isn\'t in the first 20 results below the map.');
   var line = parts.join(' ');
   var meta = [];
@@ -4026,6 +4338,19 @@ function searchCard_(s, spec) {
     '      <p class="q-meta">' + meta.map(function (m) { return '<span>' + esc_(m) + '</span>'; }).join('') + '</p>\n' + html +
     '      <p class="you-line">' + ICONS.you + '<span>' + esc_(line) + '</span></p>\n' +
     '    </li>';
+}
+
+// The shop's one map position on a search, matched to the three map spots the page shows: one of them, further down (#4
+// and below), or not found. When Google's two lists disagree (Maps has it #2, but the search page's three don't include
+// it), the search page wins: it's what a customer sees.
+function mapSpot_(s) {
+  var y = s.you || {}, pack = ((s.map_pack || []).length ? s.map_pack : s.maps_top || []).slice(0, 3);
+  var shown = pack.filter(function (e) { return e.you; })[0];
+  if (shown) return { top: Number(shown.rank) || pack.indexOf(shown) + 1 };
+  if (y.map_pack && y.map_pack <= 3) return { top: y.map_pack };
+  if (y.maps && y.maps > 3) return { below: y.maps };
+  if (y.maps) return { outside: true };
+  return { none: true, total: s.maps_total || 0 };
 }
 
 function oxford_(items, word) {
