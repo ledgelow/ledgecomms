@@ -13,6 +13,7 @@
 //   TURNSTILE_SITE_KEY  Turnstile site key (optional; the form works without it)
 //   TURNSTILE_SECRET    Turnstile secret key (optional while testing)
 //   BOOKING_URL         booking page link (optional; booking links are hidden when it's empty)
+//   GA4_ID              Google Analytics 4 Measurement ID, G-... (optional; no analytics when it's empty)
 
 export default {
   async fetch(request, env, ctx) {
@@ -25,11 +26,11 @@ export default {
     const page = path.match(/^\/(audit|proposal|report)\/([^/]+)$/);
     if (page && page[2] !== "sample" && request.method === "GET") {
       const res = await hubPage(env, page[1], page[2]);
-      if (res) return fillPageValues(res, env);
+      if (res) return fillPageValues(res, env, null, res.status === 404 ? "Not found" : PAGE_GROUP[page[1]]);
     }
 
     const pricing = (path === "/" || path === "/pricing") && request.method === "GET" ? await livePricing(env, ctx) : null;
-    return fillPageValues(await env.ASSETS.fetch(request), env, pricing);
+    return fillPageValues(await env.ASSETS.fetch(request), env, pricing, siteGroup(path));
   },
 };
 
@@ -326,9 +327,69 @@ main{max-width:34rem;margin:0 auto;padding:72px max(16px,env(safe-area-inset-lef
 
 // Fills in values that live in Cloudflare settings, so changing the booking link or adding the
 // spam check never needs a code change.
-function fillPageValues(res, env, pricing) {
+/* ───────────── Google Analytics ───────────── */
+
+// Each page's content group in GA4 (Reports > Engagement > Pages and screens, then pick "Content group"), so audit visits
+// read apart from the site's own pages without any setup in GA.
+const PAGE_GROUP = { audit: "Audit", proposal: "Proposal", report: "Account report" };
+function siteGroup(path) {
+  const known = { "/": "Home", "/pricing": "Pricing", "/privacy": "Privacy", "/audit/sample": "Sample audit", "/proposal/sample": "Sample proposal", "/report/sample": "Sample report" };
+  return known[path] || "Other";
+}
+
+// The GA4 tag, when GA4_ID is set. What it sends and what it leaves out:
+//   - the page's address without its query string (utm_ tags kept), so nothing a link carries ends up in GA;
+//   - its content group (above);
+//   - generate_lead when the site's audit form goes through, quote_request when the ask on an audit does (with the offer
+//     picked), proposal_approved when a proposal is approved, and book_call_click on any booking link.
+// A browser that has opened any page with ?ledge_me=1 sends nothing from then on, so Logan's own checks of audits and
+// proposals (the links in the pipeline's emails to him carry it) don't count as visits. ?ledge_me=0 undoes it.
+function analyticsTag(id, group) {
+  return `<script>
+(function () {
+  var ID = ${JSON.stringify(id)}, GROUP = ${JSON.stringify(group || "Other")}, me = false, was = null, m = location.search.match(/[?&]ledge_me=([01])/);
+  try { was = localStorage.getItem("ledge_me"); if (m) localStorage.setItem("ledge_me", m[1]); me = (m ? m[1] : was) === "1"; } catch (e) { me = !!m && m[1] === "1"; }
+  if (m && m[1] !== (was || "0")) document.addEventListener("DOMContentLoaded", function () {
+    var n = document.createElement("div");
+    n.textContent = m[1] === "1" ? "Google Analytics now leaves this browser out." : "This browser counts in Google Analytics again.";
+    n.style.cssText = "position:fixed;left:16px;right:16px;bottom:16px;z-index:99;max-width:26rem;margin:0 auto;padding:12px 16px;border-radius:10px;background:#0C1630;color:#fff;font:15px/1.4 system-ui,sans-serif;text-align:center";
+    document.body.appendChild(n);
+    setTimeout(function () { n.remove(); }, 5000);
+  });
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { window.dataLayer.push(arguments); };
+  if (me) return;
+  var s = document.createElement("script");
+  s.async = true; s.src = "https://www.googletagmanager.com/gtag/js?id=" + ID;
+  document.head.appendChild(s);
+  var utm = location.search.replace(/^\\?/, "").split("&").filter(function (p) { return /^utm_[a-z_]+=/.test(p); }).join("&");
+  gtag("js", new Date());
+  gtag("config", ID, { page_location: location.origin + location.pathname + (utm ? "?" + utm : ""), content_group: GROUP });
+  var EV = { "audit-request": "generate_lead", "quote-request": "quote_request", "approve": "proposal_approved" }, f = window.fetch;
+  if (f) window.fetch = function (u, o) {
+    var p = f.apply(window, arguments), k = String(u).match(/\\/api\\/(audit-request|quote-request|approve)$/);
+    if (k && o && /^post$/i.test(o.method || "")) p.then(function (r) {
+      if (!r.ok) return;
+      r.clone().json().then(function (j) {
+        if (!j || !j.ok) return;
+        var extra = { content_group: GROUP };
+        try { if (o.body && o.body.get && o.body.get("offer")) extra.offer = String(o.body.get("offer")); } catch (e) {}
+        gtag("event", EV[k[1]], extra);
+      }, function () {});
+    }, function () {});
+    return p;
+  };
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.closest && e.target.closest("a[data-booking]")) gtag("event", "book_call_click", { content_group: GROUP });
+  }, true);
+})();
+</script>`;
+}
+
+function fillPageValues(res, env, pricing, group) {
   const type = res.headers.get("content-type") || "";
   if (!type.includes("text/html")) return res;
+  const ga = (env.GA4_ID || "").trim().toUpperCase();
 
   const booking = (env.BOOKING_URL || "").trim();
   const siteKey = (env.TURNSTILE_SITE_KEY || "").trim();
@@ -372,6 +433,7 @@ function fillPageValues(res, env, pricing) {
     })
     .on("head", {
       element(el) {
+        if (/^G-[A-Z0-9]{4,16}$/.test(ga)) el.append(analyticsTag(ga, group), { html: true });
         if (siteKey) el.append('<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>', { html: true });
       },
     })

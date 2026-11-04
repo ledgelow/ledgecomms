@@ -15,7 +15,130 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 2, night): the check fixes what it finds; you only see what needs you
+## Where you are (Nov 4): Google Analytics and a privacy page
+
+The new site had no analytics: the GA4 tag lived in Squarespace, so the property has shown nothing since the switch on
+Oct 28. Now the Worker adds GA4 to every page (site, audits, proposals, reports) once `GA4_ID` is set in Cloudflare.
+- **Each page is in a content group** (Home, Pricing, Privacy, Audit, Proposal, Account report, the samples), so audit
+  visits read apart from the site's own pages. In GA4: Reports > Engagement > Pages and screens, then switch the first
+  column to "Content group".
+- **Events:** `generate_lead` (the site's audit form went through), `quote_request` (the ask on an audit, with the offer
+  picked), `proposal_approved`, and `book_call_click` (any booking link).
+- **Nothing a link carries reaches GA:** page addresses are sent without their query string (utm tags kept).
+- **Your own visits are left out.** Any browser that opens a page with `?ledge_me=1` sends nothing from then on (a note
+  at the bottom confirms it). The audit, proposal, and report links in the pipeline's emails to you carry it, so
+  checking an audit from a review email never counts. Links to shops never carry it. `?ledge_me=0` undoes it.
+- **Per-shop opens stay on the Leads tab** (`audit_opened`, `audit_opens`): that's who read their audit. GA is the
+  overall picture.
+- **Privacy page** at /privacy/, linked from every footer: what we collect, the service providers, Google Analytics with
+  Google's opt-out, and how to ask for a copy or deletion. Google Analytics' terms require one.
+
+Set it up (10 minutes):
+1. **The Measurement ID.** GA4 > Admin > Data streams > the ledgecommunications.com web stream > copy the Measurement ID
+   (starts with G-). Use the existing stream so the Squarespace history stays in the same property.
+2. **Cloudflare.** Workers & Pages > ledgecomms > Settings > Variables and Secrets > Add: type Text, name `GA4_ID`, value
+   the Measurement ID, then Deploy. It's not a secret (it's in every page's code), and `keep_vars` keeps it through
+   GitHub deploys.
+3. **Ship it:** upload the files to GitHub, and replace `Code.gs` and `Templates.gs` in Apps Script.
+4. **Check it:** open ledgecommunications.com on your phone and watch GA4 > Reports > Realtime. Then open
+   ledgecommunications.com/?ledge_me=1 in each browser you use (phone and laptop) to leave them out.
+5. **Key events:** GA4 > Admin > Key events > New key event, and add `generate_lead`, `quote_request`, and
+   `proposal_approved`.
+6. Optional: GA4 > Admin > Data collection > Data retention, set to 14 months (the default is 2).
+
+## Where you were (Nov 3, night): homeowner shops only, each measured on its biggest job
+
+The first wave had shops that don't really do homeowner work (a commercial overhead door company, a luxury general
+contractor listed as an electrician, an electrical shop for builders), and every shop was measured on its trade's broad
+searches. Now:
+- **The home page is read first.** Before any search money is spent, the small model reads each prospect's home page:
+  does it do its trade for homeowners, which of our priced big jobs it offers, and who it mostly works for. A cold
+  prospect that mostly serves businesses, industry, or builders, or doesn't do the trade for homes, is held as
+  `Held (not residential)` with what its page says. Site-form leads are never held. A page that can't be read (too
+  little text, a script-built site) holds nothing. Turn it off with `FIT_CHECK`.
+- **Each shop is measured on its biggest job.** The second search and the value box go on whichever big job its site
+  offers would book the most work in its town at typical rates: heat pump installs, air conditioners (April to
+  September), tankless water heaters, sewer lines, EV chargers, or the trade's usual one when nothing beats it. Prices
+  and sources are in `engine/value-sources.md`.
+- **Screenshots only for strong prospects.** The "Phone screenshots needed" email leaves out any prospect that would be
+  held anyway, even with the most a screenshot could add to its score. Those are held right away instead of waiting.
+- **On the first run after the update,** prospects you haven't approved get the home page read: non-residential ones
+  are held (an approve link for one then says it's already handled), and ones whose site offers a bigger job worth more
+  in their town get fresh searches on it and a new audit. Prospects held as lower priority get the same chance.
+  **Where the audits are** now breaks the held count down by reason.
+
+This version also carries everything from the evening update below, so paste this one in place of it.
+
+## Where you were (Nov 3, evening): every cold audit waits for your OK
+
+What went wrong: `REVIEW_AUDITS_FIRST` was 10 and 14 audits had been approved, so from then on any audit the check
+passed went straight into the send queue without a review email. About 33 audits were queued that you'd never seen.
+Now:
+- **`REVIEW_ALL` (yes):** every cold audit waits for your OK, however many you've approved. The batch email's
+  approve-all link keeps that to one click.
+- **On the first run after the update,** audits queued without your OK come back (status `audit_ready`) and arrive in
+  one "Check these N audits" email. The ones you approved stay queued. Chains are held even if approved (Home Depot
+  Heating & Cooling: the email found belonged to the installer behind the listing). The audit that ran out of room
+  is written again with more.
+- **Where the audits are** now shows the whole line: being researched, written, checked, waiting for your review (and
+  when it'll reach your inbox), approved and queued to send, emailed so far, and held.
+
+## Where you were (Nov 3, afternoon): faster, fewer, stronger, reviewed in batches
+
+The cycle was too slow (every step waited for the next hourly run) and weak prospects took the same slow, costly path
+as strong ones. Now:
+- **Only strong prospects get written up.** Before any audit is written, a cold prospect is held (status `held`, the
+  reason in `priority_why`) when it's a chain or national brand (Home Depot, Reliance, Enercare, Mr. Rooter, and the
+  like), its website doesn't load or shows a placeholder ("domain isn't connected"), its work can't pay for search ads,
+  or it scores under `AUDIT_MIN_PRIORITY` (55). Dead sites are caught before any search money is spent. Lower the bar
+  and the held ones come back on the next run.
+- **More per run, less waiting.** Each run researches up to `SHOPS_PER_RUN` (15) shops instead of 6, and while work is
+  with Claude a short extra pass runs 15 minutes later (`QUICK_RUNS`), so writing, the check, and its second read each
+  take about 15 minutes to pick up instead of an hour. A wave of audits now takes an hour or two, not most of a day.
+- **One review email per wave** (`REVIEW_BATCH`). Finished cold audits are held until the wave in progress is done, 10
+  are ready, or the oldest has waited 4 hours, then come in one "Check these N audits" email, strongest first, with
+  **one link that approves every audit in it with nothing flagged**. Flagged ones keep their own links. Site-form
+  audits still come right away.
+- **On the first run after the update,** chains and shops without a working site already in the pipeline (not approved)
+  are held, and prospects not yet written up are held under the bar.
+
+If the Sheet ever shows "Service using too much computer time for one day" (a free Gmail account gets 90 minutes of
+script time a day), set `QUICK_RUNS` to no.
+
+Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now**.
+
+## Where you were (Nov 3): each shop audited in its own town and trade
+
+From the 9 audits on Nov 3:
+- **Town:** a cold prospect was audited in the area we were searching when we found it, so a Calgary shop that came
+  up in a Chestermere search got Chestermere's (much smaller) numbers. Now the shop's own town decides: the city on its
+  Google listing, then its website (a street address with "AB" and the page title count most; a town it lists among
+  the places it serves doesn't move it). New prospects outside the towns in `AREAS` are left out.
+- **Trade:** same story. An HVAC shop found in a plumber search was audited as a plumber. Its Google category now sets
+  the trade (HVAC contractor is heating and cooling), and a kind of business we don't do is left out or held.
+- **Failed searches** ("Search 2 didn't run") are tried again on the spot, and the check no longer asks you for a
+  screenshot when one didn't run.
+- **The home page picture** (the phone capture from PageSpeed) now goes to both the writer and the check, so a site
+  built with scripts (where our scan reads nothing) is judged from what a visitor actually sees.
+- **Ads under a different legal name** ("CRC Electric LTD" for Colz) are matched by the shop's website, so they're
+  theirs. The check no longer flags that.
+- **Small towns:** with the corrected search totals, a town where the big job's searches book fewer than three a
+  year gets no value box (rather than "two jobs a year from about $0 a month"). That's not the same as a money-loser:
+  those shops aren't held, they just score lower.
+- **No more doubled asks** in "NEEDS YOU".
+
+On the first run after the update, every cold prospect that hasn't been emailed is checked against its own site and
+listing: wrong town, wrong trade, or a failed search means fresh searches and a new audit (an audit already with
+Claude for the old town is set aside). Flagged audits that were right are read again by the check with what it
+knows now.
+
+**Higher-value prospects:** small towns have small search markets, so their shops score lower (and should). To fill the
+pipeline with stronger prospects, put the Calgary quadrants first in `AREAS` (or only them for now), then
+**Find prospects now**: each run finds up to `PROSPECTS_PER_WEEK` shops in the next area on the list.
+
+Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now**.
+
+## Where you were (Nov 2, night): the check fixes what it finds; you only see what needs you
 
 From the first batch of 14 "Check these audits" (the flags listed problems for you to fix, which was backwards):
 - **The check is now an editor.** It reads each audit as the owner would, rewrites every line with a problem in place,

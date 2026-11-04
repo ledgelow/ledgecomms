@@ -531,8 +531,8 @@ function handleApprove_(id, t, addons) {
     lead.business + ' approved the proposal.\n\n' +
     'Offer: ' + priceSummary_(prop) + '\n' +
     'Contact: ' + (lead.name || lead.first_name) + ' <' + lead.email + '>' + (lead.phone ? ', ' + lead.phone : '') + '\n' +
-    'Proposal: ' + siteUrl_() + '/proposal/' + lead.proposal_slug + '\n' +
-    'Audit: ' + auditUrl_(lead) + '\n\n' +
+    'Proposal: ' + siteUrl_() + '/proposal/' + lead.proposal_slug + ME_ + '\n' +
+    'Audit: ' + auditUrl_(lead) + ME_ + '\n\n' +
     'They were told: ' + paymentLine_() + ' Next from you: ' + (setting_('PAYMENT_URL') || fbConnected_() ? '' : 'the invoice, then ') +
     ({ account_audit: 'a link request from the manager account (' + (setting_('ADS_MANAGER_ID') || '') + ') once they reply with their customer ID.',
       starting_plan: 'their new account under the manager account (Accounts > + > Create new account), an admin invite to them, then your setup questions. ' +
@@ -717,7 +717,7 @@ function requestAuditReviews_(list) {
     logEvent_(l.id, l.email, 'review_requested', 'audit');
     return (i + 1) + '. ' + l.business + ' (' + (l.source === 'cold' ? 'cold prospect' : 'asked on the site') + ', ' + (l.area || '') + ', ' +
       (adsLabel[l.segment] || adsLabel.unknown) + ')\n' +
-      '   Audit: ' + auditUrl_(l) + '\n' +
+      '   Audit: ' + auditUrl_(l) + ME_ + '\n' +
       priorityLine_(l, '   ') +
       qaLines_(l, '   ') +
       '   Biggest finding: ' + l.top_finding + '\n' +
@@ -765,7 +765,7 @@ function requestAuditReview_(l) {
     l.business + ' (' + (l.source === 'cold' ? 'cold prospect' : 'asked on the site') + ') is ready. ' +
     (reviewsLeft_('audit') > 0 ? 'It\'s one of the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so it waits for your OK (' + reviewsLeft_('audit') + ' left).\n\n'
       : 'It waits a few hours in case you want to add a personal line.\n\n') +
-    'Audit: ' + auditUrl_(l) + '\n' +
+    'Audit: ' + auditUrl_(l) + ME_ + '\n' +
     priorityLine_(l, '') +
     qaLines_(l, '') +
     'Google Ads: ' + ({ running_ads: 'running ads, so the page offers the $' + money_(setting_('PRICE_ACCOUNT_AUDIT') || 500) + ' account audit',
@@ -1006,9 +1006,9 @@ function requestProposalReview_(l) {
   var prop = findRow_(TAB.proposals, HEAD.proposals, 'slug', l.proposal_slug);
   ownerMail_('Check this proposal: ' + l.business,
     l.business + ' asked for a price. It\'s one of the first ' + setting_('REVIEW_PROPOSALS_FIRST') + ' proposals, so it waits for your OK.\n\n' +
-    'Proposal: ' + siteUrl_() + '/proposal/' + l.proposal_slug + '\n' +
+    'Proposal: ' + siteUrl_() + '/proposal/' + l.proposal_slug + ME_ + '\n' +
     'Offer: ' + priceSummary_(prop) + '\n' +
-    'Audit: ' + auditUrl_(l) + '\n' +
+    'Audit: ' + auditUrl_(l) + ME_ + '\n' +
     (l.notes ? 'Notes from them: ' + l.notes + '\n' : '') +
     '\nTo change the price for this one, edit price_sprint (one time), price_care (monthly), or ad_spend on the Proposals tab before approving.\n\n' +
     'Looks right, send it: ' + ownerLink_('approve_proposal', l) + '\n' +
@@ -1249,8 +1249,8 @@ function checkCalendar_() {
         'Who: ' + (lead.name || lead.first_name || '') + ' <' + g + '>\n' +
         'Shop: ' + (lead.business || 'not given') + (lead.website ? ', ' + lead.website : '') + '\n' +
         'Came from: ' + lead.source + '\n' +
-        'Audit: ' + (lead.audit_slug ? auditUrl_(lead) : 'none yet') + '\n' +
-        (lead.proposal_slug ? 'Proposal: ' + siteUrl_() + '/proposal/' + lead.proposal_slug + '\n' : '') +
+        'Audit: ' + (lead.audit_slug ? auditUrl_(lead) + ME_ : 'none yet') + '\n' +
+        (lead.proposal_slug ? 'Proposal: ' + siteUrl_() + '/proposal/' + lead.proposal_slug + ME_ + '\n' : '') +
         (lead.top_finding ? 'Biggest finding: ' + lead.top_finding + '\n' : '') +
         (lead.fix_1 ? 'Quick win: ' + lead.fix_1 + '\n' : '') +
         (lead.notes ? '\nNotes: ' + lead.notes : ''));
@@ -3955,7 +3955,7 @@ function applyMonthlyReport_(job, a) {
 function requestMonthlyReview_(l, slug, spec) {
   var c = clientOf_(l.id) || {}, fee = Number(c.monthly_fee || 0), tierFee = feeFor_(spec.totals.cost);
   ownerMail_('Check ' + l.business + '\'s ' + spec.month_name + ' report', l.business + '\'s ' + spec.month_name + ' report is ready.\n\n' +
-    'Report: ' + siteUrl_() + '/report/' + slug + '\n' + spec.headline + '\n\n' +
+    'Report: ' + siteUrl_() + '/report/' + slug + ME_ + '\n' + spec.headline + '\n\n' +
     'Spend ' + dollars_(spec.totals.cost) + ', ' + spec.totals.leads + ' calls and forms' + (spec.totals.cost_per_lead != null ? ' at ' + dollars_(spec.totals.cost_per_lead) + ' each' : '') + '.' +
     (fee && Math.abs(tierFee - fee) >= 1 && spec.totals.cost >= Number(setting_('MIN_AD_BUDGET') || 0) ?
       '\n\nHeads-up: last month\'s spend sits in the $' + money_(tierFee) + ' fee tier, and their fee is $' + money_(fee) + '. To change it, edit monthly_fee in the Clients tab.' : '') +
@@ -4566,7 +4566,7 @@ function requestReportReview_(l, spec) {
   var plan = planFromSpend_(l, spec.totals.monthly);
   ownerMail_('Check this account audit: ' + l.business,
     'The Google Ads account audit for ' + l.business + ' is ready.\n\n' +
-    'Report: ' + siteUrl_() + '/report/' + l.report_slug + '\n' +
+    'Report: ' + siteUrl_() + '/report/' + l.report_slug + ME_ + '\n' +
     'Biggest finding: ' + spec.top_finding + '\n' +
     'Spend: ' + dollars_(spec.totals.cost) + ' over ' + spec.days + ' days, ' + dollars_(spec.totals.monthly) + ' in the last 30. ' +
     (spec.wasted.total ? dollars_(spec.wasted.total) + ' went to searches that brought nothing.' : '') + '\n\n' +
@@ -5561,6 +5561,9 @@ function myEmail_() { return String(Session.getEffectiveUser().getEmail()).toLow
 function yes_(v) { return /^(yes|true|on|1)$/i.test(String(v || '').trim()); }
 function siteUrl_() { return String(setting_('SITE_URL') || 'https://ledgecommunications.com').trim().replace(/\/+$/, ''); }
 function auditUrl_(l) { return siteUrl_() + '/audit/' + l.audit_slug; }
+// On links in emails to Logan only: the browser that opens one is left out of Google Analytics from then on, so his own
+// checks of audits, proposals, and reports don't count as visits. Links to shops never carry it.
+var ME_ = '?ledge_me=1';
 function unsubUrl_(l) { return siteUrl_() + '/api/unsubscribe?id=' + encodeURIComponent(l.id) + '&t=' + token_(l.id); }
 function ownerLink_(action, l) { return prop_('WEB_APP_URL') + '?action=' + action + '&id=' + encodeURIComponent(l.id) + '&t=' + token_(l.id); }
 /* ══════════════════════════ FreshBooks invoices ══════════════════════════ */

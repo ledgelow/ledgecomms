@@ -346,6 +346,12 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
 .foot-links a:hover { text-decoration: underline; }
 .foot-mail { color: var(--deep); font-weight: 600; text-decoration: none; }
 .foot-mail:hover { text-decoration: underline; }
+.prose { max-width: 44rem; display: grid; gap: 14px; }
+.prose h2 { font-size: clamp(1.4rem, 2.6vw, 1.75rem); margin-top: 22px; }
+.prose p, .prose li { color: var(--muted); }
+.prose strong { color: var(--ink); }
+.prose ul { margin: 0; padding-left: 1.2em; display: grid; gap: 10px; }
+.prose a { color: var(--deep); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -535,7 +541,7 @@ fieldset.field legend small { font-weight: 400; color: var(--muted); }
   </a>
   <div class="foot-line">
     <span>Ledge Communications &middot; 1122 3 St SE, Ste 1906 #117, Calgary, AB T2G 0E7 &middot; <a class="foot-mail" href="mailto:ledgecommunications@gmail.com">ledgecommunications@gmail.com</a></span>
-    <span class="foot-links"><a href="/">Home</a><a href="/audit/sample/">Sample audit</a></span>
+    <span class="foot-links"><a href="/">Home</a><a href="/audit/sample/">Sample audit</a><a href="/privacy/">Privacy</a></span>
     <span>&copy; 2026 Ledge Communications</span>
   </div>
 </footer>
