@@ -15,7 +15,20 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 4): Google Analytics and a privacy page
+## Where you are (Nov 5): checking the cold emails land
+
+- **Ledge menu > Send a test cold email (spam check).** Sends the first cold email exactly as a shop got it (the latest
+  one sent), through the same send path, to up to five addresses you type: a fresh mail-tester.com address for a spam
+  score, and inboxes of your own on Gmail, Outlook or Hotmail, Yahoo, and a work account. Nothing on the shop's row
+  changes, its unsubscribe links do nothing, and opening its audit link doesn't count as the shop reading it. Each test
+  is logged on the Events tab as `test_cold_email`.
+- **Your own views no longer count as a shop reading its audit,** from any browser that's opened a page with
+  `?ledge_me=1` (the same switch that leaves it out of Google Analytics).
+
+Ship it: replace `Code.gs` and `Templates.gs` in Apps Script, upload both and `SETUP.md` to GitHub, and reload the
+Sheet so the new menu item shows.
+
+## Where you were (Nov 4): Google Analytics and a privacy page
 
 The new site had no analytics: the GA4 tag lived in Squarespace, so the property has shown nothing since the switch on
 Oct 28. Now the Worker adds GA4 to every page (site, audits, proposals, reports) once `GA4_ID` is set in Cloudflare.

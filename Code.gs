@@ -229,6 +229,7 @@ function onOpen() {
     .addItem('Check the waiting audits again', 'recheckWaitingAudits')
     .addItem('Connect FreshBooks', 'connectFreshBooks')
     .addItem('Send a test invoice to myself', 'testFreshBooksInvoice')
+    .addItem('Send a test cold email (spam check)', 'testColdEmail')
     .addItem('Send me the weekly digest now', 'sendDigest')
     .addItem('Check settings', 'showSettingsCheck')
     .addToUi();
@@ -5316,6 +5317,42 @@ function footer_(l) {
 function previewEmail_(l, key) {
   var tpl = EMAILS[trackKey_(l, key)], vars = emailVars_(l);
   return (tpl.subject ? 'Subject: ' + fillText_(tpl.subject, vars) + '\n\n' : '') + fillText_(tpl.body, vars);
+}
+
+// Ledge menu > Send a test cold email: the first cold email exactly as a shop got it (the most recent one sent, or the top
+// one queued), through the same send path and headers, to up to five addresses Logan types in: a mail-tester.com address
+// for a spam score, and inboxes of his own on Gmail, Outlook, Yahoo, or a work account to see where it lands. Nothing on
+// the shop's row changes. Its unsubscribe links point at a test row that doesn't exist, so they do nothing, and its audit
+// link carries ?ledge_me=1, so opening it doesn't count as the shop reading its audit.
+function testColdEmail() {
+  var ui = SpreadsheetApp.getUi();
+  var r = ui.prompt('Send a test cold email', 'Up to five addresses, separated by commas. Tip: get a fresh address at mail-tester.com and include it.', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  var msg = sendTestColdEmail_(r.getResponseText());
+  ui.alert('Test cold email', msg, ui.ButtonSet.OK);
+}
+function sendTestColdEmail_(list) {
+  var to = String(list || '').split(/[,;\s]+/).map(function (a) { return a.trim(); }).filter(function (a) { return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(a); }).slice(0, 5);
+  if (!to.length) return 'No email addresses found. Type them separated by commas.';
+  var leads = readRows_(TAB.leads, HEAD.leads), byId = {};
+  leads.forEach(function (l) { byId[l.id] = l; });
+  var sentEv = readRows_(TAB.events, HEAD.events).filter(function (e) { return e.event === 'sent_cold_1' && byId[e.lead_id] && byId[e.lead_id].audit_slug; }).pop();
+  var l = sentEv ? byId[sentEv.lead_id] : leads.filter(function (x) { return x.source === 'cold' && x.status === 'ready_to_send' && x.audit_slug && x.email; })
+    .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); })[0];
+  if (!l) return 'No cold email has gone out yet and none is queued, so there is nothing to copy.';
+  var test = Object.keys(l).reduce(function (o, k) { o[k] = l[k]; return o; }, {});
+  test.id = 'test-' + Utilities.getUuid().slice(0, 8);
+  var tpl = EMAILS[trackKey_(l, 'cold_1')], vars = emailVars_(l);
+  if (vars.audit_url) vars.audit_url = auditUrl_(l) + ME_;
+  var subject = fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text = fillText_(tpl.body, vars) + footer_(test);
+  var sent = [], failed = [];
+  to.forEach(function (a) {
+    try { gmailSend_(a, subject, text, { unsubUrl: unsubUrl_(test) }); sent.push(a); } catch (err) { failed.push(a + ' (' + String(err && err.message || err).slice(0, 60) + ')'); }
+  });
+  logEvent_('', '', 'test_cold_email', 'The ' + (sentEv ? 'one sent to ' : 'one queued for ') + (l.business || l.email) + ', to ' + sent.join(', ') + (failed.length ? '; failed: ' + failed.join(', ') : ''));
+  return 'Sent "' + subject + '" (the email ' + (l.business || 'a shop') + (sentEv ? ' got' : ' will get') + ') to ' + (sent.join(', ') || 'nobody') + '.' +
+    (failed.length ? ' Failed: ' + failed.join(', ') + '.' : '') +
+    ' Give it a few minutes, then check each inbox: Inbox, Promotions or Other, or Spam. For mail-tester, go back to its page and check your score.';
 }
 
 function sendLeadEmail_(l, key, extra) {
