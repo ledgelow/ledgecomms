@@ -15,7 +15,42 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 5): checking the cold emails land
+## Where you are (Nov 9): Search Console after the site switch
+
+Search Console flagged four reasons pages aren't indexed. Three are expected; one needed work.
+- **Blocked by robots.txt:** the audit, proposal, and report pages, samples included. Each is for one shop, so they stay
+  out of Google on purpose.
+- **Alternate page with proper canonical tag** and **Page with redirect:** other addresses for the same page (www, http,
+  /pricing without the slash, links with tags on the end). Google files them under the main address, which is what
+  should happen. The Worker now sends www, plain http, and the old workers.dev address to https://ledgecommunications.com
+  with a permanent redirect, so there's one address for everything.
+- **Not found (404):** pages from the old Squarespace site. Common ones (about, contact, services, and the like) now
+  redirect to the closest section, and anything else gets a proper "This page isn't here" page. Gone pages drop out of
+  Google on their own; send me the list from the report and any worth keeping get their own redirect.
+- **A sitemap** at /sitemap.xml (home, pricing, privacy), listed in robots.txt.
+
+Ship it: upload `worker.js`, `robots.txt`, and `SETUP.md` to GitHub. Then in Search Console:
+1. **Indexing > Sitemaps:** enter `sitemap.xml` and Submit. If an old Squarespace sitemap is listed, remove it.
+2. **URL Inspection:** check https://ledgecommunications.com/ and https://ledgecommunications.com/pricing/, and click
+   Request indexing on each.
+3. **Indexing > Pages > Not found (404):** send me the example URLs it lists.
+
+## Where you were (Nov 5, night): a subject line test
+
+- **`COLD_SUBJECT_B`** (Settings tab, starts as `Made this for {business}`): while it's filled in, every other cold first
+  email goes out with it instead of the usual subject, alternating down the send queue so both get the same mix of shops.
+  Placeholders: `{business}` (the shop's name, shortened: "Lamberts HVAC Ltd. Heating & Air Conditioning" becomes
+  "Lamberts HVAC"), `{search}`, `{town}`, `{job}`. A shop whose placeholder can't be filled gets the usual subject.
+  Follow-ups reply in the same thread, so they carry whichever subject the shop got. Clear the cell to stop the test.
+- **The results** show in **Where the audits are** and the Monday digest, one line per subject: sent, bounced, read their
+  audit, replied. A new `subject_test` column on the Leads tab says which one each shop got. There's no open tracking
+  (no tracking pixel), so "read their audit" is the measure: it takes an open and a click.
+- **Send a test cold email** now sends both subjects, so you can see each in your inbox.
+- At 10 a day, each subject gets about 25 a week. Treat the first two weeks as a rough read, not a verdict.
+
+Ship it: replace `Code.gs` in Apps Script (and GitHub), then Deploy > Manage deployments > edit > New version > Deploy.
+
+## Where you were (Nov 5): checking the cold emails land
 
 - **Ledge menu > Send a test cold email (spam check).** Sends the first cold email exactly as a shop got it (the latest
   one sent), through the same send path, to up to five addresses you type: a fresh mail-tester.com address for a spam
@@ -25,8 +60,9 @@ Your Squarespace site stays up on ledgecommunications.com until step 9, so you c
 - **Your own views no longer count as a shop reading its audit,** from any browser that's opened a page with
   `?ledge_me=1` (the same switch that leaves it out of Google Analytics).
 
-Ship it: replace `Code.gs` and `Templates.gs` in Apps Script, upload both and `SETUP.md` to GitHub, and reload the
-Sheet so the new menu item shows.
+Ship it: replace `Code.gs` and `Templates.gs` in Apps Script, upload both and `SETUP.md` to GitHub, reload the Sheet so
+the new menu item shows, and deploy a new version of the web app (Deploy > Manage deployments > edit > New version >
+Deploy). Anything opened from a link (audit pages, approve links, the site form) runs on the deployed version.
 
 ## Where you were (Nov 4): Google Analytics and a privacy page
 

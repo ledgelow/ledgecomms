@@ -2,3 +2,5 @@ User-agent: *
 Disallow: /audit/
 Disallow: /proposal/
 Disallow: /report/
+
+Sitemap: https://ledgecommunications.com/sitemap.xml
