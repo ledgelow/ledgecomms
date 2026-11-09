@@ -1,0 +1,485 @@
+// The Ledge site on Cloudflare Workers. One file on purpose: the GitHub repo is kept flat.
+//
+// Static files come from site/, which build-site.js assembles from the flat repo on every deploy.
+// This script sits in front of them to:
+//   - handle the form endpoints under /api/
+//   - serve each shop's audit and proposal page, which the pipeline hub (Apps Script) renders
+//   - fill in the booking link and the Turnstile spam check on every HTML page
+//   - fill in the prices on the home and pricing pages from the hub's Settings tab (cached; built-in prices are the fallback)
+//
+// Settings live in Cloudflare (Worker > Settings > Variables and Secrets), not in the code:
+//   HUB_URL             Apps Script web app URL (ends in /exec)
+//   HUB_KEY             shared secret, same value as the hub's HUB_KEY script property
+//   TURNSTILE_SITE_KEY  Turnstile site key (optional; the form works without it)
+//   TURNSTILE_SECRET    Turnstile secret key (optional while testing)
+//   BOOKING_URL         booking page link (optional; booking links are hidden when it's empty)
+//   GA4_ID              Google Analytics 4 Measurement ID, G-... (optional; no analytics when it's empty)
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const path = url.pathname.replace(/\/+$/, "") || "/";
+    const get = request.method === "GET" || request.method === "HEAD";
+
+    // One address for the site: www, the old workers.dev address, and plain http move to https://ledgecommunications.com
+    // for good, so search engines and old links all land in one place. The API answers wherever it's asked.
+    if (get && !path.startsWith("/api/") && (OTHER_HOSTS.includes(url.hostname) || (url.hostname === SITE_HOST && url.protocol === "http:"))) {
+      return Response.redirect("https://" + SITE_HOST + url.pathname + url.search, 301);
+    }
+    if (get && path === "/sitemap.xml") return sitemap();
+    if (get && OLD_PAGES[path.toLowerCase()]) return Response.redirect("https://" + SITE_HOST + OLD_PAGES[path.toLowerCase()], 301);
+
+    if (path.startsWith("/api/")) return handleApi(request, env, path);
+    if (path.startsWith("/img/") && request.method === "GET") return auditImage(url, env, ctx);
+
+    const page = path.match(/^\/(audit|proposal|report)\/([^/]+)$/);
+    if (page && page[2] !== "sample" && request.method === "GET") {
+      const res = await hubPage(env, page[1], page[2]);
+      if (res) return fillPageValues(res, env, null, res.status === 404 ? "Not found" : PAGE_GROUP[page[1]]);
+    }
+
+    const pricing = (path === "/" || path === "/pricing") && request.method === "GET" ? await livePricing(env, ctx) : null;
+    const res = await env.ASSETS.fetch(request);
+    if (res.status === 404 && get) return fillPageValues(notFound(), env, null, "Not found");
+    return fillPageValues(res, env, pricing, siteGroup(path));
+  },
+};
+
+/* ───────────── search engines: one address, a sitemap, old pages moved ───────────── */
+
+const SITE_HOST = "ledgecommunications.com";
+const OTHER_HOSTS = ["www.ledgecommunications.com", "ledgecomms.ledgelow.workers.dev"];
+
+// The pages search engines should know about. The audit, proposal, and report pages are for one shop each and stay out
+// (robots.txt and a noindex header), samples included.
+const SITEMAP_PAGES = ["/", "/pricing/", "/privacy/"];
+function sitemap() {
+  const body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    SITEMAP_PAGES.map((p) => "  <url><loc>https://" + SITE_HOST + p + "</loc></url>").join("\n") + "\n</urlset>\n";
+  return new Response(body, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
+}
+
+// Addresses from the old Squarespace site, moved to the closest page now. Lower case, no trailing slash. Anything else
+// that's gone gets the not-found page, which is right for a page that no longer exists.
+const OLD_PAGES = {
+  "/home": "/",
+  "/about": "/#about", "/about-us": "/#about",
+  "/contact": "/#audit", "/contact-us": "/#audit", "/get-started": "/#audit", "/free-audit": "/#audit",
+  "/services": "/#how", "/how-it-works": "/#how",
+  "/plans": "/pricing/",
+};
+
+function notFound() {
+  return new Response(
+    simplePage("Page not found | Ledge Communications",
+      "<h1>This page isn't here</h1><p>It may have moved when the site was rebuilt.</p>" +
+      "<p><a href=\"/\">Ledge Communications</a> &middot; <a href=\"/pricing/\">Pricing</a> &middot; <a href=\"/#audit\">Get a free audit</a></p>"),
+    { status: 404, headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex" } },
+  );
+}
+
+/* ───────────── /img/<id>: pictures on audit pages ───────────── */
+
+// Phone screenshots of searches and home pages live in the hub owner's Google Drive. The hub signs each picture it puts
+// on a page (an HMAC of the file ID with HUB_KEY), so this only ever serves pictures the hub chose. Cached for a week.
+async function auditImage(url, env, ctx) {
+  const id = decodeURIComponent(url.pathname.slice("/img/".length));
+  const k = url.searchParams.get("k") || "";
+  if (!/^[\w-]{20,80}$/.test(id) || !env.HUB_KEY || k !== (await imgSig(id, env.HUB_KEY))) return new Response("Not found", { status: 404 });
+  const cache = caches.default;
+  const key = url.origin + "/img/" + id;
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const res = await fetch(`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1200`, { redirect: "follow" }).catch(() => null);
+  const type = res && res.ok ? res.headers.get("content-type") || "" : "";
+  if (!type.startsWith("image/")) return new Response("Not found", { status: 404 });
+  const out = new Response(res.body, { headers: { "content-type": type, "cache-control": "public, max-age=604800", "x-robots-tag": "noindex" } });
+  ctx.waitUntil(cache.put(key, out.clone()));
+  return out;
+}
+
+async function imgSig(id, secret) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode("img:" + id)));
+  return btoa(String.fromCharCode(...sig)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "").slice(0, 22);
+}
+
+/* ───────────── live prices ───────────── */
+
+// The hub's Settings tab is the one place prices live. A copy is kept for a day and refreshed in the background once
+// it's 10 minutes old, so a price change shows up within minutes and no visitor waits on the hub.
+const PRICING_CACHE_KEY = "https://pricing.ledgecommunications.com/v1";
+
+async function livePricing(env, ctx) {
+  if (!env.HUB_URL || !env.HUB_KEY) return null;
+  const cache = caches.default;
+  const refresh = async () => {
+    const res = await fetch(`${env.HUB_URL}?page=pricing&key=${encodeURIComponent(env.HUB_KEY)}`, { redirect: "follow" }).catch(() => null);
+    const data = res && res.ok ? await res.json().catch(() => null) : null;
+    if (!validPricing(data)) return null;
+    await cache.put(PRICING_CACHE_KEY, new Response(JSON.stringify(data), {
+      headers: { "content-type": "application/json", "cache-control": "max-age=86400", "x-fetched": String(Date.now()) },
+    })).catch(() => {});
+    return data;
+  };
+  const hit = await cache.match(PRICING_CACHE_KEY).catch(() => null);
+  if (!hit) { ctx.waitUntil(refresh()); return null; }
+  if (Date.now() - Number(hit.headers.get("x-fetched") || 0) > 600e3) ctx.waitUntil(refresh());
+  const data = await hit.json().catch(() => null);
+  return validPricing(data) ? data : null;
+}
+
+function validPricing(d) {
+  const num = (v) => typeof v === "string" && /^[\d,]{1,9}$/.test(v);
+  const short = (v, n) => typeof v === "string" && v.length <= n;
+  const optionalNum = (v) => v === undefined || num(v);
+  return !!d && d.ok === true && num(d.price_audit) && num(d.credit_days) && num(d.min_fee) && num(d.min_budget) &&
+    optionalNum(d.price_page_fixes) && optionalNum(d.price_landing_page) && optionalNum(d.price_full) && optionalNum(d.price_site_support) &&
+    short(d.cap_line, 140) && short(d.setup_months, 20) && Array.isArray(d.rows) && d.rows.length >= 1 && d.rows.length <= 10 &&
+    d.rows.every((r) => Array.isArray(r) && r.length === 2 && short(r[0], 40) && short(r[1], 40));
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ───────────── /api/ routes ───────────── */
+
+async function handleApi(request, env, path) {
+  const routes = {
+    "/api/audit-request": { POST: auditRequest },
+    "/api/quote-request": { POST: quoteRequest },
+    "/api/approve": { POST: approve },
+    "/api/unsubscribe": { GET: unsubscribeGet, POST: unsubscribePost },
+    "/api/viewed": { POST: viewed },
+  };
+  const route = routes[path];
+  if (!route) return json({ ok: false, error: "not_found" }, 404);
+  const handler = route[request.method];
+  if (!handler) return json({ ok: false, error: "method_not_allowed" }, 405);
+  try {
+    return await handler(request, env);
+  } catch (err) {
+    console.error(path, err && err.stack ? err.stack : err);
+    return json({ ok: false, error: "server" }, 500);
+  }
+}
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+async function toHub(env, payload) {
+  const res = await fetch(env.HUB_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...payload, key: env.HUB_KEY }),
+    redirect: "follow",
+  }).catch(() => null);
+  const out = res ? await res.json().catch(() => ({})) : {};
+  return { httpOk: !!(res && res.ok), ok: out.ok === true };
+}
+
+// POST /api/audit-request: the site form. Checks it's a real person (Turnstile + honeypot),
+// then hands the lead to the hub, which records it, sends the confirmation and queues the audit.
+const LIMITS = { name: 120, business: 160, website: 300, email: 200, phone: 40, trade: 60, area: 80, running_ads: 20, budget: 30, missed_calls: 60, tools: 300, tools_other: 120 };
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function clean(value, max) {
+  return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+async function readBody(request) {
+  const type = request.headers.get("content-type") || "";
+  if (type.includes("application/json")) return await request.json();
+  const form = await request.formData();
+  const out = {};
+  for (const key of new Set(form.keys())) out[key] = form.getAll(key).map(String).join(", "); // checkboxes send several values
+  return out;
+}
+
+async function passesTurnstile(token, ip, secret) {
+  if (!secret) return true; // not configured yet
+  if (!token) return false;
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ secret, response: token, remoteip: ip, idempotency_key: crypto.randomUUID() }),
+  });
+  const out = await res.json().catch(() => ({}));
+  return out.success === true;
+}
+
+async function auditRequest(request, env) {
+  let data;
+  try {
+    data = await readBody(request);
+  } catch {
+    return json({ ok: false, error: "bad_request" }, 400);
+  }
+
+  // Bots fill the hidden field. Tell them it worked and drop it.
+  if (clean(data.fax, 50)) return json({ ok: true });
+
+  const lead = {};
+  for (const [key, max] of Object.entries(LIMITS)) lead[key] = clean(data[key], max);
+  lead.email = lead.email.toLowerCase();
+
+  const missing = ["name", "business", "website", "email"].filter((k) => lead[k].length < 2);
+  if (missing.length || !EMAIL.test(lead.email)) {
+    return json({ ok: false, error: "invalid", fields: missing }, 400);
+  }
+
+  const ip = request.headers.get("cf-connecting-ip") || "";
+  if (!(await passesTurnstile(data["cf-turnstile-response"], ip, env.TURNSTILE_SECRET))) {
+    return json({ ok: false, error: "verification" }, 400);
+  }
+
+  if (!env.HUB_URL || !env.HUB_KEY) return json({ ok: false, error: "not_configured" }, 503);
+
+  const out = await toHub(env, {
+    type: "inbound",
+    lead: { ...lead, submitted_at: new Date().toISOString(), page: request.headers.get("referer") || "" },
+  });
+  if (!out.httpOk || !out.ok) return json({ ok: false, error: "hub" }, 502);
+  return json({ ok: true });
+}
+
+// POST /api/quote-request: the ask at the bottom of an audit page (account audit, starting plan, or details).
+async function quoteRequest(request, env) {
+  const form = await request.formData().catch(() => null);
+  if (!form) return buttonReply(request, false, 400, QUOTE_MSG);
+  const id = String(form.get("id") || "").slice(0, 40);
+  const t = String(form.get("t") || "").slice(0, 64);
+  const notes = String(form.get("notes") || "").replace(/\s+/g, " ").trim().slice(0, 1000);
+  const pick = (name, allowed) => { const v = String(form.get(name) || ""); return allowed.includes(v) ? v : ""; };
+  const offer = pick("offer", ["account_audit", "starting_plan", "details"]);
+  const budget = pick("budget", ["not sure", "under 1000", "1000-2000", "2000-4000", "4000+"]);
+  const running_ads = pick("running_ads", ["yes", "no", "not sure"]);
+  const addons = [...new Set(form.getAll("addons").map(String))].filter((a) => ["site_audit"].includes(a)).join(",");
+  if (!id || !t || !env.HUB_URL || !env.HUB_KEY) return buttonReply(request, false, 400, QUOTE_MSG);
+  const out = await toHub(env, { type: "quote", id, t, notes, offer, budget, running_ads, addons });
+  return buttonReply(request, out.ok, out.ok ? 200 : 502, QUOTE_MSG);
+}
+
+// POST /api/viewed: an audit page was on screen for a few seconds (a beacon from the page, so link scanners don't count).
+async function viewed(request, env) {
+  const form = await request.formData().catch(() => null);
+  const id = form ? String(form.get("id") || "").slice(0, 40) : "";
+  const t = form ? String(form.get("t") || "").slice(0, 64) : "";
+  if (!id || !t || id === "sample" || !env.HUB_URL || !env.HUB_KEY) return json({ ok: false }, 400);
+  const out = await toHub(env, { type: "viewed", id, t });
+  return json({ ok: out.ok });
+}
+
+// POST /api/approve: the "Approve and get started" button on a proposal page.
+async function approve(request, env) {
+  const form = await request.formData().catch(() => null);
+  if (!form) return buttonReply(request, false, 400, APPROVE_MSG);
+  const id = String(form.get("id") || "").slice(0, 40);
+  const t = String(form.get("t") || "").slice(0, 64);
+  if (!id || !t || !env.HUB_URL || !env.HUB_KEY) return buttonReply(request, false, 400, APPROVE_MSG);
+  const addons = [...new Set(form.getAll("addons").map(String))].filter((a) => ["page_fixes", "landing_page", "site_audit"].includes(a)).join(",");
+  const out = await toHub(env, { type: "approve", id, t, addons });
+  return buttonReply(request, out.ok, out.ok ? 200 : 502, APPROVE_MSG);
+}
+
+const QUOTE_MSG = {
+  ok: "<h1>Got it</h1><p>You'll hear back by the end of the next business day.</p>",
+  fail: "<h1>That didn't go through</h1><p>Reply to the email with \"yes\" and we'll take it from there.</p>",
+};
+const APPROVE_MSG = {
+  ok: "<h1>Approved</h1><p>Thanks. Next steps are on their way to your inbox.</p>",
+  fail: "<h1>That didn't go through</h1><p>Reply to the email with \"approved\" and we'll take it from there.</p>",
+};
+
+function buttonReply(request, ok, status, msg) {
+  if ((request.headers.get("accept") || "").includes("application/json")) return json({ ok }, status);
+  return new Response(simplePage("Ledge Communications", ok ? msg.ok : msg.fail), {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+// /api/unsubscribe?id=<lead id>&t=<token>
+// GET: the unsubscribe link at the bottom of every email.
+// POST: Gmail's and Apple Mail's one-click unsubscribe button (List-Unsubscribe-Post).
+async function unsubscribe(request, env) {
+  const url = new URL(request.url);
+  const id = (url.searchParams.get("id") || "").slice(0, 40);
+  const t = (url.searchParams.get("t") || "").slice(0, 64);
+  if (!id || !t) return { ok: false, bad: true };
+  if (!env.HUB_URL || !env.HUB_KEY) return { ok: false };
+  const out = await toHub(env, { type: "unsubscribe", id, t });
+  return { ok: out.ok };
+}
+
+async function unsubscribeGet(request, env) {
+  const r = await unsubscribe(request, env);
+  const html = (title, body, status) =>
+    new Response(simplePage(`${title} | Ledge Communications`, `<h1>${title}</h1>${body}`), {
+      status,
+      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    });
+  if (r.bad) return html("Link not recognised", "<p>This unsubscribe link is incomplete. Reply to any of our emails with \"unsubscribe\" and you'll be taken off the list.</p>", 400);
+  if (!r.ok) return html("Something went wrong", "<p>That didn't go through just now. Reply to any of our emails with \"unsubscribe\" and you'll be taken off the list within a day.</p>", 502);
+  return html("You're unsubscribed", "<p>You won't get any more emails from Ledge Communications.</p><p><a href=\"/\">Back to the site</a></p>", 200);
+}
+
+async function unsubscribePost(request, env) {
+  const r = await unsubscribe(request, env);
+  return new Response(r.ok ? "ok" : "error", { status: r.ok ? 200 : 400 });
+}
+
+/* ───────────── /audit/<slug> and /proposal/<slug> ───────────── */
+
+// Each shop's audit and fixed-price pages live in the hub, which renders the HTML.
+// /audit/sample, /proposal/sample, and /report/sample are static files and never reach here.
+const PAGE_CACHE = { audit: "public, max-age=300", proposal: "no-store", report: "no-store" };
+
+async function hubPage(env, page, slug) {
+  if (!/^[a-z0-9-]{4,80}$/.test(slug)) return null; // not a real slug: fall through to static files
+  if (!env.HUB_URL || !env.HUB_KEY) return null;
+  const url = `${env.HUB_URL}?page=${page}&slug=${encodeURIComponent(slug)}&key=${encodeURIComponent(env.HUB_KEY)}`;
+  const res = await fetch(url, { redirect: "follow" }).catch(() => null);
+  const body = res && res.ok ? await res.text() : "";
+  if (!body.startsWith("<!doctype")) {
+    return new Response(
+      simplePage("Not found | Ledge Communications",
+        "<h1>This page isn't here</h1><p>The link may be incomplete. Reply to the email it came in and we'll send it again.</p><p><a href=\"/\">Ledge Communications</a></p>"),
+      { status: 404, headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex, nofollow" } },
+    );
+  }
+  return new Response(body, {
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": PAGE_CACHE[page], "x-robots-tag": "noindex, nofollow" },
+  });
+}
+
+function simplePage(title, inner) {
+  return `<!doctype html><html lang="en-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>${title}</title>
+<style>:root{--bg:#F5F7FA;--fg:#1B2A38;--muted:#566A7E}@media (prefers-color-scheme:dark){:root{--bg:#0F1820;--fg:#E8EEF3;--muted:#9AAFC2}}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:34rem;margin:0 auto;padding:72px max(16px,env(safe-area-inset-left,0px))}h1{font-size:1.6rem;margin:0 0 12px}p{color:var(--muted)}a{color:inherit}</style>
+</head><body><main>${inner}</main></body></html>`;
+}
+
+/* ───────────── every HTML page ───────────── */
+
+// Fills in values that live in Cloudflare settings, so changing the booking link or adding the
+// spam check never needs a code change.
+/* ───────────── Google Analytics ───────────── */
+
+// Each page's content group in GA4 (Reports > Engagement > Pages and screens, then pick "Content group"), so audit visits
+// read apart from the site's own pages without any setup in GA.
+const PAGE_GROUP = { audit: "Audit", proposal: "Proposal", report: "Account report" };
+function siteGroup(path) {
+  const known = { "/": "Home", "/pricing": "Pricing", "/privacy": "Privacy", "/audit/sample": "Sample audit", "/proposal/sample": "Sample proposal", "/report/sample": "Sample report" };
+  return known[path] || "Other";
+}
+
+// The GA4 tag, when GA4_ID is set. What it sends and what it leaves out:
+//   - the page's address without its query string (utm_ tags kept), so nothing a link carries ends up in GA;
+//   - its content group (above);
+//   - generate_lead when the site's audit form goes through, quote_request when the ask on an audit does (with the offer
+//     picked), proposal_approved when a proposal is approved, and book_call_click on any booking link.
+// A browser that has opened any page with ?ledge_me=1 sends nothing from then on, so Logan's own checks of audits and
+// proposals (the links in the pipeline's emails to him carry it) don't count as visits. ?ledge_me=0 undoes it.
+function analyticsTag(id, group) {
+  return `<script>
+(function () {
+  var ID = ${JSON.stringify(id)}, GROUP = ${JSON.stringify(group || "Other")}, me = false, was = null, m = location.search.match(/[?&]ledge_me=([01])/);
+  try { was = localStorage.getItem("ledge_me"); if (m) localStorage.setItem("ledge_me", m[1]); me = (m ? m[1] : was) === "1"; } catch (e) { me = !!m && m[1] === "1"; }
+  if (m && m[1] !== (was || "0")) document.addEventListener("DOMContentLoaded", function () {
+    var n = document.createElement("div");
+    n.textContent = m[1] === "1" ? "Google Analytics now leaves this browser out." : "This browser counts in Google Analytics again.";
+    n.style.cssText = "position:fixed;left:16px;right:16px;bottom:16px;z-index:99;max-width:26rem;margin:0 auto;padding:12px 16px;border-radius:10px;background:#0C1630;color:#fff;font:15px/1.4 system-ui,sans-serif;text-align:center";
+    document.body.appendChild(n);
+    setTimeout(function () { n.remove(); }, 5000);
+  });
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { window.dataLayer.push(arguments); };
+  if (me) return;
+  var s = document.createElement("script");
+  s.async = true; s.src = "https://www.googletagmanager.com/gtag/js?id=" + ID;
+  document.head.appendChild(s);
+  var utm = location.search.replace(/^\\?/, "").split("&").filter(function (p) { return /^utm_[a-z_]+=/.test(p); }).join("&");
+  gtag("js", new Date());
+  gtag("config", ID, { page_location: location.origin + location.pathname + (utm ? "?" + utm : ""), content_group: GROUP });
+  var EV = { "audit-request": "generate_lead", "quote-request": "quote_request", "approve": "proposal_approved" }, f = window.fetch;
+  if (f) window.fetch = function (u, o) {
+    var p = f.apply(window, arguments), k = String(u).match(/\\/api\\/(audit-request|quote-request|approve)$/);
+    if (k && o && /^post$/i.test(o.method || "")) p.then(function (r) {
+      if (!r.ok) return;
+      r.clone().json().then(function (j) {
+        if (!j || !j.ok) return;
+        var extra = { content_group: GROUP };
+        try { if (o.body && o.body.get && o.body.get("offer")) extra.offer = String(o.body.get("offer")); } catch (e) {}
+        gtag("event", EV[k[1]], extra);
+      }, function () {});
+    }, function () {});
+    return p;
+  };
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.closest && e.target.closest("a[data-booking]")) gtag("event", "book_call_click", { content_group: GROUP });
+  }, true);
+})();
+</script>`;
+}
+
+function fillPageValues(res, env, pricing, group) {
+  const type = res.headers.get("content-type") || "";
+  if (!type.includes("text/html")) return res;
+  const ga = (env.GA4_ID || "").trim().toUpperCase();
+
+  const booking = (env.BOOKING_URL || "").trim();
+  const siteKey = (env.TURNSTILE_SITE_KEY || "").trim();
+  const rows = pricing ? pricing.rows.map((r) => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td></tr>`).join("") : "";
+
+  return new HTMLRewriter()
+    .on("[data-price]", {
+      element(el) {
+        if (!pricing) return;
+        const key = el.getAttribute("data-price");
+        if (key === "rows") el.setInnerContent(rows, { html: true });
+        else if (typeof pricing[key] === "string") el.setInnerContent(pricing[key]);
+      },
+    })
+    .on("a[data-booking]", {
+      element(el) {
+        if (booking) {
+          el.setAttribute("href", booking);
+          el.setAttribute("target", "_blank");
+          el.setAttribute("rel", "noopener");
+        } else {
+          el.remove();
+        }
+      },
+    })
+    .on("[data-booking-wrap]", {
+      element(el) {
+        if (!booking) el.remove();
+      },
+    })
+    .on("div[data-turnstile]", {
+      element(el) {
+        if (siteKey) {
+          el.setAttribute("class", "cf-turnstile");
+          el.setAttribute("data-sitekey", siteKey);
+          el.setAttribute("data-theme", "light"); // the site is light only
+        } else {
+          el.remove();
+        }
+      },
+    })
+    .on("head", {
+      element(el) {
+        if (/^G-[A-Z0-9]{4,16}$/.test(ga)) el.append(analyticsTag(ga, group), { html: true });
+        if (siteKey) el.append('<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>', { html: true });
+      },
+    })
+    .transform(res);
+}
