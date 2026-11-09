@@ -49,7 +49,8 @@ var HEAD = {
     'priority', 'priority_why',
     // home_town: the town the shop itself is based in (its Google profile's address or its website), when we know it.
     // service: the big job its searches and value box are on (SERVICES), the most valuable one its home page offers.
-    'home_town', 'service'],
+    // subject_test: which subject its first cold email went out with (A, the usual one, or B, COLD_SUBJECT_B).
+    'home_town', 'service', 'subject_test'],
   // qa: what the check found before the audit reached Logan (pass, rewritten: [...], or flagged: ...).
   audits: ['slug', 'lead_id', 'created', 'business', 'spec_json', 'qa'],
   // One row per phone screenshot of a Google search in the Ledge search screenshots folder, as Claude read it.
@@ -72,7 +73,7 @@ var HEAD = {
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '22';
+var SCHEMA_VERSION = '24';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -100,6 +101,8 @@ var SETTINGS_DEFAULTS = [
   ['REQUIRE_SHOTS', 'yes', 'yes holds each cold audit until every search it uses has a phone screenshot, and emails you the searches to check. no builds without them (the audit then says nothing about who advertises on those searches).'],
   ['SHOT_WAIT_HOURS', '4', 'How long a site-form audit waits for your phone screenshots before it\'s built without them, so it still goes out on the day promised.'],
   ['REVIEW_ALL', 'yes', 'yes: every cold audit waits for your OK before it can be emailed (the review email\'s approve-all link makes that one click). no: after the first REVIEW_AUDITS_FIRST, audits the check passes go into the send queue on their own.'],
+  ['COLD_SUBJECT_B', 'Made this for {business}', 'A second subject line to test on cold first emails. While it\'s filled in, every other cold first email goes out with it instead of the usual subject (A), and Where the audits are and the Monday digest compare the two: sent, read their audit, replied. Placeholders: {business} (the shop\'s name, shortened), {search} (its first search), {town}, {job} (the big job its audit is on). Clear the cell to stop the test.'],
+  ['READ_ALERTS', 'yes', 'yes emails you the moment a cold prospect reads their audit for the first time (and hasn\'t replied), with a suggested personal note. A note you write in their thread stops the automatic emails to that shop. no turns the alerts off.'],
   ['FIT_CHECK', 'yes', 'yes has the small model read each prospect\'s home page before any searches run. Cold prospects that mostly work for businesses, industry, or builders, or don\'t do their trade for homeowners, are held. Every shop\'s second search and value box go on the most valuable homeowner job its site offers (heat pumps, tankless water heaters, sewer lines, EV chargers), when that beats its trade\'s usual one.'],
   ['AUDIT_MIN_PRIORITY', '55', 'Cold prospects scoring below this (out of 100) once their searches are in are held instead of written up, so the audits you review are the strongest. Lower it and they come back on the next run.'],
   ['SHOPS_PER_RUN', '15', 'Shops researched per run, as many as fit in the run\'s time.'],
@@ -442,6 +445,7 @@ function doGet(e) {
   else if (p.action === 'rebuild_report') res = ownerRebuildReport_(lead);
   else if (p.action === 'approve_monthly') res = ownerApproveMonthly_(lead, p.slug);
   else if (p.action === 'check_back') res = ownerCheckBack_(lead, p.when);
+  else if (p.action === 'noted') res = ownerNoted_(lead);
   else if (p.action === 'handled') {
     updateLead_(lead, { attention: '' });
     logEvent_(lead.id, lead.email, 'handled', '');
@@ -743,7 +747,8 @@ function requestAuditReviews_(list) {
       yes_(setting_('COLD_EMAIL_ON')) ? 'Approved cold prospects go into the next cold email slots.' : 'Approving a cold prospect sends nothing while COLD_EMAIL_ON is no.') + '\n\n' +
     blocks.join('\n\n') + '\n\n' +
     'The email ' + first.business + ' would get (the others follow the same wording):\n────────\n' +
-    (first.source === 'cold' ? previewEmail_(first, 'cold_1') : previewEmail_(first, 'inbound_audit')) + '\n────────\n\n' +
+    (first.source === 'cold' ? previewEmail_(first, 'cold_1') : previewEmail_(first, 'inbound_audit')) + '\n────────\n' +
+    (first.source === 'cold' && subjectB_(first) ? 'Every other one goes out with the test subject instead: ' + subjectB_(first) + '\n' : '') + '\n' +
     'Want a change to how audits are written? Tell Claude in the Ledge project and it\'ll update the instructions.');
 }
 
@@ -814,10 +819,45 @@ function handleViewed_(id, t) {
   var l = findLead_('id', id);
   if (!l) return { ok: false, error: 'not_found' };
   if (!Number(l.touches || 0)) return { ok: true, counted: false };
-  var fields = { audit_opens: Number(l.audit_opens || 0) + 1 };
-  if (!l.audit_opened) { fields.audit_opened = new Date(); logEvent_(l.id, l.email, 'audit_opened', ''); }
+  var fields = { audit_opens: Number(l.audit_opens || 0) + 1 }, firstRead = !l.audit_opened;
+  if (firstRead) { fields.audit_opened = new Date(); logEvent_(l.id, l.email, 'audit_opened', ''); }
   updateLead_(l, fields);
+  if (firstRead) { try { readAlert_(l); } catch (err) { logEvent_(l.id, l.email, 'error', 'Read alert failed: ' + (err && err.message || err)); } }
   return { ok: true, counted: true };
+}
+
+// A cold prospect reading their audit for the first time is the best moment for a short personal note, so Logan hears
+// about it right away (READ_ALERTS). Only while they haven't replied: once they have, the reply email covers it.
+var READ_ALERT_STATUSES = ['in_sequence', 'sequence_done', 'check_back'];
+function readAlert_(l) {
+  if (!yes_(setting_('READ_ALERTS')) || l.source !== 'cold' || READ_ALERT_STATUSES.indexOf(l.status) === -1 || l.attention) return;
+  var tz = tz_(), day = function (d) { return Utilities.formatDate(new Date(d), tz, 'EEE MMM d'); };
+  var mine = readRows_(TAB.events, HEAD.events).filter(function (e) { return e.lead_id === l.id; });
+  var sends = mine.filter(function (e) { return /^sent_cold/.test(e.event); });
+  var noted = mine.filter(function (e) { return e.event === 'personal_note'; }).pop();
+  var vars = emailVars_(l), short = l.business ? shortBusiness_(l.business) : l.email;
+  var spec = auditSpecOf_(l), job = spec.opp && spec.opp.job ? String(spec.opp.job) : '';
+  var seq = SEQUENCES[l.status], step = seq && seq[Number(l.touches || 1)];
+  var nth = ['', 'first', 'second', 'third', 'last'][Number(l.touches || 1) + 1] || 'next';
+  var next = l.status === 'in_sequence' && l.next_touch && step ? day(l.next_touch) + ' (the ' + nth + ' email)'
+    : l.status === 'check_back' && l.next_touch ? day(l.next_touch) + ' (the check-back email)' : 'none, the emails are done';
+  var subject = l.thread_id ? threadSubject_(l.thread_id) : '';
+  var ask = job ? 'is ' + job + ' work something you want more of right now, or are you pretty booked up?' : 'is there a kind of job you\'d like more of right now?';
+  ownerMail_(short + ' just read their audit',
+    (l.business || l.email) + ' opened their audit for the first time a moment ago.\n\n' +
+    'Emailed: ' + (sends.length ? day(sends[0].timestamp) + ' (' + sends.length + ' email' + (sends.length > 1 ? 's' : '') + ' so far)' : 'yes') + '\n' +
+    'Priority: ' + (l.priority || '?') + ' of 100\n' +
+    'Next automatic email: ' + next + '\n' +
+    'Their audit: ' + auditUrl_(l) + ME_ + '\n' +
+    'Their email: ' + l.email + '\n\n' +
+    (noted ? 'You wrote to them yourself on ' + day(noted.timestamp) + ', so they read it after your note. If they haven\'t replied in a few days, one more short line from you is the next step.\n\n'
+      : 'Now, while it\'s fresh, is the best time for a short personal note. Reply in their thread' + (subject ? ' (search for "' + subject + '")' : '') +
+        ', from Superhuman as ' + myEmail_() + ' as usual: two or three lines and one easy question, like "Hi ' + vars.first + ', quick question: ' + ask + '" ' +
+        'Don\'t mention that you saw them read it.\n\n' +
+        'Then tap this, so the automatic emails stop and a template doesn\'t land on top of your note:\n' + ownerLink_('noted', l) + '\n' +
+        'A note written straight from the ' + myEmail_() + ' inbox is noticed on its own within the hour. Their reply comes to you like any other.\n\n') +
+    'To stop these alerts, set READ_ALERTS to no on the Settings tab.');
+  logEvent_(l.id, l.email, 'read_alert', '');
 }
 
 // "Try me later": one short note on the day Logan picks from the needs-you email, nothing before it.
@@ -1058,12 +1098,56 @@ function sendColdEmails_() {
   var perRun = Math.max(1, Math.ceil(cap / 9));
   var room = Math.min(cap - sentToday, perRun);
   if (room <= 0) return;
-  readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.status === 'ready_to_send'; })
-    .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); }).slice(0, room).forEach(function (l) { // strongest first
-    if (isDnc_(l.email)) { stopLead_(l, 'skipped', 'On do-not-contact list'); return; }
-    sendLeadEmail_(l, 'cold_1');
-    updateLead_(l, { status: 'in_sequence', touches: 1, next_touch: addBusinessDays_(new Date(), 3) });
-  });
+  var all = readRows_(TAB.leads, HEAD.leads), counts = { A: 0, B: 0 };
+  all.forEach(function (l) { if (l.subject_test === 'A' || l.subject_test === 'B') counts[l.subject_test]++; });
+  var queue = all.filter(function (l) { return l.status === 'ready_to_send'; })
+    .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); }); // strongest first
+  for (var i = 0, sent = 0; i < queue.length && sent < room; i++) {
+    var l = queue[i];
+    if (isDnc_(l.email)) { stopLead_(l, 'skipped', 'On do-not-contact list'); continue; }
+    if (!mailDomainOk_(l.email)) { stopLead_(l, 'skipped', 'Email domain doesn\'t accept email'); continue; }
+    // The subject line test: every other first email goes out with COLD_SUBJECT_B, so the two stay even.
+    var subjectB = nextSubjectVariant_(counts) === 'B' ? subjectB_(l) : '', variant = subjectB ? 'B' : 'A';
+    sendLeadEmail_(l, 'cold_1', subjectB ? { subject_override: subjectB } : null);
+    counts[variant]++;
+    sent++;
+    updateLead_(l, { status: 'in_sequence', touches: 1, next_touch: addBusinessDays_(new Date(), 3), subject_test: String(setting_('COLD_SUBJECT_B') || '').trim() ? variant : '' });
+  }
+}
+
+// Whether an address's domain takes email at all: it has mail servers (MX records), or failing that a web address that
+// mail can fall back to. Asked of Google's public DNS just before a first cold email, since a dead domain means a bounce,
+// and bounces hurt how Gmail treats everything else sent from this account. Any trouble asking counts as yes, so a hiccup
+// never holds an email back. It can't tell whether one mailbox exists (info@ on a domain that works), only the domain.
+var MAIL_OK_DOMAINS = ['gmail.com', 'yahoo.com', 'yahoo.ca', 'hotmail.com', 'outlook.com', 'live.com', 'icloud.com', 'shaw.ca', 'telus.net', 'telusplanet.net'];
+var _mailDomains = {};
+function mailDomainOk_(email) {
+  var d = String(email || '').toLowerCase().split('@')[1] || '';
+  d = d.trim().replace(/\.$/, '');
+  if (!d) return false;
+  if (MAIL_OK_DOMAINS.indexOf(d) > -1) return true;
+  if (d in _mailDomains) return _mailDomains[d];
+  var ask = function (type) {
+    var r = UrlFetchApp.fetch('https://dns.google/resolve?name=' + encodeURIComponent(d) + '&type=' + type, { muteHttpExceptions: true });
+    return r.getResponseCode() === 200 ? JSON.parse(r.getContentText()) : null;
+  };
+  var has = function (res, t) { return !!res && (res.Answer || []).some(function (a) { return a.type === t; }); };
+  var ok = true;
+  try {
+    var mx = ask('MX');
+    if (mx && mx.Status === 3) ok = false; // the domain doesn't exist
+    else if (mx && mx.Status === 0) {
+      var recs = (mx.Answer || []).filter(function (a) { return a.type === 15; });
+      // "0 ." is a null MX: the domain says outright that it takes no email.
+      if (recs.length) ok = !recs.every(function (a) { return /^0\s+\.?$/.test(String(a.data).trim()); });
+      else {
+        var a = ask('A');
+        if (a && a.Status === 0 && !has(a, 1)) { var aaaa = ask('AAAA'); ok = !(aaaa && aaaa.Status === 0 && !has(aaaa, 28)); }
+      }
+    }
+  } catch (err) { ok = true; }
+  _mailDomains[d] = ok;
+  return ok;
 }
 
 /* ── follow-ups for every sequence ── */
@@ -1112,8 +1196,17 @@ function checkReplies_() {
     var thread;
     try { thread = GmailApp.getThreadById(l.thread_id); } catch (err) { return; }
     if (!thread) return;
+    var msgs = thread.getMessages();
+    // A note Logan wrote himself in the thread (sent after the last automatic email) takes over from the templates.
+    if (NOTE_STOPS[l.status] && l.next_touch && l.last_touch) {
+      var after = new Date(l.last_touch).getTime() + 2 * 60e3;
+      var mine = msgs.filter(function (m) {
+        return !(m.isDraft && m.isDraft()) && m.getDate().getTime() > after && String(m.getFrom()).toLowerCase().indexOf(me) > -1;
+      });
+      if (mine.length) personalNote_(l, mine[mine.length - 1]);
+    }
     var since = Number(l.last_reply_at || 0);
-    var fresh = thread.getMessages().filter(function (m) {
+    var fresh = msgs.filter(function (m) {
       return m.getDate().getTime() > since && String(m.getFrom()).toLowerCase().indexOf(me) === -1;
     });
     if (!fresh.length) return;
@@ -1123,11 +1216,44 @@ function checkReplies_() {
   });
 }
 
+// Statuses whose automatic emails stop once Logan writes in the thread himself.
+var NOTE_STOPS = { in_sequence: true, check_back: true, audit_sent: true, proposal_sent: true };
+
+// Logan wrote to the shop himself, so a template doesn't land on top of his note. Cold and site-form follow-ups stop; for
+// a proposal, the nudge is dropped and it still comes back to him if they're quiet for 5 business days. Their reply,
+// whenever it comes, is read like any other. Seen in the thread when he writes from this account's inbox; a note from
+// Superhuman (ledgelow@gmail.com, sending as this address) never reaches this mailbox, so the read alert also has a link
+// for it (ownerNoted_).
+function personalNote_(l, m) { noteStops_(l, m.getDate(), String(m.getSubject() || '').slice(0, 200)); }
+function ownerNoted_(l) {
+  var name = l.business || l.email;
+  if (!NOTE_STOPS[l.status] || !l.next_touch) return { title: 'Nothing waiting', message: 'No automatic emails are lined up for ' + name + ', so there\'s nothing to stop.' };
+  noteStops_(l, new Date(), 'from the read alert link');
+  return { title: 'Automatic emails stopped', message: 'Nothing more goes to ' + name + ' on its own. Their reply comes to you like any other.' };
+}
+function noteStops_(l, when, detail) {
+  var day = Utilities.formatDate(when, tz_(), 'EEE MMM d');
+  var fields = { last_touch: when };
+  if (l.status === 'proposal_sent') {
+    fields.touches = SEQUENCES.proposal_sent.length;
+    fields.next_touch = addBusinessDays_(when, 5);
+    fields.notes = appendNote_(l.notes, 'You wrote to them yourself on ' + day + ', so the proposal nudge is off. If they stay quiet for 5 business days, it comes back to you.');
+  } else {
+    fields.status = 'sequence_done';
+    fields.next_touch = '';
+    fields.notes = appendNote_(l.notes, 'You wrote to them yourself on ' + day + ', so the automatic follow-ups stopped. Their reply still comes to you.');
+  }
+  updateLead_(l, fields);
+  logEvent_(l.id, l.email, 'personal_note', detail || '');
+}
+
 function handleReply_(l, msg) {
   if (/mailer-daemon|postmaster/i.test(String(msg.getFrom()))) { stopLead_(l, 'bounced', 'Delivery failed'); return; }
   var subject = String(msg.getSubject() || '');
   var auto = String(msg.getHeader('Auto-Submitted') || '').toLowerCase();
   if ((auto && auto !== 'no') || AUTO_SUBJECT.test(subject)) { logEvent_(l.id, l.email, 'auto_reply', subject); return; }
+  // No name yet: the reply's From line usually has one ("Mike Lambert <info@...>"), so the next email says "Hi Mike".
+  if (!l.first_name) { var fromName = nameFromFrom_(msg.getFrom()); if (fromName) updateLead_(l, { first_name: fromName }); }
 
   var text = topOfReply_(msg.getPlainBody() || '');
   var sorted = sortReply_(text);
@@ -2674,6 +2800,8 @@ function showAuditStatus() {
     'Held (not worth an audit right now): ' + heldN + (heldN ? ' (' + whyList.join(', ') + '; each one\'s reason is in priority_why on the Leads tab)' : ''),
     'Engine spend this month: US$' + monthSpend_().toFixed(2) + ' of ' + setting_('MONTHLY_ENGINE_BUDGET_USD')
   ];
+  var test = subjectTestLines_();
+  if (test.length) lines.push('', 'Subject line test (cold first emails):', test.map(function (t) { return '  ' + t; }).join('\n'));
   if (errors.length) lines.push('', 'Problems in the last day (also on the Events tab):', errors.map(function (e) {
     return '  ' + Utilities.formatDate(new Date(e.timestamp), tz_(), 'h:mm a') + ' ' + String(e.detail || '').split('\n')[0].slice(0, 160);
   }).join('\n'));
@@ -5120,13 +5248,12 @@ var EMAILS = {
   },
   cold_1: {
     subject: '{search_subject}',
-    body: 'Hi {first},\n\n{search_line} The biggest opportunity: {top_finding}\n\n{value_para}' +
-      'Wanted to share it with you in case it\'s helpful (no cost and nothing to sign up for):\n{audit_url}\n\n' +
-      'I\'m {sender}, and I run Ledge Communications here in Alberta. {intro_line} ' +
-      'If it\'d help, I\'m happy to put together a plan for where you could start. Just reply and let me know.\n\nThanks,\n{sign}'
+    body: 'Hi {first},\n\n{lead_line}\n\nI put together a one-page look at what came up and where {short_business} stands:\n{audit_url}\n\n' +
+      'No cost and nothing to sign up for. I\'m {sign}, and I run Ledge Communications here in Alberta, setting up Google Ads for local trades. ' +
+      'Want me to send over where I\'d start?{pass_line}\n\nThanks,\n{sign}'
   },
   cold_2: {
-    body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only take one thing away from it, I\'d start here: {business} should absolutely {fix_1_them}.\n\n' +
+    body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only do one thing from it, I\'d start here: {fix_1}.\n\n' +
       'Happy to set it up for you or share more details. Just let me know, and I\'ll send a plan for how I\'d recommend running it.\n\nAll the best,\n{sign}'
   },
   cold_3: {
@@ -5138,10 +5265,9 @@ var EMAILS = {
   },
   cold_ads_1: {
     subject: '{ads_subject}',
-    body: 'Hi {first},\n\n{search_line} It includes where your ads showed up. The biggest thing that stood out: {top_finding}\n\n{value_para}' +
-      'Wanted to share it with you in case it\'s helpful (no cost and nothing to sign up for):\n{audit_url}\n\n' +
-      'I\'m {sender}, and I run Ledge Communications here in Alberta. {intro_line} ' +
-      'If it\'d help, I\'m happy to look inside the account and show you where the budget is going. Just reply and let me know.\n\nThanks,\n{sign}'
+    body: 'Hi {first},\n\n{lead_line}\n\nI put together a one-page look at what came up, including where your ads did and didn\'t show:\n{audit_url}\n\n' +
+      'No cost and nothing to sign up for. I\'m {sign}, and I run Ledge Communications here in Alberta, managing Google Ads for local trades. ' +
+      'Want me to send over what I\'d look at first in your account?{pass_line}\n\nThanks,\n{sign}'
   },
   cold_ads_2: {
     body: 'Hi {first},\n\nFollowing up on the audit I sent. From the outside I can see where your ads show up. From the inside I can see why: ' +
@@ -5226,19 +5352,33 @@ function emailVars_(l) {
   var paymentStep = fbConnected_() ? 'The invoice comes from FreshBooks within the hour. You can pay it online by card or straight from your bank account.'
     : pay ? 'You can pay here whenever suits: ' + pay : 'I\'ll send the invoice today.';
   var business = l.business || 'your business';
+  var greet = greetingName_(l);
+  var topFinding = (function (f) {
+    f = String(f || '');
+    var first = f.split(/\s+/)[0] || '';
+    return /^(Google|Local|I|I'm|I've|LSA|GBP)$/.test(first) || (l.business && f.indexOf(l.business) === 0) ? f : f.charAt(0).toLowerCase() + f.slice(1);
+  })(l.top_finding);
   return {
-    first: l.first_name || 'there',
+    first: greet,
     business: business,
+    short_business: l.business ? shortBusiness_(l.business) : business,
+    // Opens the cold first email with the finding: 'I searched "furnace repair airdrie" on a phone in Airdrie, and one thing
+    // stood out: three Google Verified shops...'.
+    lead_line: (kw ? 'I searched "' + kw + '" on a phone in ' + townWords_(town) : 'I looked at how ' + (l.business ? shortBusiness_(l.business) : 'your business') + ' shows up on Google') +
+      (topFinding ? ', and one thing stood out: ' + topFinding.replace(/\s+$/, '').replace(/([^.!?])$/, '$1.') : '.'),
+    // A shared inbox (info@, office@) with no name to go on: someone else may handle marketing.
+    pass_line: !l.first_name && !emailFirstName_(l.email) && roleInbox_(l.email) ? ' If someone else looks after marketing, I\'d appreciate you passing this along.' : '',
     audit_url: l.audit_slug ? auditUrl_(l) : '',
     proposal_url: l.proposal_slug ? siteUrl_() + '/proposal/' + l.proposal_slug : '',
     // Mid-sentence after a colon ("The biggest opportunity: three other shops..."), so it starts lowercase unless it opens
     // with a name (Google, Local Services Ads, the shop's own name) or "I".
-    top_finding: (function (f) {
-      f = String(f || '');
+    top_finding: topFinding,
+    // After "I'd start here:", so lowercase too, unless it opens with a name.
+    fix_1: (function (f) {
+      f = String(f || '').replace(/\.$/, '');
       var first = f.split(/\s+/)[0] || '';
-      return /^(Google|Local|I|I'm|I've|LSA|GBP)$/.test(first) || (l.business && f.indexOf(l.business) === 0) ? f : f.charAt(0).toLowerCase() + f.slice(1);
-    })(l.top_finding),
-    fix_1: String(l.fix_1 || '').replace(/\.$/, ''),
+      return /^(Google|Local|LSA|GBP)$/.test(first) || /^[A-Z]{2,}\b/.test(f) || (l.business && f.indexOf(l.business) === 0) ? f : f.charAt(0).toLowerCase() + f.slice(1);
+    })(l.fix_1),
     // After "<business> should absolutely ...", so "your" reads as "their" (audits written before the prompt said not to use it).
     fix_1_them: String(l.fix_1 || '').replace(/\.$/, '').replace(/\byou're\b/gi, 'they\'re').replace(/\byours\b/gi, 'theirs').replace(/\byour\b/gi, 'their').replace(/\byou\b/gi, 'they'),
     sender: setting_('SENDER_NAME') || 'Logan',
@@ -5249,7 +5389,7 @@ function emailVars_(l) {
     keyword_q: kw ? '"' + kw + '"' : 'for what you do' + (town ? ' around ' + townWords_(town) : ''),
     search_hook: kw ? 'who shows up for "' + kw + '"' : 'a quick look at how you show up on Google',
     ads_hook: kw ? 'your ads on "' + kw + '"' : 'a quick look at your Google Ads',
-    search_subject: kw ? 'Who shows up for "' + kw + '"' : business + ' on Google',
+    search_subject: kw ? 'Who shows up for "' + kw + '"' : shortBusiness_(business) + ' on Google',
     ads_subject: kw ? 'Your ads on "' + kw + '"' : 'Your Google Ads',
     search_line: kw ? 'I searched "' + kw + '" on a phone in ' + townWords_(town) + ' and put together a quick review of what came up, and where ' + business + ' stands.'
       : 'I looked at how ' + business + ' shows up on Google and put together a quick review.',
@@ -5331,6 +5471,113 @@ function testColdEmail() {
   var msg = sendTestColdEmail_(r.getResponseText());
   ui.alert('Test cold email', msg, ui.ButtonSet.OK);
 }
+/* ── the subject line test on cold first emails ── */
+
+// A shop's name as it reads in a subject line: no legal suffix, no tagline after a dash, bar, or comma, nothing in brackets.
+// "Lamberts HVAC Ltd. Heating & Air Conditioning" is "Lamberts HVAC".
+function shortBusiness_(name) {
+  var n = String(name || '').replace(/\s*\(.*$/, '').split(/\s+[-|\u2013\u2014]\s+|\s*[|,]\s*/)[0];
+  n = n.replace(/\s+a division of\b.*$/i, '').replace(/\s+(ltd|limited|inc|incorporated|corp|corporation)\b\.?.*$/i, '').trim();
+  // A name in capitals ("QUICK LIFT GARAGE DOORS") reads as shouting in a subject or a greeting. Words of three letters
+  // or fewer keep their capitals, since they're usually initials (ABC, AC), and so does HVAC.
+  if (n && n === n.toUpperCase() && (n.match(/[A-Z]{5,}/g) || []).length >= 2) {
+    n = n.split(/\s+/).map(function (w) { return w.length > 3 && w !== 'HVAC' ? w.charAt(0) + w.slice(1).toLowerCase() : w; }).join(' ');
+  }
+  return n || String(name || '').trim();
+}
+
+/* ── who a cold email says hello to ── */
+
+// Common first names, for reading one out of an email address (mike@, sarah.jones@). Words that are also ordinary words
+// (Art, Hope, Summer) are left out, so a name is only used when it's almost certainly a person's.
+var FIRST_NAMES = ('aaron adam adrian aidan alan albert alex alexander alexandra alexis alice alicia alison allan allison amanda amandeep amber amit amy ' +
+  'andre andrea andrew andy angela angie anita ann anna anne annie anthony antonio april arjun arnold ashley austin barb barbara barry ben benjamin bernard ' +
+  'beth betty bill billy blair blake bob bobby bonnie brad bradley brandon brenda brendan brent brett brian brianne bridget brittany brooke bruce bryan bryce ' +
+  'byron caleb cam cameron carl carla carlos carmen carol caroline carolyn carrie carter casey catherine cathy chad charles charlie charlotte chelsea cheryl ' +
+  'cherie chris christian christina christine christopher chuck cindy claire clark clayton clint cody colby cole colin colleen connor corey cory courtney craig ' +
+  'curtis cynthia dale dallas dalton damian damon dan dana daniel danielle danny darcy darren darryl daryl dave david dean deanna debbie deborah denis denise ' +
+  'dennis derek derrick devin devon diana diane dianne dominic don donald donna doug douglas drew duane dustin dwayne dylan earl ed eddie edward elaine eli ' +
+  'elizabeth ellen emily emma eric erica erik erin ethan evan evelyn fernando fiona francis frank fred gabriel gail garrett gary gavin geoff geoffrey george ' +
+  'gerald gerry glen glenn gord gordon graham greg gregory gurdeep gurpreet harjit harpreet harvey heather heidi helen henry holly howard hunter ian isaac ' +
+  'jack jackie jacob jake james jamie jan jane janet janice jared jas jasmine jason jaspreet jaswinder jay jean jeff jeffrey jen jenn jennifer jenny jeremy ' +
+  'jerry jesse jessica jill jim jimmy joan joanne jodi jody joe joel john johnny jon jonathan jordan jose joseph josh joshua joyce juan judy julia julie ' +
+  'justin karen kari karl kate katherine kathleen kathy katie kayla keith kelly kelsey ken kendra kenneth kenny kerry kevin kim kimberly kirk kris krista ' +
+  'kristen kristin kuldeep kurt kyle lana lance larry laura lauren laurie lee leah len leo leon les leslie lindsay lindsey linda lisa liam logan lori lorne ' +
+  'louis lucas luke lynn mackenzie maggie mandeep manpreet marc marcel marcus margaret maria marie marilyn mario mark marlene martin marty mary mason matt ' +
+  'matthew maureen megan melanie melissa michael michel michele michelle mike mitch mitchell mohammed monica morgan murray nancy natalie nathan navdeep neil ' +
+  'nicholas nick nicole noah nolan norm norman olivia omar owen pam pamela paolo pardeep pat patricia patrick paul paula peggy perry pete peter phil philip ' +
+  'phillip pierre rachel raj rajinder ralph randy raymond rebecca reg reggie renee rhonda ricardo rick ricky riley rob robert roberta robin rod rodney roger ' +
+  'rohit roland ron ronald ross roy russ russell ruth ryan sabrina sam samantha samuel sandeep sandra sara sarah scott sean shane shannon sharon shaun shawn ' +
+  'shelley sheila sherry simon simran stacey stacy stan stanley stephanie stephen steve steven stewart stu stuart sue sukhdeep susan suzanne tammy tanya tara ' +
+  'taylor ted teresa terri terry theresa thomas tim timothy tina todd tom tommy tony tracy travis trent trevor troy tyler valerie vanessa vern victor victoria ' +
+  'vikas vince vincent virginia walter wanda warren wayne wendy wes wesley william willy zach zachary').split(' ').reduce(function (o, n) { o[n] = true; return o; }, {});
+// Shared inboxes: whoever reads one may not be the person who'd decide on ads.
+var ROLE_INBOX = /^(?:hi|ops|cs|hr|book|care|main|web)$|^(info|office|admin|contact|hello|sales|support|service|dispatch|general|inquir|enquir|mail|email|team|help|customer|booking|reception|account|billing|estimat|quote|schedul|appointment|frontdesk|operation|project|install|repair|emergency|marketing)/;
+var ROLE_SUFFIX = /(info|office|admin|sales|service|dispatch|contact)$/;
+
+// The first name in an address like mike@ or sarah.jones@, or ''.
+function emailFirstName_(email) {
+  var local = String(email || '').toLowerCase().split('@')[0].split('+')[0];
+  var tok = local.split(/[._\-0-9]+/).filter(Boolean)[0] || '';
+  if (tok.length < 3 || tok.length > 12 || !/^[a-z]+$/.test(tok) || !FIRST_NAMES[tok]) return '';
+  return tok.charAt(0).toUpperCase() + tok.slice(1);
+}
+// Whether the address is a shared inbox (info@, office@, admin@, or a Gmail like itselectricoffice@).
+function roleInbox_(email) {
+  var local = String(email || '').toLowerCase().split('@')[0].split('+')[0].replace(/[^a-z]/g, '');
+  return !!local && (ROLE_INBOX.test(local) || ROLE_SUFFIX.test(local));
+}
+// The name after "Hi": the first name we have, then one read from the address, then (cold emails only) the shop's team,
+// "Lamberts HVAC team". "there" when the shop's name is too long to read well.
+function greetingName_(l) {
+  var n = String(l.first_name || '').trim() || emailFirstName_(l.email);
+  if (n) return n;
+  if (l.source !== 'cold' || !l.business) return 'there';
+  var b = shortBusiness_(l.business).replace(/^the\s+/i, '').trim();
+  if (!b || b.split(/\s+/).length > 4 || b.length > 32) return 'there';
+  return /\bteam$/i.test(b) ? b : b + ' team';
+}
+// A first name from a reply's From line ("Mike Lambert <info@...>"), when it's a common first name; otherwise ''.
+function nameFromFrom_(from) {
+  var m = String(from || '').match(/^\s*"?([^"<@]+?)"?\s*</);
+  if (!m) return '';
+  var tok = m[1].trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, '');
+  return FIRST_NAMES[tok] ? tok.charAt(0).toUpperCase() + tok.slice(1) : '';
+}
+// Subject B for this shop (COLD_SUBJECT_B with its placeholders filled), or '' when the test is off or a placeholder has
+// nothing to fill it (then the shop gets the usual subject).
+function subjectB_(l) {
+  var tpl = String(setting_('COLD_SUBJECT_B') || '').trim();
+  if (!tpl) return '';
+  var spec = auditSpecOf_(l), kw = spec.searches && spec.searches[0] ? spec.searches[0].keyword : '';
+  var town = spec.area || l.area || '', job = spec.opp && spec.opp.job ? String(spec.opp.job) : '';
+  var vals = { business: shortBusiness_(l.business), search: kw, town: town ? townWords_(town) : '', job: job };
+  var missing = false;
+  var out = tpl.replace(/\{(\w+)\}/g, function (m, k) { if (!(k in vals) || !vals[k]) { missing = true; return m; } return vals[k]; });
+  out = out.replace(/\s+/g, ' ').trim();
+  return missing || !out ? '' : out.charAt(0).toUpperCase() + out.slice(1);
+}
+// Which subject the next cold first email gets: whichever of A and B has gone out less, so the two stay even.
+function nextSubjectVariant_(counts) {
+  return String(setting_('COLD_SUBJECT_B') || '').trim() && counts.B < counts.A ? 'B' : 'A';
+}
+// The test so far, one line per subject: sent, bounced, read their audit, replied.
+function subjectTestLines_() {
+  var leads = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.subject_test === 'A' || l.subject_test === 'B'; });
+  if (!leads.length) return [];
+  var replied = {};
+  readRows_(TAB.events, HEAD.events).forEach(function (e) { if (/^reply_/.test(e.event)) replied[e.lead_id] = true; });
+  var label = { A: 'A (the usual "Who shows up for ...")', B: 'B ("' + (String(setting_('COLD_SUBJECT_B') || '').trim() || 'test subject, now off') + '")' };
+  return ['A', 'B'].map(function (v) {
+    var g = leads.filter(function (l) { return l.subject_test === v; });
+    var bounced = g.filter(function (l) { return l.status === 'bounced'; }).length;
+    var read = g.filter(function (l) { return l.audit_opened; }).length, rep = g.filter(function (l) { return replied[l.id]; }).length;
+    var got = g.length - bounced;
+    var pct = function (n) { return got ? ' (' + Math.round(100 * n / got) + '%)' : ''; };
+    return v + ': ' + g.length + ' sent' + (bounced ? ', ' + bounced + ' bounced' : '') + ', ' + read + ' read their audit' + pct(read) + ', ' + rep + ' replied' + pct(rep) + '. ' + label[v];
+  });
+}
+
 function sendTestColdEmail_(list) {
   var to = String(list || '').split(/[,;\s]+/).map(function (a) { return a.trim(); }).filter(function (a) { return /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(a); }).slice(0, 5);
   if (!to.length) return 'No email addresses found. Type them separated by commas.';
@@ -5345,12 +5592,13 @@ function sendTestColdEmail_(list) {
   var tpl = EMAILS[trackKey_(l, 'cold_1')], vars = emailVars_(l);
   if (vars.audit_url) vars.audit_url = auditUrl_(l) + ME_;
   var subject = fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text = fillText_(tpl.body, vars) + footer_(test);
+  var subjects = [subject].concat(subjectB_(l) ? [subjectB_(l)] : []);
   var sent = [], failed = [];
   to.forEach(function (a) {
-    try { gmailSend_(a, subject, text, { unsubUrl: unsubUrl_(test) }); sent.push(a); } catch (err) { failed.push(a + ' (' + String(err && err.message || err).slice(0, 60) + ')'); }
+    try { subjects.forEach(function (sj) { gmailSend_(a, sj, text, { unsubUrl: unsubUrl_(test) }); }); sent.push(a); } catch (err) { failed.push(a + ' (' + String(err && err.message || err).slice(0, 60) + ')'); }
   });
   logEvent_('', '', 'test_cold_email', 'The ' + (sentEv ? 'one sent to ' : 'one queued for ') + (l.business || l.email) + ', to ' + sent.join(', ') + (failed.length ? '; failed: ' + failed.join(', ') : ''));
-  return 'Sent "' + subject + '" (the email ' + (l.business || 'a shop') + (sentEv ? ' got' : ' will get') + ') to ' + (sent.join(', ') || 'nobody') + '.' +
+  return 'Sent "' + subjects.join('" and "') + '" (the email ' + (l.business || 'a shop') + (sentEv ? ' got' : ' will get') + (subjects.length > 1 ? ', with each subject' : '') + ') to ' + (sent.join(', ') || 'nobody') + '.' +
     (failed.length ? ' Failed: ' + failed.join(', ') + '.' : '') +
     ' Give it a few minutes, then check each inbox: Inbox, Promotions or Other, or Spam. For mail-tester, go back to its page and check your score.';
 }
@@ -5365,7 +5613,7 @@ function sendLeadEmail_(l, key, extra) {
   if (l.thread_id && !tpl.subject) {
     res = gmailSend_(l.email, 'Re: ' + threadSubject_(l.thread_id), text, { threadId: l.thread_id, inReplyTo: l.last_msg_id, unsubUrl: unsubUrl_(l) });
   } else {
-    res = gmailSend_(l.email, fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text, { unsubUrl: unsubUrl_(l) });
+    res = gmailSend_(l.email, vars.subject_override || fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text, { unsubUrl: unsubUrl_(l) });
   }
   updateLead_(l, { thread_id: res.threadId, last_msg_id: res.messageId || l.last_msg_id, last_touch: new Date() });
   logEvent_(l.id, l.email, 'sent_' + key, actual !== key ? actual : '');
@@ -5467,6 +5715,7 @@ function sendDigest() {
     '• Proposals approved: ' + count('won') + '\n' +
     '• Calls booked: ' + count('booked') + '\n' +
     '• Unsubscribes: ' + count('unsubscribed') + ', not interested: ' + count('not_interested') + ', bounces: ' + count('bounced') + '\n\n' +
+    (subjectTestLines_().length ? 'Subject line test, all time\n' + subjectTestLines_().map(function (t) { return '• ' + t; }).join('\n') + '\n\n' : '') +
     'Engine spend this month: about US$' + monthSpend_().toFixed(2) + ' of US$' + setting_('MONTHLY_ENGINE_BUDGET_USD') + '\n\n' +
     'Coming up\n' + (upcoming.length ? upcoming.join('\n') : '• No calls booked') + '\n\n' +
     'Pipeline now\n' + Object.keys(by).sort().map(function (k) { return '• ' + k + ': ' + by[k]; }).join('\n') +

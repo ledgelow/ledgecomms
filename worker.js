@@ -28,6 +28,7 @@ export default {
     }
     if (get && path === "/sitemap.xml") return sitemap();
     if (get && OLD_PAGES[path.toLowerCase()]) return Response.redirect("https://" + SITE_HOST + OLD_PAGES[path.toLowerCase()], 301);
+    if (get && GONE_PAGES.some((r) => r.test(path.toLowerCase()))) return fillPageValues(notFound(410), env, null, "Not found");
 
     if (path.startsWith("/api/")) return handleApi(request, env, path);
     if (path.startsWith("/img/") && request.method === "GET") return auditImage(url, env, ctx);
@@ -59,22 +60,30 @@ function sitemap() {
   return new Response(body, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
 }
 
-// Addresses from the old Squarespace site, moved to the closest page now. Lower case, no trailing slash. Anything else
-// that's gone gets the not-found page, which is right for a page that no longer exists.
+// Addresses from the old Squarespace site, moved to the closest page now. Lower case, no trailing slash; anything after
+// a "?" is dropped. Anything else that's gone gets the not-found page, which is right for a page that no longer exists.
 const OLD_PAGES = {
   "/home": "/",
   "/about": "/#about", "/about-us": "/#about",
   "/contact": "/#audit", "/contact-us": "/#audit", "/get-started": "/#audit", "/free-audit": "/#audit",
   "/services": "/#how", "/how-it-works": "/#how",
   "/plans": "/pricing/",
+  // The old service pages (Search Console still had them in November 2026).
+  "/digital-marketing-services": "/", "/seo-digital-marketing-services": "/",
+  "/website-development-digital-marketing-services": "/pricing/",
+  "/landing-page-and-ux-optimization-digital-marketing-services": "/pricing/",
 };
+// Old Squarespace pages with nothing like them on the new site: the blog (every post, tag, and category), the gallery,
+// and the content marketing page. They answer 410 Gone, which tells Google they were taken down on purpose, so it drops
+// them from its list sooner than with a plain not-found. Visitors see the same not-found page either way.
+const GONE_PAGES = [/^\/blog(\/|$)/, /^\/new-gallery$/, /^\/digital-inbound-content-marketing-strategy$/];
 
-function notFound() {
+function notFound(status = 404) {
   return new Response(
     simplePage("Page not found | Ledge Communications",
       "<h1>This page isn't here</h1><p>It may have moved when the site was rebuilt.</p>" +
       "<p><a href=\"/\">Ledge Communications</a> &middot; <a href=\"/pricing/\">Pricing</a> &middot; <a href=\"/#audit\">Get a free audit</a></p>"),
-    { status: 404, headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex" } },
+    { status, headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex" } },
   );
 }
 

@@ -15,25 +15,50 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 9): Search Console after the site switch
+## Where you are (Nov 9, afternoon): a shorter first email, read alerts, old pages cleared
 
-Search Console flagged four reasons pages aren't indexed. Three are expected; one needed work.
-- **Blocked by robots.txt:** the audit, proposal, and report pages, samples included. Each is for one shop, so they stay
-  out of Google on purpose.
-- **Alternate page with proper canonical tag** and **Page with redirect:** other addresses for the same page (www, http,
-  /pricing without the slash, links with tags on the end). Google files them under the main address, which is what
-  should happen. The Worker now sends www, plain http, and the old workers.dev address to https://ledgecommunications.com
-  with a permanent redirect, so there's one address for everything.
-- **Not found (404):** pages from the old Squarespace site. Common ones (about, contact, services, and the like) now
-  redirect to the closest section, and anything else gets a proper "This page isn't here" page. Gone pages drop out of
-  Google on their own; send me the list from the report and any worth keeping get their own redirect.
-- **A sitemap** at /sitemap.xml (home, pricing, privacy), listed in robots.txt.
+- **A shorter first cold email (about 80 words).** It opens with the finding ("I searched "furnace repair calgary" on a
+  phone in Calgary, and one thing stood out: ..."), then the audit link, then one plain ask ("Want me to send over where
+  I'd start?"). The dollar estimate and the 10+ years line are out of it; the money stays on the audit and in email 3.
+  Email 2 now reads "If you only do one thing from it, I'd start here: get on Local Services Ads." Audits already in the
+  queue go out with the new copy.
+- **Better hellos.** No more "Hi there" on cold emails: the name from the audit, else one read from the address
+  (mike@ is "Hi Mike"), else the shop's team ("Hi Lamberts HVAC team"). A name you type in `first_name` on the Leads tab
+  wins. When a shop replies, the first name in their From line is saved, so the thank-you says "Thanks Dana".
+- **Shared inboxes** (info@, office@, service@) with no name get one extra line: "If someone else looks after marketing,
+  I'd appreciate you passing this along."
+- **Read alerts (`READ_ALERTS`, on).** The first time a cold prospect who hasn't replied reads their audit, you get
+  "[Ledge] Lamberts HVAC just read their audit": when they were emailed, their priority, the next automatic email, the
+  audit link, and a suggested two-line note. Reply in their thread from Superhuman as usual, and never mention that you
+  saw them read it.
+- **Your note stops the templates.** After sending it, tap the alert's "so the automatic emails stop" link, and nothing
+  more goes to that shop on its own (the row's notes say so). The tap matters: notes sent from Superhuman go out through
+  ledgelow@gmail.com, so the hub never sees them. A note written straight from the ledgecommunications@gmail.com inbox is
+  noticed on its own within the hour. For a proposal, the nudge is dropped, and a quiet proposal still comes back to you
+  after 5 business days.
+- **Dead domains are skipped.** Before a first cold email, the address's domain is checked with Google's public DNS. One
+  that doesn't exist or takes no email is skipped ("Email domain doesn't accept email"), and the next shop takes its slot.
+  It can't tell when one mailbox is gone on a working domain, so the odd bounce still happens.
+- **The old Squarespace pages.** The blog (posts, tags, and categories), /new-gallery, and the content marketing page now
+  answer "410 Gone", which tells Google they were taken down on purpose. The four old service pages redirect: digital
+  marketing and SEO to the home page, website development and landing pages to pricing.
 
-Ship it: upload `worker.js`, `robots.txt`, and `SETUP.md` to GitHub. Then in Search Console:
-1. **Indexing > Sitemaps:** enter `sitemap.xml` and Submit. If an old Squarespace sitemap is listed, remove it.
-2. **URL Inspection:** check https://ledgecommunications.com/ and https://ledgecommunications.com/pricing/, and click
-   Request indexing on each.
-3. **Indexing > Pages > Not found (404):** send me the example URLs it lists.
+Ship it:
+1. Paste `Code.gs` into the Apps Script editor (replace everything) and save. `Templates.gs` hasn't changed.
+2. **Deploy > Manage deployments >** pencil icon **> Version: New version > Deploy.** The read alert runs in the web app,
+   so it starts only once the new version is deployed.
+3. Upload `Code.gs`, `worker.js`, `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md` to GitHub (the Worker
+   rebuilds in about a minute).
+4. Search Console: **Indexing > Pages > Not found (404) > Validate fix.** Google takes a week or two to work through it.
+
+The `READ_ALERTS` row appears on the Settings tab after the next hourly run.
+
+## Where you were (Nov 9, morning): Search Console after the site switch
+
+Done: www, plain http, and the old workers.dev address move to https://ledgecommunications.com for good; the sitemap at
+/sitemap.xml (home, pricing, privacy) is submitted; home and pricing were sent for indexing. "Blocked by robots.txt"
+(the per-shop audit, proposal, and report pages) and "Alternate page with proper canonical tag" or "Page with redirect"
+(other addresses for the same page) are expected and stay.
 
 ## Where you were (Nov 5, night): a subject line test
 
@@ -82,18 +107,8 @@ Oct 28. Now the Worker adds GA4 to every page (site, audits, proposals, reports)
 - **Privacy page** at /privacy/, linked from every footer: what we collect, the service providers, Google Analytics with
   Google's opt-out, and how to ask for a copy or deletion. Google Analytics' terms require one.
 
-Set it up (10 minutes):
-1. **The Measurement ID.** GA4 > Admin > Data streams > the ledgecommunications.com web stream > copy the Measurement ID
-   (starts with G-). Use the existing stream so the Squarespace history stays in the same property.
-2. **Cloudflare.** Workers & Pages > ledgecomms > Settings > Variables and Secrets > Add: type Text, name `GA4_ID`, value
-   the Measurement ID, then Deploy. It's not a secret (it's in every page's code), and `keep_vars` keeps it through
-   GitHub deploys.
-3. **Ship it:** upload the files to GitHub, and replace `Code.gs` and `Templates.gs` in Apps Script.
-4. **Check it:** open ledgecommunications.com on your phone and watch GA4 > Reports > Realtime. Then open
-   ledgecommunications.com/?ledge_me=1 in each browser you use (phone and laptop) to leave them out.
-5. **Key events:** GA4 > Admin > Key events > New key event, and add `generate_lead`, `quote_request`, and
-   `proposal_approved`.
-6. Optional: GA4 > Admin > Data collection > Data retention, set to 14 months (the default is 2).
+Set up Nov 4 and 5 (done): `GA4_ID` in Cloudflare, the key events, and your browsers left out with `?ledge_me=1`
+(`?ledge_me=0` undoes it). Optional: GA4 > Admin > Data collection > Data retention, set to 14 months.
 
 ## Where you were (Nov 3, night): homeowner shops only, each measured on its biggest job
 
