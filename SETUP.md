@@ -15,7 +15,33 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 9, afternoon): a shorter first email, read alerts, old pages cleared
+## Where you are (Nov 12): false replies fixed, nothing waits on you
+
+- **The 21 "replies" weren't replies.** Since the Ledge inbox went into Superhuman, a copy of our own last email turned up
+  in prospects' threads two days after it went (most likely a Superhuman draft or reminder). The hub read each as their
+  reply, so 21 shops stopped getting follow-ups and landed in your needs-you email. None were real. Now a message only
+  counts as theirs when it isn't a draft, has a sender, isn't from the Ledge address or yours (`OWNER_EMAIL`), and
+  doesn't just repeat one of our emails. On the first run after the update, the 21 go back into their sequence (a
+  follow-up that came due meanwhile goes the next business morning), and the Events tab logs what each copy was
+  (`false_reply_undone`).
+- **Screenshots no longer hold anything up (`COLD_SHOT_WAIT_HOURS`, 24).** A cold audit waits a day for your phone
+  screenshots, then gets written without them (it then says nothing about who advertises on that search). The 9 audits
+  waiting since Nov 10 (Airdrie garage doors, Cochrane plumbers, KaiTech) go on the next run. 0 waits as long as it takes.
+- **Read alerts need nothing from you (`READ_PULLS_FOLLOWUP`, yes).** When a prospect reads their audit for the first
+  time, their next follow-up moves up to the next business morning (never sooner than 2 business days after the last
+  email), and the alert says so. Writing to them yourself is optional. Prospects who already read theirs get the same
+  move on the first run after the update.
+
+Ship it:
+1. Paste `Code.gs` into the Apps Script editor (replace everything) and save.
+2. **Deploy > Manage deployments >** pencil icon **> Version: New version > Deploy** (the read change runs in the web app).
+3. Upload `Code.gs` and `SETUP.md` to GitHub.
+
+Two things to clear by hand: **Skip** Tru Electric and Stronghold Electric (waiting for review since Nov 3; the check
+flagged both as builder and commercial shops), and approve or skip the four audits from Nov 9 and 10 (Macleod's,
+5th Element, Timberline, Our Electrician).
+
+## Where you were (Nov 9, afternoon): a shorter first email, read alerts, old pages cleared
 
 - **A shorter first cold email (about 80 words).** It opens with the finding ("I searched "furnace repair calgary" on a
   phone in Calgary, and one thing stood out: ..."), then the audit link, then one plain ask ("Want me to send over where
@@ -202,62 +228,17 @@ pipeline with stronger prospects, put the Calgary quadrants first in `AREAS` (or
 
 Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now**.
 
-## Where you were (Nov 2, night): the check fixes what it finds; you only see what needs you
+## Where you were (Nov 2, night and evening): the check edits; the value box only when the money adds up
 
-From the first batch of 14 "Check these audits" (the flags listed problems for you to fix, which was backwards):
-- **The check is now an editor.** It reads each audit as the owner would, rewrites every line with a problem in place,
-  opens the shop's website itself to confirm what the writer said about it (hours, buttons, what the page says) and drops
-  anything it can't confirm, and takes the value box off when its numbers don't hold up. Then it reads the edited audit
-  a second time to make sure the fixes hold. No new audit is written, so it's quick.
-- **Your review email shows the finished audit.** Each block says "The check: fixed 4 lines before it reached you"
-  (and "left the value box off (why)" when it did). "NEEDS YOU before you approve" appears only for what a rewrite can't
-  settle: the website looks like a different business, the town or trade looks wrong, a search needs a fresh screenshot.
-  Most audits have none, and a flagged one always waits for you.
-- **"600 searches a month" in small towns was a bug.** Google reports every small search as about 10 a month, and the
-  tool was adding up dozens of rewordings. Totals are now capped at four times the three biggest searches, and the
-  audits already written use the corrected numbers on their next view. Expect the Chestermere and Airdrie boxes to
-  show per-job costs instead of monthly totals.
-- **"#3 on the map, below the three that show here"** was a wording bug when the shop was one of the three on the card.
-  The map line now always matches the card.
-- **"Who runs Google ads around you"** now says "Shops high on the map whose websites we could look up", which is
-  what it is (it was claiming to be the three map spots).
-- **The writer** only states what it saw on the shop's site when it fetched that page, keeps seasonal lines true to
-  the date, and calls reviews good only when they're in line with the shops above.
-
-On the first run after the update, the audits the old check flagged (approved ones too, since none has gone out) go
-through the editor and come back finished. Priorities are re-scored on the corrected numbers.
-
-Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now**.
-
-## Where you were (Nov 2, evening): the value box only when the money adds up, strongest prospects first
-
-- **No losing math on the page.** The value box ("About $1,500 a month in Google Ads could book…") now shows only when
-  the work it books starts at no less than the ad spend and its middle is at least twice it (`VALUE_MIN_RETURN`, 2).
-  Appliance repair at typical rates ($1,500 of ads for $600 to $1,350 of work) fails that, so those audits have no box
-  and no dollar line in the emails, and the audit is told the numbers don't pay for that work: it points at the profile,
-  reviews, and Local Services Ads (per lead, not per click) instead of pitching search ads. Big jobs (furnaces, panels,
-  water heaters, garage doors, roofs) pass.
-- **The check** now flags money that doesn't add up too, and has room to reply (the "couldn't run" note was it running
-  out of space; that limit is in the code, not the Sheet).
-- **On the first run after the update:** audits waiting for your review whose box no longer adds up (the two appliance
-  repair ones) are rewritten without it, and ones whose check couldn't run are checked again. Approved audits stay approved.
-
-**Only trades we can help, strongest prospects first**
-- **Appliance repair is off** (`TRADES` is now heating and cooling, plumbing, electrical, garage doors). Cold prospects in
-  a trade that isn't in `TRADES` are held: status `held`, nothing written or sent, no search costs. Roofing prospects
-  found before it went off for the winter are held the same way, and come back with fresh searches when you add roofing
-  back in March. Someone who asked on the site is never held.
-- **Low fits are held too:** a cold prospect whose work search ads can't pay for at typical rates isn't written up.
-- **Every prospect gets a priority out of 100**, from its searches, in two new Leads columns (`priority`, `priority_why`):
-  what the work is worth (up to 40: the work a month of ads could book), room to grow on Google (up to 30: below the top
-  three on the map, rivals advertising when they don't, Google Verified listings without them), and how likely ads are
-  to work (up to 30: rating and reviews, a site with tap-to-call or a form, a claimed profile). 65 and up is high.
-- **Highest first, everywhere:** searches are gathered for the most valuable trades first, audits go to Claude
-  strongest first, review emails list them strongest first with "Priority: 82 of 100 (high)" and the reasons, and
-  approved cold emails go out strongest first. Sort the Leads tab by `priority` to see the whole pipeline that way.
-- The first hourly run after the update ranks everything already in the pipeline and holds what's off.
-
-Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now** once. Then `COLD_EMAIL_ON` can go to yes.
+- The check reads each audit as the owner would, rewrites lines with problems in place, confirms what the writer said
+  about the shop's site, and drops the value box when its numbers don't hold up. Your review email shows the finished
+  audit; "NEEDS YOU" appears only for what a rewrite can't settle (wrong business, town, or trade).
+- Search totals are capped at four times the three biggest searches (small towns were showing "600 a month").
+- The value box shows only when the work it books starts at no less than the ad spend and its middle is at least twice it
+  (`VALUE_MIN_RETURN`, 2). Appliance repair fails that and is off; `TRADES` is heating and cooling, plumbing,
+  electrical, and garage doors (roofing and eavestroughs come back in March). Cold prospects outside `TRADES` are held.
+- Every prospect has a priority out of 100 (`priority`, `priority_why`): what the work is worth (40), room to grow on
+  Google (30), and how likely ads are to work (30). Everything runs strongest first.
 
 ## Where you were (Nov 2): a check before audits reach you
 

@@ -73,7 +73,7 @@ var HEAD = {
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
   reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
 };
-var SCHEMA_VERSION = '24';
+var SCHEMA_VERSION = '25';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -100,8 +100,10 @@ var SETTINGS_DEFAULTS = [
   ['SEARCH_SHOT_DAYS', '14', 'How many days a phone screenshot of a search stays in use on audits. Ads change, so keep it short.'],
   ['REQUIRE_SHOTS', 'yes', 'yes holds each cold audit until every search it uses has a phone screenshot, and emails you the searches to check. no builds without them (the audit then says nothing about who advertises on those searches).'],
   ['SHOT_WAIT_HOURS', '4', 'How long a site-form audit waits for your phone screenshots before it\'s built without them, so it still goes out on the day promised.'],
+  ['COLD_SHOT_WAIT_HOURS', '24', 'How long a cold audit waits for your phone screenshots before it\'s built without them (it then says nothing about who advertises on those searches). 0 waits for them however long it takes.'],
   ['REVIEW_ALL', 'yes', 'yes: every cold audit waits for your OK before it can be emailed (the review email\'s approve-all link makes that one click). no: after the first REVIEW_AUDITS_FIRST, audits the check passes go into the send queue on their own.'],
   ['COLD_SUBJECT_B', 'Made this for {business}', 'A second subject line to test on cold first emails. While it\'s filled in, every other cold first email goes out with it instead of the usual subject (A), and Where the audits are and the Monday digest compare the two: sent, read their audit, replied. Placeholders: {business} (the shop\'s name, shortened), {search} (its first search), {town}, {job} (the big job its audit is on). Clear the cell to stop the test.'],
+  ['READ_PULLS_FOLLOWUP', 'yes', 'yes moves a cold prospect\'s next follow-up up to the next business morning when they read their audit for the first time (never sooner than 2 business days after the last email), so it lands while they\'re thinking about it. no keeps the usual gaps.'],
   ['READ_ALERTS', 'yes', 'yes emails you the moment a cold prospect reads their audit for the first time (and hasn\'t replied), with a suggested personal note. A note you write in their thread stops the automatic emails to that shop. no turns the alerts off.'],
   ['FIT_CHECK', 'yes', 'yes has the small model read each prospect\'s home page before any searches run. Cold prospects that mostly work for businesses, industry, or builders, or don\'t do their trade for homeowners, are held. Every shop\'s second search and value box go on the most valuable homeowner job its site offers (heat pumps, tankless water heaters, sewer lines, EV chargers), when that beats its trade\'s usual one.'],
   ['AUDIT_MIN_PRIORITY', '55', 'Cold prospects scoring below this (out of 100) once their searches are in are held instead of written up, so the audits you review are the strongest. Lower it and they come back on the next run.'],
@@ -305,6 +307,8 @@ function ensureSchema_(force) {
   if (from > 0 && from < 21) backToReview_();
   // 22: prospects not approved yet get their home page read: non-residential ones are held, and ones with a bigger job redone on it.
   if (from > 0 && from < 22) props_().setProperty('FIT_PENDING', '1');
+  // 25: leads marked as replied by a copy of our own email (see fromUs_) go back into their sequence, on the next hourly run.
+  if (from > 0 && from < 25) props_().setProperty('REPLY_RECHECK_PENDING', '1');
 }
 
 // Once (21): a cold audit queued to send that Logan never approved (it went in on its own after the first reviews were
@@ -605,6 +609,7 @@ function runHourly() {
   RUN_STARTED = Date.now();
   try {
     ensureSchema_();
+    step_('undoFalseReplies', function () { if (prop_('REPLY_RECHECK_PENDING') && undoFalseReplies_(runLeft_() - 200000)) props_().deleteProperty('REPLY_RECHECK_PENDING'); });
     step_('checkReplies', checkReplies_);
     step_('checkBounces', checkBounces_);
     step_('checkCalendar', checkCalendar_);
@@ -822,14 +827,30 @@ function handleViewed_(id, t) {
   var fields = { audit_opens: Number(l.audit_opens || 0) + 1 }, firstRead = !l.audit_opened;
   if (firstRead) { fields.audit_opened = new Date(); logEvent_(l.id, l.email, 'audit_opened', ''); }
   updateLead_(l, fields);
-  if (firstRead) { try { readAlert_(l); } catch (err) { logEvent_(l.id, l.email, 'error', 'Read alert failed: ' + (err && err.message || err)); } }
+  if (firstRead) {
+    var moved = null;
+    try { moved = pullForward_(l); } catch (err) { logEvent_(l.id, l.email, 'error', 'Moving the follow-up up failed: ' + (err && err.message || err)); }
+    try { readAlert_(l, moved); } catch (err) { logEvent_(l.id, l.email, 'error', 'Read alert failed: ' + (err && err.message || err)); }
+  }
   return { ok: true, counted: true };
 }
 
-// A cold prospect reading their audit for the first time is the best moment for a short personal note, so Logan hears
-// about it right away (READ_ALERTS). Only while they haven't replied: once they have, the reply email covers it.
+// A cold prospect who just read their audit hears from us sooner, with no step for Logan: the next follow-up moves up to
+// the next business morning (never sooner than 2 business days after the last email). Returns {from, to} when it moved.
+function pullForward_(l) {
+  if (!yes_(setting_('READ_PULLS_FOLLOWUP')) || l.source !== 'cold' || l.status !== 'in_sequence' || l.attention || !l.next_touch) return null;
+  var was = new Date(l.next_touch), soon = addBusinessDays_(new Date(), 1);
+  var floor = l.last_touch ? addBusinessDays_(new Date(l.last_touch), 2) : soon, to = soon > floor ? soon : floor;
+  if (to >= was) return null;
+  updateLead_(l, { next_touch: to });
+  logEvent_(l.id, l.email, 'follow_up_moved', Utilities.formatDate(was, tz_(), 'MMM d') + ' -> ' + Utilities.formatDate(to, tz_(), 'MMM d'));
+  return { from: was, to: to };
+}
+
+// A cold prospect reading their audit for the first time, as a heads-up (READ_ALERTS): nothing is needed from Logan, since
+// the follow-up has moved up on its own, but a short personal note is an option. Only while they haven't replied.
 var READ_ALERT_STATUSES = ['in_sequence', 'sequence_done', 'check_back'];
-function readAlert_(l) {
+function readAlert_(l, moved) {
   if (!yes_(setting_('READ_ALERTS')) || l.source !== 'cold' || READ_ALERT_STATUSES.indexOf(l.status) === -1 || l.attention) return;
   var tz = tz_(), day = function (d) { return Utilities.formatDate(new Date(d), tz, 'EEE MMM d'); };
   var mine = readRows_(TAB.events, HEAD.events).filter(function (e) { return e.lead_id === l.id; });
@@ -839,7 +860,8 @@ function readAlert_(l) {
   var spec = auditSpecOf_(l), job = spec.opp && spec.opp.job ? String(spec.opp.job) : '';
   var seq = SEQUENCES[l.status], step = seq && seq[Number(l.touches || 1)];
   var nth = ['', 'first', 'second', 'third', 'last'][Number(l.touches || 1) + 1] || 'next';
-  var next = l.status === 'in_sequence' && l.next_touch && step ? day(l.next_touch) + ' (the ' + nth + ' email)'
+  var nextAt = moved ? moved.to : l.next_touch;
+  var next = l.status === 'in_sequence' && nextAt && step ? day(nextAt) + ' (the ' + nth + ' email' + (moved ? ', moved up from ' + day(moved.from) + ' because they read it' : '') + ')'
     : l.status === 'check_back' && l.next_touch ? day(l.next_touch) + ' (the check-back email)' : 'none, the emails are done';
   var subject = l.thread_id ? threadSubject_(l.thread_id) : '';
   var ask = job ? 'is ' + job + ' work something you want more of right now, or are you pretty booked up?' : 'is there a kind of job you\'d like more of right now?';
@@ -851,11 +873,10 @@ function readAlert_(l) {
     'Their audit: ' + auditUrl_(l) + ME_ + '\n' +
     'Their email: ' + l.email + '\n\n' +
     (noted ? 'You wrote to them yourself on ' + day(noted.timestamp) + ', so they read it after your note. If they haven\'t replied in a few days, one more short line from you is the next step.\n\n'
-      : 'Now, while it\'s fresh, is the best time for a short personal note. Reply in their thread' + (subject ? ' (search for "' + subject + '")' : '') +
+      : 'Nothing needed from you: the next email goes on its own' + (moved ? ', sooner now that they\'ve read it' : '') + '.\n\n' +
+        'If you\'d rather write to them yourself, reply in their thread' + (subject ? ' (search for "' + subject + '")' : '') +
         ', from Superhuman as ' + myEmail_() + ' as usual: two or three lines and one easy question, like "Hi ' + vars.first + ', quick question: ' + ask + '" ' +
-        'Don\'t mention that you saw them read it.\n\n' +
-        'Then tap this, so the automatic emails stop and a template doesn\'t land on top of your note:\n' + ownerLink_('noted', l) + '\n' +
-        'A note written straight from the ' + myEmail_() + ' inbox is noticed on its own within the hour. Their reply comes to you like any other.\n\n') +
+        'Don\'t mention that you saw them read it. Then tap this, so a template doesn\'t land on top of your note:\n' + ownerLink_('noted', l) + '\n\n') +
     'To stop these alerts, set READ_ALERTS to no on the Settings tab.');
   logEvent_(l.id, l.email, 'read_alert', '');
 }
@@ -1187,6 +1208,7 @@ function sendFollowUps_() {
 
 function checkReplies_() {
   var me = myEmail_();
+  var us = fromUs_(me);
   // Clients are done as leads, but a management client's reply with their customer ID still needs reading.
   var waiting = {};
   readRows_(TAB.clients, HEAD.clients).forEach(function (c) { if (c.plan === 'management' && !c.customer_id) waiting[c.lead_id] = true; });
@@ -1196,24 +1218,73 @@ function checkReplies_() {
     var thread;
     try { thread = GmailApp.getThreadById(l.thread_id); } catch (err) { return; }
     if (!thread) return;
-    var msgs = thread.getMessages();
+    var msgs = thread.getMessages().filter(function (m) { return !(m.isDraft && m.isDraft()); });
     // A note Logan wrote himself in the thread (sent after the last automatic email) takes over from the templates.
     if (NOTE_STOPS[l.status] && l.next_touch && l.last_touch) {
       var after = new Date(l.last_touch).getTime() + 2 * 60e3;
-      var mine = msgs.filter(function (m) {
-        return !(m.isDraft && m.isDraft()) && m.getDate().getTime() > after && String(m.getFrom()).toLowerCase().indexOf(me) > -1;
-      });
+      var sent = msgs.filter(function (m) { return us(m) && m.getDate().getTime() <= after; }).map(function (m) { return plainForMatch_(m.getPlainBody()); });
+      var mine = msgs.filter(function (m) { return m.getDate().getTime() > after && us(m) && !copyOfOurs_(m, sent); });
       if (mine.length) personalNote_(l, mine[mine.length - 1]);
     }
     var since = Number(l.last_reply_at || 0);
-    var fresh = msgs.filter(function (m) {
-      return m.getDate().getTime() > since && String(m.getFrom()).toLowerCase().indexOf(me) === -1;
-    });
+    var ours = msgs.filter(us).map(function (m) { return plainForMatch_(m.getPlainBody()); });
+    var fresh = msgs.filter(function (m) { return m.getDate().getTime() > since && theirs_(m, us, ours); });
     if (!fresh.length) return;
     var latest = fresh[fresh.length - 1];
     updateLead_(l, { last_reply_at: latest.getDate().getTime() });
     handleReply_(findLead_('id', l.id), latest);
   });
+}
+
+// Which messages in a lead's thread are really from them. A mail app on the Ledge inbox can leave things in a thread that
+// aren't: Superhuman, once the inbox was added to it in November 2026, left a copy of our last email in 21 threads two days
+// after it went, and the hub took each for a reply (the follow-ups stopped and they all landed in the needs-you email). So
+// a message counts only when it isn't a draft, has a sender, isn't from us (this account, or Logan's own OWNER_EMAIL), and
+// doesn't just repeat one of our own emails.
+function fromUs_(me) {
+  var owner = String(setting_('OWNER_EMAIL') || '').toLowerCase().trim();
+  return function (m) { var f = String(m.getFrom() || '').toLowerCase(); return f.indexOf(me) > -1 || (!!owner && f.indexOf(owner) > -1); };
+}
+function theirs_(m, us, ours) {
+  if (m.isDraft && m.isDraft()) return false;
+  if (!String(m.getFrom() || '').trim() || us(m)) return false;
+  return !copyOfOurs_(m, ours);
+}
+// Plain text for comparing emails: zero-width characters out (mail apps pad previews with them), spaces collapsed.
+function plainForMatch_(s) { return String(s || '').replace(/[\u200b-\u200d\u2060\ufeff\u034f\u00ad]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+// Whether a message only repeats one of ours: its opening lines match the start of something we sent.
+function copyOfOurs_(m, ours) {
+  var top = plainForMatch_(topOfReply_(m.getPlainBody() || '')).slice(0, 80);
+  return top.length >= 25 && ours.some(function (o) { return o.indexOf(top) > -1; });
+}
+
+// A lead marked as replied whose thread has no real reply in it (only a copy of our own email) goes back to where it was:
+// its sequence, with the next follow-up on its old date, or the next business morning if that has passed. What the copy was
+// is logged (false_reply_undone), so the cause can be confirmed. True once every such lead is done.
+function undoFalseReplies_(budget) {
+  var me = myEmail_(), us = fromUs_(me), start = Date.now(), now = new Date();
+  var todo = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.status === 'replied' && l.thread_id && (l.attention === 'reply' || l.attention === 'later'); });
+  for (var i = 0; i < todo.length; i++) {
+    if (Date.now() - start > budget) return false;
+    var l = todo[i], thread;
+    try { thread = GmailApp.getThreadById(l.thread_id); } catch (err) { continue; }
+    if (!thread) continue;
+    var all = thread.getMessages(), sent = all.filter(function (m) { return !(m.isDraft && m.isDraft()) && us(m); });
+    var ours = sent.map(function (m) { return plainForMatch_(m.getPlainBody()); });
+    if (all.some(function (m) { return theirs_(m, us, ours); })) continue; // a real reply: it stays with Logan
+    var odd = all.filter(function (m) { return sent.indexOf(m) < 0; }).map(function (m) {
+      return (m.isDraft && m.isDraft() ? 'draft' : 'message') + ' from "' + String(m.getFrom() || '(none)') + '" ' + Utilities.formatDate(m.getDate(), tz_(), 'EEE MMM d, h:mm a');
+    });
+    var back = l.source === 'cold' ? 'in_sequence' : 'audit_sent', seq = SEQUENCES[back], more = !!seq[Number(l.touches || 1)];
+    var next = l.next_touch && new Date(l.next_touch) > now ? new Date(l.next_touch) : addBusinessDays_(now, 1);
+    updateLead_(l, { status: more ? back : 'sequence_done', attention: '', next_touch: more ? next : '',
+      notes: appendNote_(l.notes, 'That "reply" was a copy of our own email that a mail app left in the thread, not from them, so ' + (more ? 'the follow-ups are back on.' : 'nothing more was needed.')) });
+    logEvent_(l.id, l.email, 'false_reply_undone', odd.join('; ').slice(0, 900));
+  }
+  // Prospects who read their audit before follow-ups moved up on a read (READ_PULLS_FOLLOWUP) get the same treatment once,
+  // so their read alerts need nothing from Logan either.
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) { if (l.audit_opened) pullForward_(l); });
+  return true;
 }
 
 // Statuses whose automatic emails stop once Logan writes in the thread himself.
@@ -2881,16 +2952,19 @@ function shotQueries_() {
 }
 
 // Audits waiting on a phone check: search -> the shops waiting on it. Without a screenshot an audit can't say who advertises
-// on a search, which is most of what it's for. A site-form audit stops waiting SHOT_WAIT_HOURS after they asked, so it's on time.
+// on a search, which is most of what it's for. A site-form audit stops waiting SHOT_WAIT_HOURS after they asked, so it's on time,
+// and a cold one COLD_SHOT_WAIT_HOURS after it was ready to write, so a busy week never leaves the pipeline waiting on Logan.
 function shotsWanted_() {
   var want = {};
   if (!yes_(setting_('REQUIRE_SHOTS'))) return want;
   var have = shotQueries_(), waitMs = Number(setting_('SHOT_WAIT_HOURS') || 4) * 3600e3, leads = {};
+  var coldWait = coldShotWaitMs_();
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) { leads[l.id] = l; });
   readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) {
     var l = leads[j.lead_id];
     if (j.kind !== 'audit' || j.status !== 'queued' || !l) return;
     if (l.source !== 'cold' && Date.now() - new Date(l.created || j.created).getTime() > waitMs) return;
+    if (l.source === 'cold' && Date.now() - new Date(j.created || l.created).getTime() > coldWait) return;
     var ev = freshEvidence_(j.lead_id);
     if (!ev) return;
     // Only prospects worth an audit: not ones that will be held, even with the most the screenshots could add.
@@ -2904,6 +2978,10 @@ function shotsWanted_() {
     });
   });
   return want;
+}
+function coldShotWaitMs_() {
+  var h = String(setting_('COLD_SHOT_WAIT_HOURS')).trim(), n = h === '' ? 24 : Number(h);
+  return n > 0 ? n * 3600e3 : Infinity;
 }
 // The most a phone screenshot can add to a prospect's score: Google Verified listings it isn't in (8), and its own ads missing
 // from a search where it advertises (4 more than without the screenshot).
@@ -2935,6 +3013,8 @@ function askForShots_() {
     'Search each one on your phone and save the whole results page as a PDF (Share, then Print or Create PDF), or take normal screenshots from the top down. ' +
     'Drop them in the "Ledge search screenshots" Drive folder. Naming each file after its search ("electrician chestermere.pdf") makes the match certain; ' +
     'otherwise it\'s worked out from the page. The next run reads them and writes the audits, and they come to you after the check.' +
+    (coldShotWaitMs_() < Infinity ? '\n\nIf you don\'t get to it, cold audits go ahead without the phone check ' + Number(setting_('COLD_SHOT_WAIT_HOURS') || 24) +
+      ' hours after they\'re ready to write (they then say nothing about who advertises on that search), so nothing waits on you for long.' : '') +
     (keys.some(function (k) { return want[k].site_form; }) ? '\n\nOne of these is for someone who asked on the site. It goes ahead without the phone check ' +
       Number(setting_('SHOT_WAIT_HOURS') || 4) + ' hours after they asked, so it still goes out on time.' : '') +
     '\n\nTo build cold audits without phone checks, set REQUIRE_SHOTS to no on the Settings tab.');
