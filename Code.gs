@@ -77,7 +77,7 @@ var HEAD = {
   // months: searches a month for the last 12 months, oldest first; peak_month: the busiest of them.
   research: ['set', 'kind', 'keyword', 'volume', 'cpc_usd', 'bid_low_usd', 'bid_high_usd', 'competition', 'months', 'peak_month', 'location', 'fetched']
 };
-var SCHEMA_VERSION = '26';
+var SCHEMA_VERSION = '27';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -109,6 +109,7 @@ var SETTINGS_DEFAULTS = [
   ['COLD_SUBJECT_B', 'Made this for {business}', 'A second subject line to test on cold first emails. While it\'s filled in, every other cold first email goes out with it instead of the usual subject (A), and Where the audits are and the Monday digest compare the two: sent, read their audit, replied. Placeholders: {business} (the shop\'s name, shortened), {search} (its first search), {town}, {job} (the big job its audit is on). Clear the cell to stop the test.'],
   ['READ_PULLS_FOLLOWUP', 'yes', 'yes moves a cold prospect\'s next follow-up up to the next business morning when they read their audit for the first time (never sooner than 2 business days after the last email), so it lands while they\'re thinking about it. no keeps the usual gaps.'],
   ['READ_ALERTS', 'yes', 'yes emails you the moment a cold prospect reads their audit for the first time (and hasn\'t replied), with a suggested personal note. A note you write in their thread stops the automatic emails to that shop. no turns the alerts off.'],
+  ['REPLY_BURST_MAX', '8', 'More replies than this in one hourly run means the hub is misreading its own emails (it happened twice in November 2026), so none are acted on and you get an email instead. Real replies have never come close.'],
   ['SCANNER_WINDOW_MIN', '3', 'A first view of an audit this many minutes or less after our email went out is taken for a work mail system\'s link scanner, not a person: no read alert, no follow-up moved up, and it isn\'t counted as a read. 0 counts every view.'],
   ['SENDER_EMAIL', '', 'The address new emails to shops go out from, like logan@ledgecommunications.com. Add it in this Gmail account first (Settings > Accounts and Import > Send mail as; SETUP.md has the steps). Empty: this account\'s own address. A thread already started keeps the address it started from.'],
   ['FIT_CHECK', 'yes', 'yes has the small model read each prospect\'s home page before any searches run. Cold prospects that mostly work for businesses, industry, or builders, or don\'t do their trade for homeowners, are held. Every shop\'s second search and value box go on the most valuable homeowner job its site offers (heat pumps, tankless water heaters, sewer lines, EV chargers), when that beats its trade\'s usual one.'],
@@ -319,6 +320,13 @@ function ensureSchema_(force) {
   if (from > 0 && from < 25) props_().setProperty('REPLY_RECHECK_PENDING', '1');
   // 26: first reads that came within SCANNER_WINDOW_MIN of our email were link scanners: they stop counting as reads.
   if (from > 0 && from < 26) props_().setProperty('SCANNER_RECHECK_PENDING', '1');
+  // 27: the account's old address stays ours, and the shops our own emails were taken for replies from go back.
+  if (from > 0 && from < 27) {
+    var had = String(prop_('OUR_ADDRESSES') || '').split(',').filter(String);
+    if (had.indexOf('ledgecommunications@gmail.com') < 0) props_().setProperty('OUR_ADDRESSES', had.concat(['ledgecommunications@gmail.com']).join(','));
+    _ours = null;
+    props_().setProperty('OWN_EMAIL_RECHECK_PENDING', '1');
+  }
 }
 
 // Once (21): a cold audit queued to send that Logan never approved (it went in on its own after the first reviews were
@@ -632,6 +640,7 @@ function runHourly() {
     ensureSchema_();
     step_('undoFalseReplies', function () { if (prop_('REPLY_RECHECK_PENDING') && undoFalseReplies_(runLeft_() - 200000)) props_().deleteProperty('REPLY_RECHECK_PENDING'); });
     step_('undoScannerReads', function () { if (prop_('SCANNER_RECHECK_PENDING')) { undoScannerReads_(); props_().deleteProperty('SCANNER_RECHECK_PENDING'); } });
+    step_('undoOwnEmailReplies', function () { if (prop_('OWN_EMAIL_RECHECK_PENDING') && undoOwnEmailReplies_(runLeft_() - 200000)) props_().deleteProperty('OWN_EMAIL_RECHECK_PENDING'); });
     step_('checkReplies', checkReplies_);
     step_('checkAliasReplies', checkAliasReplies_);
     step_('checkBounces', checkBounces_);
@@ -942,7 +951,7 @@ function readAlert_(l, moved) {
     (noted ? 'You wrote to them yourself on ' + day(noted.timestamp) + ', so they read it after your note. If they haven\'t replied in a few days, one more short line from you is the next step.\n\n'
       : 'Nothing needed from you: the next email goes on its own' + (moved ? ', sooner now that they\'ve read it' : '') + '.\n\n' +
         'If you\'d rather write to them yourself, reply in their thread' + (subject ? ' (search for "' + subject + '")' : '') +
-        ', from Superhuman as ' + (threadFrom_(l.thread_id) || myEmail_()) + ' as usual: two or three lines and one easy question, like "Hi ' + vars.first + ', quick question: ' + ask + '" ' +
+        ', from Superhuman as ' + senderEmail_() + ' as usual: two or three lines and one easy question, like "Hi ' + vars.first + ', quick question: ' + ask + '" ' +
         'Don\'t mention that you saw them read it. Then tap this, so a template doesn\'t land on top of your note:\n' + ownerLink_('noted', l) + '\n\n') +
     'To stop these alerts, set READ_ALERTS to no on the Settings tab.');
   logEvent_(l.id, l.email, 'read_alert', '');
@@ -1249,10 +1258,10 @@ var SEQUENCES = {
 
 function sendFollowUps_() {
   if (!inWindow_(8, 18)) return;
-  var now = new Date();
+  var now = new Date(), held = JSON.parse(prop_('REPLY_BURST_IDS') || '[]');
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
     var seq = SEQUENCES[l.status];
-    if (!seq || !l.next_touch || new Date(l.next_touch) > now || l.attention) return;
+    if (!seq || !l.next_touch || new Date(l.next_touch) > now || l.attention || held.indexOf(l.id) > -1) return;
     var t = Number(l.touches || 1);
     var stepDef = seq[t];
     if (!stepDef) {
@@ -1275,7 +1284,7 @@ function sendFollowUps_() {
 
 function checkReplies_() {
   var me = myEmail_();
-  var us = fromUs_(me);
+  var us = fromUs_(me), found = [];
   // Clients are done as leads, but a management client's reply with their customer ID still needs reading.
   var waiting = {};
   readRows_(TAB.clients, HEAD.clients).forEach(function (c) { if (c.plan === 'management' && !c.customer_id) waiting[c.lead_id] = true; });
@@ -1296,10 +1305,29 @@ function checkReplies_() {
     var since = Number(l.last_reply_at || 0);
     var ours = msgs.filter(us).map(function (m) { return plainForMatch_(m.getPlainBody()); });
     var fresh = msgs.filter(function (m) { return m.getDate().getTime() > since && theirs_(m, us, ours); });
-    if (!fresh.length) return;
-    var latest = fresh[fresh.length - 1];
-    updateLead_(l, { last_reply_at: latest.getDate().getTime() });
-    handleReply_(findLead_('id', l.id), latest);
+    if (fresh.length) found.push({ id: l.id, msg: fresh[fresh.length - 1] });
+  });
+  // More "replies" in one run than real ones ever come (Nov 12: 21 copies left by a mail app; Nov 16: 69 of our own emails
+  // after the account switch) means the hub is misreading its own mail. Nothing is changed, and Logan hears once a day.
+  var max = Number(setting_('REPLY_BURST_MAX') || 0);
+  if (max && found.length > max) {
+    props_().setProperty('REPLY_BURST_IDS', JSON.stringify(found.map(function (f) { return f.id; })));
+    var day = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
+    if (prop_('REPLY_BURST_WARNED') !== day) {
+      props_().setProperty('REPLY_BURST_WARNED', day);
+      logEvent_('', '', 'reply_burst_held', found.length + ' at once');
+      ownerMail_('Held: ' + found.length + ' replies at once', found.length + ' shops look like they replied since the last run, more than the ' + max +
+        ' (REPLY_BURST_MAX) that ever come in at once. That usually means the hub is misreading its own emails, so nothing was changed and their follow-ups are on hold until it\'s sorted.\n\n' +
+        found.slice(0, 15).map(function (f) { var l = findLead_('id', f.id); return '- ' + (l.business || l.email) + ': "' + topOfReply_(f.msg.getPlainBody() || '').replace(/\s+/g, ' ').slice(0, 90) + '" from ' + f.msg.getFrom(); }).join('\n') +
+        (found.length > 15 ? '\n...and ' + (found.length - 15) + ' more.' : '') +
+        '\n\nIf they really are replies, raise REPLY_BURST_MAX on the Settings tab and the next run reads them. Otherwise send this to Claude.');
+    }
+    return;
+  }
+  if (prop_('REPLY_BURST_IDS')) props_().deleteProperty('REPLY_BURST_IDS');
+  found.forEach(function (f) {
+    updateLead_(findLead_('id', f.id), { last_reply_at: f.msg.getDate().getTime() });
+    handleReply_(findLead_('id', f.id), f.msg);
   });
 }
 
@@ -1331,8 +1359,27 @@ function checkAliasReplies_() {
 // a message counts only when it isn't a draft, has a sender, isn't from us (this account, or Logan's own OWNER_EMAIL), and
 // doesn't just repeat one of our own emails.
 function fromUs_(me) {
-  var owner = String(setting_('OWNER_EMAIL') || '').toLowerCase().trim(), alias = senderSetting_();
-  return function (m) { var f = String(m.getFrom() || '').toLowerCase(); return f.indexOf(me) > -1 || (!!owner && f.indexOf(owner) > -1) || (!!alias && f.indexOf(alias) > -1); };
+  var owner = String(setting_('OWNER_EMAIL') || '').toLowerCase().trim(), ours = ourAddresses_().concat(me ? [me] : []);
+  return function (m) {
+    var f = addrOf_(m.getFrom());
+    return ours.indexOf(f) > -1 || (!!owner && f === owner);
+  };
+}
+
+// Every address this mailbox sends as. Nov 16, 2026: the Gmail account behind the hub became the Workspace account
+// logan@ledgecommunications.com, and every email sent before then is from ledgecommunications@gmail.com. Knowing only the
+// new address, the hub read 69 of our own emails as the shops' replies. So it's the account's own address, SENDER_EMAIL,
+// every "Send mail as" address, and every address it has ever had (kept in OUR_ADDRESSES), once a run.
+var _ours = null;
+function ourAddresses_() {
+  if (_ours) return _ours;
+  var list = [myEmail_(), String(setting_('SENDER_EMAIL') || '').trim().toLowerCase()];
+  try { (Gmail.Users.Settings.SendAs.list('me').sendAs || []).forEach(function (sa) { list.push(String(sa.sendAsEmail || '').toLowerCase()); }); } catch (err) {}
+  var kept = String(prop_('OUR_ADDRESSES') || '').split(',');
+  var all = list.concat(kept).map(function (a) { return String(a || '').trim().toLowerCase(); })
+    .filter(function (a, i, arr) { return a.indexOf('@') > 0 && arr.indexOf(a) === i; });
+  if (all.join(',') !== kept.filter(String).join(',')) props_().setProperty('OUR_ADDRESSES', all.join(','));
+  return (_ours = all);
 }
 function theirs_(m, us, ours) {
   if (m.isDraft && m.isDraft()) return false;
@@ -1376,6 +1423,42 @@ function undoFalseReplies_(budget) {
   return true;
 }
 
+// Once, after the Nov 16, 2026 account switch: a lead marked unsubscribed, not interested, or replied from a "reply" since
+// Nov 15 whose thread holds nothing really from them (only our own emails, now that every address of ours is known) goes
+// back to its sequence and off the Do not contact tab. Its next follow-up keeps the usual gap after the last email, and
+// no sooner than the next business morning. True once every such lead is done.
+function undoOwnEmailReplies_(budget) {
+  var start = Date.now(), now = new Date(), since = new Date('2026-11-15T00:00:00-07:00');
+  var us = fromUs_(myEmail_());
+  var hit = {};
+  readRows_(TAB.events, HEAD.events).forEach(function (e) { if (/^reply_/.test(e.event) && e.lead_id && new Date(e.timestamp) >= since) hit[e.lead_id] = true; });
+  var todo = readRows_(TAB.leads, HEAD.leads).filter(function (l) {
+    return hit[l.id] && l.thread_id && ['unsubscribed', 'not_interested', 'replied'].indexOf(l.status) > -1;
+  });
+  for (var i = 0; i < todo.length; i++) {
+    if (Date.now() - start > budget) return false;
+    var l = todo[i], thread;
+    try { thread = GmailApp.getThreadById(l.thread_id); } catch (err) { continue; }
+    if (!thread) continue;
+    var all = thread.getMessages(), sent = all.filter(function (m) { return !(m.isDraft && m.isDraft()) && us(m); });
+    var ours = sent.map(function (m) { return plainForMatch_(m.getPlainBody()); });
+    if (all.some(function (m) { return theirs_(m, us, ours); })) continue; // something really from them: it stands
+    var back = l.source === 'cold' ? 'in_sequence' : 'audit_sent', seq = SEQUENCES[back], t = Number(l.touches || 1), more = !!seq[t];
+    var gap = t > 1 && seq[t - 1] ? seq[t - 1].gap : 3, soon = addBusinessDays_(now, 1);
+    var due = l.last_touch ? addBusinessDays_(new Date(l.last_touch), gap) : soon;
+    var was = l.status, mine = String(setting_('SENDER_NAME') || 'Logan').trim().split(/\s+/)[0].toLowerCase();
+    // The misread also took the first name from our own From line (31 shops became "Hi Logan").
+    var name = String(l.first_name || '').trim().toLowerCase() === mine ? { first_name: '' } : {};
+    updateLead_(l, Object.assign(name, { status: more ? back : 'sequence_done', attention: '', next_touch: more ? (due > soon ? due : soon) : '',
+      notes: appendNote_(l.notes, 'On Nov 16 the hub took one of our own emails for their reply (the account had just switched to logan@ledgecommunications.com) and marked them ' +
+        was.replace('_', ' ') + '. They never wrote, so ' + (more ? 'the follow-ups are back on.' : 'nothing more was needed.')) }));
+    if (was !== 'replied') removeFromDnc_(l.email);
+    logEvent_(l.id, l.email, 'false_reply_undone', 'was ' + was + '; our own email from ' + sent.map(function (m) { return addrOf_(m.getFrom()); })
+      .filter(function (a, k, arr) { return arr.indexOf(a) === k; }).join(', '));
+  }
+  return true;
+}
+
 // Statuses whose automatic emails stop once Logan writes in the thread himself.
 var NOTE_STOPS = { in_sequence: true, check_back: true, audit_sent: true, proposal_sent: true };
 
@@ -1413,7 +1496,10 @@ function handleReply_(l, msg) {
   var auto = String(msg.getHeader('Auto-Submitted') || '').toLowerCase();
   if ((auto && auto !== 'no') || AUTO_SUBJECT.test(subject)) { logEvent_(l.id, l.email, 'auto_reply', subject); return; }
   // No name yet: the reply's From line usually has one ("Mike Lambert <info@...>"), so the next email says "Hi Mike".
-  if (!l.first_name) { var fromName = nameFromFrom_(msg.getFrom()); if (fromName) updateLead_(l, { first_name: fromName }); }
+  if (!l.first_name) {
+    var fromName = nameFromFrom_(msg.getFrom()), mine = String(setting_('SENDER_NAME') || '').trim().split(/\s+/)[0].toLowerCase();
+    if (fromName && fromName.toLowerCase() !== mine) updateLead_(l, { first_name: fromName });
+  }
 
   var text = topOfReply_(msg.getPlainBody() || '');
   var sorted = sortReply_(text);
@@ -1509,14 +1595,14 @@ function checkCalendar_() {
   var id = setting_('CALENDAR_ID') || 'primary';
   var cal = id === 'primary' ? CalendarApp.getDefaultCalendar() : CalendarApp.getCalendarById(id);
   if (!cal) return;
-  var me = myEmail_(), owner = String(setting_('OWNER_EMAIL') || '').toLowerCase(), alias = senderSetting_();
+  var me = myEmail_(), owner = String(setting_('OWNER_EMAIL') || '').toLowerCase(), ours = ourAddresses_();
   var match = String(setting_('BOOKING_EVENT_MATCH') || '').toLowerCase();
   var seen = JSON.parse(prop_('EVENTS_SEEN') || '[]');
   cal.getEvents(new Date(Date.now() - 864e5), new Date(Date.now() + 60 * 864e5)).forEach(function (ev) {
     var key = ev.getId() + '|' + ev.getStartTime().getTime();
     if (seen.indexOf(key) > -1) return;
     var guests = ev.getGuestList().map(function (g) { return String(g.getEmail()).toLowerCase(); })
-      .filter(function (g) { return g && g !== me && g !== owner && g !== alias; });
+      .filter(function (g) { return g && g !== me && g !== owner && ours.indexOf(g) < 0; });
     if (!guests.length) return;
     seen.push(key);
     guests.forEach(function (g) {
@@ -1744,7 +1830,8 @@ function opportunity_(o) {
     cpc: cpc, cpc_from: o.cpc_usd > 0 ? 'google' : 'typical', click: r.click, lead: r.lead, book: r.book, plan_budget: o.budget,
     budget: jobs ? spend : 0, clicks: jobs ? Math.round(spend / cpc) : 0, leads: jobs ? Math.max(1, Math.round(spend / cpc * lead)) : 0, jobs: jobs,
     low: jobs * o.job_low, high: jobs * o.job_high, per_job: Math.round(cpc / (lead * book) / 10) * 10, per_lead: Math.round(cpc / lead / 10) * 10,
-    clicks_per_job: Math.round(1 / (lead * book)), year_jobs: jobs ? 0 : Math.round(spendable / cpc * lead * book * 12), spendable: Math.round(spendable / 100) * 100
+    clicks_per_job: Math.round(1 / (lead * book)), year_jobs: jobs ? 0 : Math.round(spendable / cpc * lead * book * 12), spendable: Math.round(spendable / 100) * 100,
+    dedup: o.dedup ? 1 : 0
   };
 }
 
@@ -1759,7 +1846,7 @@ function opportunityFor_(trade, siteHint, townName, bigMk, mk, svc) {
   var base = { rates: r, budget: plannedBudget_('1000-2000'), where: townName, work: jv[1] };
   var make = function (kind, job, m, where) {
     return m && m.total ? opportunity_(Object.keys(base).reduce(function (o, k) { o[k] = base[k]; return o; },
-      { kind: kind, job: job[0].replace(/^(a|an) /, ''), job_low: job[1], job_high: job[2], searches: m.total, top: m.top, cpc_usd: m.cpc_usd, price_where: where })) : null;
+      { kind: kind, job: job[0].replace(/^(a|an) /, ''), job_low: job[1], job_high: job[2], searches: m.total, top: m.top, cpc_usd: m.cpc_usd, price_where: where, dedup: !!m.dedup })) : null;
   };
   var bigJob = svc ? svc.job : jv[3];
   var big = bigJob ? make('big', bigJob, bigMk, svc ? svc.where : '') : null, day = make('everyday', jv[2], mk, '');
@@ -1842,7 +1929,9 @@ function oppWords_(p) {
     out.how.push('Booked jobs: ' + aboutN_(p.book) + ' calls and forms turn into a booked job, which is typical for trades. So one booked ' + p.job + ' takes about $' + money_(p.per_job) + ' in ads.' +
       (p.year_jobs >= 2 && p.spendable >= 100 ? ' With about ' + money_(p.searches) + ' searches a month, that\'s about ' + word_(p.year_jobs) + ' a year from about $' + money_(p.spendable) + ' a month in ads.' : ''));
     out.email = 'By our estimate, each ' + p.job + ' booked from Google Ads would cost about $' + money_(p.per_job) + ' in ads, on a ' + price + ' job.';
-    out.more = p.year_jobs >= 2 ? 'One more way to look at your audit: about ' + money_(p.searches) + ' people a month search for ' + p.job + ' in ' + p.where +
+    // A search count worked out before Nov 16, 2026 may hold Google's grouped rewordings several times over, so email 3
+    // doesn't quote it; the generic paragraph goes instead.
+    out.more = p.year_jobs >= 2 && p.dedup ? 'One more way to look at your audit: about ' + money_(p.searches) + ' people a month search for ' + p.job + ' in ' + p.where +
       ', and at typical rates those searches could book about ' + word_(p.year_jobs) + ' a year, roughly $' + money_(p.year_jobs * p.job_low) + ' to $' + money_(p.year_jobs * p.job_high) + ' in work.' : '';
   }
   out.how.push('Price: ' + price + ' is a typical ' + (p.price_where || 'Calgary-area') + ' range for ' + (/s$/.test(p.job) ? '' : /^[aeiou]/i.test(p.job) ? 'an ' : 'a ') + p.job + '.');
@@ -1901,14 +1990,15 @@ function pickService_(trade, siteHint, townName, offered) {
 // Google's related searches for some seed searches in a town, kept when they're about the work (not jobs, how-tos, stores,
 // or other towns), with the total a month and the average cost per click (US dollars, weighted by searches). Kept 60 days.
 function kwMarket_(kind, seeds, keep, townName) {
-  var loc = townName + ',Alberta,Canada', key = kind + ' v2: ' + seeds.join(' + '); // v2: variants merged, total capped
+  // v3: Google's grouped rewordings counted once (Nov 16, 2026). v2 entries are fetched again.
+  var loc = townName + ',Alberta,Canada', key = kind + ' v3: ' + seeds.join(' + ');
   var hit = readRows_(TAB.volumes, HEAD.volumes).filter(function (r) {
     return r.keyword === key && r.location === loc && Date.now() - new Date(r.fetched).getTime() < 60 * 864e5;
   }).pop();
   if (hit) {
     var dt = {};
     try { dt = JSON.parse(hit.detail || '{}'); } catch (err) {}
-    return { total: Number(hit.volume || 0), count: dt.count || 0, top: dt.top || [], cpc_usd: dt.cpc_usd || 0, where: townName, cost: 0 };
+    return { total: Number(hit.volume || 0), count: dt.count || 0, top: dt.top || [], cpc_usd: dt.cpc_usd || 0, where: townName, cost: 0, dedup: true };
   }
   var d = dfsRead_(UrlFetchApp.fetch('https://api.dataforseo.com/v3/keywords_data/google_ads/keywords_for_keywords/live',
     dfsReq_('keywords_data/google_ads/keywords_for_keywords/live', { keywords: seeds, location_name: loc, language_code: 'en', sort_by: 'search_volume' })));
@@ -1922,13 +2012,22 @@ function kwMarket_(kind, seeds, keep, townName) {
     return k.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function (w) { return w && !/^(the|a|an|in|for|of|to)$/.test(w); })
       .map(function (w) { return w.length > 3 && /[^s]s$/.test(w) ? w.slice(0, -1) : w; }).sort().join(' ');
   };
-  var seen = {};
+  // Google also groups close rewordings ("ac repair", "ac fix", "aircon repair") and gives each one the whole group's
+  // figures, so the same searches showed up three to five times (Calgary water heater searches came to 8,640 a month
+  // instead of about 2,300). Searches with the same volume, cost per click, and 12 months of history are one group.
+  var seen = {}, groups = {};
+  var sig = function (v) {
+    var m = (v.monthly_searches || []).map(function (x) { return x && x.year + '-' + x.month + ':' + Number(x.search_volume || 0); });
+    return m.length && Number(v.search_volume) >= 30 ? Number(v.search_volume) + '|' + Number(v.cpc || 0) + '|' + m.join(',') : '';
+  };
   var hits = d.result.filter(function (v) { return v && v.keyword && Number(v.search_volume) > 0; })
-    .sort(function (a, b) { return b.search_volume - a.search_volume; }).filter(function (v) {
-      var k = String(v.keyword).toLowerCase(), vk = variant(k);
-      if (seen[vk]) return false;
+    .sort(function (a, b) { return b.search_volume - a.search_volume || String(a.keyword).length - String(b.keyword).length; }).filter(function (v) {
+      var k = String(v.keyword).toLowerCase(), vk = variant(k), g = sig(v);
+      if (seen[vk] || (g && groups[g])) return false;
       seen[vk] = true;
-      return keep(k) && !MARKET_SKIP.test(k) && !other.test(k);
+      if (!(keep(k) && !MARKET_SKIP.test(k) && !other.test(k))) return false;
+      if (g) groups[g] = true;
+      return true;
     }).slice(0, 60);
   var total = marketTotal_(hits.map(function (v) { return Number(v.search_volume); }));
   var top = hits.slice(0, 6).map(function (v) { return [String(v.keyword).toLowerCase(), Number(v.search_volume)]; });
@@ -1936,7 +2035,7 @@ function kwMarket_(kind, seeds, keep, townName) {
   var weight = priced.reduce(function (n, v) { return n + Number(v.search_volume); }, 0);
   var cpc = weight ? Math.round(priced.reduce(function (n, v) { return n + Number(v.cpc) * Number(v.search_volume); }, 0) / weight * 100) / 100 : 0;
   appendRow_(TAB.volumes, HEAD.volumes, { keyword: key, location: loc, volume: total, fetched: new Date(), detail: JSON.stringify({ count: hits.length, top: top, cpc_usd: cpc }) });
-  return { total: total, count: hits.length, top: top, cpc_usd: cpc, where: townName, cost: d.cost };
+  return { total: total, count: hits.length, top: top, cpc_usd: cpc, where: townName, cost: d.cost, dedup: true };
 }
 
 // A town's searches a month from Google's figures. Google reports every small search as about 10 a month, so a small
@@ -1953,7 +2052,7 @@ function oppSane_(p) {
   var top3 = p.top.slice(0, 3).reduce(function (n, t) { return n + Number(t[1] || 0); }, 0);
   if (!top3 || p.searches <= 4 * top3) return p;
   var q = opportunity_({ kind: p.kind, job: p.job, job_low: p.job_low, job_high: p.job_high, work: p.work, searches: 4 * top3, where: p.where, top: p.top,
-    price_where: p.price_where, cpc_usd: 0, rates: { click: p.click, lead: p.lead, book: p.book, cpc: p.cpc }, budget: p.plan_budget });
+    price_where: p.price_where, cpc_usd: 0, rates: { click: p.click, lead: p.lead, book: p.book, cpc: p.cpc }, budget: p.plan_budget, dedup: p.dedup });
   if (q) q.cpc_from = p.cpc_from;
   return q;
 }
@@ -5927,8 +6026,9 @@ function sendLeadEmail_(l, key, extra) {
   var actual = trackKey_(l, key);
   var tpl = EMAILS[actual], vars = emailVars_(l);
   Object.keys(extra || {}).forEach(function (k) { vars[k] = extra[k]; });
-  // A follow-up goes from the address its thread started from; a new thread from SENDER_EMAIL (once it's set up).
-  var inThread = !!(l.thread_id && !tpl.subject), from = inThread ? threadFrom_(l.thread_id) || myEmail_() : senderEmail_();
+  // Every email goes from the current sending address, a follow-up in a thread started from an older address too: since
+  // Nov 16, 2026 that's logan@ledgecommunications.com, signed for the domain, where the old Gmail address no longer is.
+  var inThread = !!(l.thread_id && !tpl.subject), from = senderEmail_();
   var text = fillText_(tpl.body, vars) + footer_(l, from);
   var res;
   if (inThread) {
@@ -5944,18 +6044,6 @@ function safeSend_(l, key, extra) {
   try { sendLeadEmail_(l, key, extra); } catch (err) { logEvent_(l && l.id, l && l.email, 'error', 'Email ' + key + ' failed: ' + (err && err.message || err)); }
 }
 
-// The address a thread's first email from us went out from (this account or SENDER_EMAIL), so its follow-ups match.
-function threadFrom_(threadId) {
-  try {
-    var mine = [myEmail_(), senderSetting_()].filter(String);
-    var msgs = GmailApp.getThreadById(threadId).getMessages();
-    for (var i = 0; i < msgs.length; i++) {
-      var f = addrOf_(msgs[i].getFrom());
-      if (mine.indexOf(f) > -1) return f;
-    }
-  } catch (err) {}
-  return '';
-}
 function addrOf_(from) { var s = String(from || '').toLowerCase(), m = s.match(/<([^>]+)>/); return (m ? m[1] : s).trim(); }
 
 // SENDER_EMAIL as typed (lowercase), or '' when it's empty or this account's own address.

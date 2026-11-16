@@ -15,7 +15,41 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 16): follow-ups link the audit, scanners don't count, a domain sender ready
+## Where you are (Nov 16, afternoon): the account is logan@ledgecommunications.com now
+
+The Gmail account that runs the hub was upgraded to Google Workspace, so its own address is now
+logan@ledgecommunications.com, and ledgecommunications@gmail.com is a second address on it. Two things followed:
+
+- **The 12:10 run misread 66 shops.** The hub only knew its own address, so our earlier emails (from the Gmail address)
+  looked like the shops' replies: 46 were marked unsubscribed (the word is in our own footer), 20 as replied, and 31 got
+  "Logan" as their first name. Nothing went out to any of them. Now every address on the account counts as ours (its
+  own, `SENDER_EMAIL`, every "Send mail as" address, and every address it has ever had), and on the first run after
+  the update the 66 go back into their sequence, off the Do not contact tab, with their names cleared
+  (`false_reply_undone` on the Events tab). A shop that really wrote stays as it is.
+- **A hold on bursts (`REPLY_BURST_MAX`, 8).** More "replies" in one run than real ones ever come means a misread like
+  this one (or Nov 12's), so none are acted on, their follow-ups wait, and you get one email listing them.
+- **Every email goes from logan@ledgecommunications.com**, follow-ups in older threads too. Replies to either address
+  land in the same inbox.
+- **Search counts, counted once.** Google groups close rewordings ("ac repair", "ac fix", "aircon repair") and reports each
+  with the whole group's numbers, and the hub counted every one. In Calgary that put water heater searches at about 8,600
+  a month instead of about 2,300, and air conditioner installs at 1,320 instead of 440 (furnace replacements were close:
+  1,200 against 1,030). New audits count each group once. For shops already emailed, email 3 leaves out the old search
+  count. Audits that haven't gone out still carry the old numbers, so rebuild them while cold email is off (step 4 below).
+- **Mail from the domain isn't trusted yet,** which is why the "Waiting on you" email went to spam. The domain has no
+  SPF, DKIM, or DMARC record. Step 5a has the three records; keep cold email off until mail-tester shows all three passing.
+
+Ship it:
+1. Settings: `COLD_EMAIL_ON` to **no** (if it isn't already).
+2. Paste `Code.gs` into the Apps Script editor (replace everything), save, and deploy a new version.
+3. **Ledge > Run now.** The 66 go back on this run. The Events tab shows a `false_reply_undone` row for each.
+4. **Ledge > Rebuild audits that haven't gone out** (roughly 80 US cents each), so the ones waiting carry honest search
+   counts. They come back to you over the next hour or two.
+5. Step 5a: the three DNS records, then the test email. When it passes, `COLD_EMAIL_ON` back to yes.
+6. In ledgelow@gmail.com, mark the "Waiting on you" email **Not spam**, then add a filter: From
+   `logan@ledgecommunications.com` > **Never send it to Spam**.
+7. Upload `Code.gs` and `SETUP.md` to GitHub.
+
+## Where you were (Nov 16, morning): follow-ups link the audit, scanners don't count, a domain sender ready
 
 - **Emails 2 and 3 carry the audit link again.** All 14 reads so far came after email 1, and neither follow-up linked
   back to the audit. Email 2 now opens with the link and email 3 ends with it (the running-ads follow-ups too). Shops
@@ -575,46 +609,33 @@ there and you reply as Ledge. The hub keeps its own copy and keeps working.
 A few inboxes (mostly Outlook) may show those replies as sent "on behalf of" the other address. It's cosmetic. The hub
 notices a lead's reply on its own copy and stops its follow-ups, so you and the hub won't talk over each other.
 
-## 5a. Sending from logan@ledgecommunications.com (about 45 minutes, plus up to 2 days for Google)
+## 5a. Sending from logan@ledgecommunications.com (20 minutes, plus up to 2 days for Google)
 
-Cold email from a free Gmail address costs some trust, and one free account carries all the sending risk. This moves new
-first emails to your own domain without moving the hub: the Workspace mailbox forwards everything to
-ledgecommunications@gmail.com, and that account sends as the new address through Workspace, so the mail is signed for
-ledgecommunications.com. Do it on a computer.
+Done Nov 16: the hub's Google account was upgraded to Google Workspace, so it is logan@ledgecommunications.com, with
+ledgecommunications@gmail.com as a second address on it. Incoming mail still forwards to ledgelow@gmail.com, and
+replies to either address land in the same inbox. Left to do: the three records that tell other mail systems our email is
+really from us. Without them, mail from the domain lands in spam (the "Waiting on you" email did).
 
-Before you start: the domain's mail records already point at Google, which usually means a Google Workspace was set up
-for it before (often through Squarespace). If you had one, sign in at admin.google.com with that address and reuse it; a
-fresh signup can't claim a domain another Workspace still holds.
+In Cloudflare: **ledgecommunications.com > DNS > Records > Add record**, all three type TXT. Leave the MX records (the
+five Google ones work) and the `google-site-verification` record alone.
 
-1. **Workspace.** At workspace.google.com, sign up with your existing domain and create `logan@ledgecommunications.com`.
-   One user on the smallest plan is enough.
-2. **Prove the domain.** Setup gives you a TXT record. Cloudflare: **ledgecommunications.com > DNS > Records > Add
-   record**, type TXT, name `@`, paste the value. Leave the existing `google-site-verification` record (Search Console).
-3. **Mail records**, in the same place:
-   - MX: the five Google records already there work. If setup asks for `smtp.google.com` (priority 1), add it and
-     delete the old five.
-   - TXT, name `@`: `v=spf1 include:_spf.google.com ~all`
-   - TXT, name `_dmarc`: `v=DMARC1; p=none; rua=mailto:logan@ledgecommunications.com`
-4. **DKIM.** admin.google.com **> Apps > Google Workspace > Gmail > Authenticate email > Generate new record** (2048).
-   Add it in Cloudflare as TXT, name `google._domainkey`, then click **Start authentication**. It can take up to 48 hours.
-5. **Forward to the hub.** Signed in as logan@: Gmail **> Settings > See all settings > Forwarding and POP/IMAP > Add a
-   forwarding address >** `ledgecommunications@gmail.com`. Confirm with the code sent there, then pick **Forward a copy
-   of incoming mail** and **keep Gmail's copy in the Inbox**.
-6. **An app password.** Still as logan@: myaccount.google.com **> Security**, turn on **2-Step Verification**, then
-   search **App passwords** and create one named Ledge hub. It goes straight into the next step, never into chat.
-7. **Send mail as.** Signed in as ledgecommunications@gmail.com: Gmail **> Settings > See all settings > Accounts and
-   Import > Send mail as > Add another email address.** Name: your full name; address: `logan@ledgecommunications.com`;
-   leave **Treat as an alias** ticked. SMTP server `smtp.gmail.com`, port 587, username `logan@ledgecommunications.com`,
-   password: the app password, **TLS**. Google emails a confirmation to logan@, which forwards to this inbox: click it.
-8. **Switch it on.** Once the Admin console shows DKIM as authenticating: Settings tab, `SENDER_EMAIL` =
-   `logan@ledgecommunications.com`. Then **Ledge > Send a test cold email** to a fresh mail-tester.com address and your
-   own inbox. The From line should be the new address, and mail-tester should show SPF, DKIM, and DMARC passing.
-9. **Superhuman (optional).** Repeat step 7 in ledgelow@gmail.com (same SMTP details; a second app password is fine), so
-   replies you write in Superhuman go out as logan@ too. "Reply from the same address the message was sent to" is
-   already on.
+1. **SPF.** Name `@`, content `v=spf1 include:_spf.google.com ~all`.
+2. **DKIM.** admin.google.com **> Apps > Google Workspace > Gmail > Authenticate email**, pick ledgecommunications.com,
+   **Generate new record** (2048). Add it in Cloudflare with name `google._domainkey` and the long `v=DKIM1; k=rsa; p=...`
+   value as the content. Back in the Admin console, click **Start authentication**. Google can take up to 48 hours to
+   switch it on; the page then says "Authenticating email".
+3. **DMARC.** Name `_dmarc`, content `v=DMARC1; p=none; rua=mailto:logan@ledgecommunications.com`. This only asks for
+   reports for now; it doesn't block anything.
+4. **Test.** Once DKIM is on: **Ledge > Send a test cold email** to a fresh address from mail-tester.com and to your own
+   inbox. The From line should be logan@ledgecommunications.com, and mail-tester should show SPF, DKIM, and DMARC passing.
+   Then set `COLD_EMAIL_ON` back to yes.
+5. **Your account.** myaccount.google.com > **Security**: check that 2-Step Verification is on for
+   logan@ledgecommunications.com and that the recovery phone and email are yours. The upgrade usually keeps them.
+6. **Superhuman (optional).** To write to shops as logan@ from Superhuman, add it in ledgelow@gmail.com under **Settings >
+   Accounts and Import > Send mail as** (SMTP `smtp.gmail.com`, port 587, username logan@ledgecommunications.com, an app
+   password from myaccount.google.com > Security > App passwords, TLS).
 
-Replies to the new address reach the hub through the forward in step 5 and land in each shop's thread. One that arrives
-outside its thread is matched by the sender's address (`reply_outside_thread` on the Events tab).
+`SENDER_EMAIL` can stay as logan@ledgecommunications.com: it's the account's own address now, so it changes nothing.
 
 ## 6. Superhuman booking page (10 minutes, optional)
 
