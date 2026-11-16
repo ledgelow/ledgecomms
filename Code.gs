@@ -77,7 +77,7 @@ var HEAD = {
   // months: searches a month for the last 12 months, oldest first; peak_month: the busiest of them.
   research: ['set', 'kind', 'keyword', 'volume', 'cpc_usd', 'bid_low_usd', 'bid_high_usd', 'competition', 'months', 'peak_month', 'location', 'fetched']
 };
-var SCHEMA_VERSION = '27';
+var SCHEMA_VERSION = '28';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -109,6 +109,7 @@ var SETTINGS_DEFAULTS = [
   ['COLD_SUBJECT_B', 'Made this for {business}', 'A second subject line to test on cold first emails. While it\'s filled in, every other cold first email goes out with it instead of the usual subject (A), and Where the audits are and the Monday digest compare the two: sent, read their audit, replied. Placeholders: {business} (the shop\'s name, shortened), {search} (its first search), {town}, {job} (the big job its audit is on). Clear the cell to stop the test.'],
   ['READ_PULLS_FOLLOWUP', 'yes', 'yes moves a cold prospect\'s next follow-up up to the next business morning when they read their audit for the first time (never sooner than 2 business days after the last email), so it lands while they\'re thinking about it. no keeps the usual gaps.'],
   ['READ_ALERTS', 'yes', 'yes emails you the moment a cold prospect reads their audit for the first time (and hasn\'t replied), with a suggested personal note. A note you write in their thread stops the automatic emails to that shop. no turns the alerts off.'],
+  ['SEASON_FOCUS', 'heating and cooling, garage doors', 'From December to March, these trades get two new prospects for every one in the other trades: their Calgary searches run above a typical month then (keyword research, Nov 2026). Empty: an even split all year.'],
   ['REPLY_BURST_MAX', '8', 'More replies than this in one hourly run means the hub is misreading its own emails (it happened twice in November 2026), so none are acted on and you get an email instead. Real replies have never come close.'],
   ['SCANNER_WINDOW_MIN', '3', 'A first view of an audit this many minutes or less after our email went out is taken for a work mail system\'s link scanner, not a person: no read alert, no follow-up moved up, and it isn\'t counted as a read. 0 counts every view.'],
   ['SENDER_EMAIL', '', 'The address new emails to shops go out from, like logan@ledgecommunications.com. Add it in this Gmail account first (Settings > Accounts and Import > Send mail as; SETUP.md has the steps). Empty: this account\'s own address. A thread already started keeps the address it started from.'],
@@ -1734,7 +1735,7 @@ function jobValueFor_(trade, siteHint) {
 // its jobs would book the most work in its town, so the broad searches don't cap what a strong shop is shown.
 //   trade: the kinds of business it belongs to; search: the second search ("+ town"); seeds: what Google's related searches
 //   start from; about / big / small: words that make a related search about this job, about the big job, or about something
-//   smaller; job: [name, low, high] in CAD; where: where the price range is typical; season: 'summer' for April to September only.
+//   smaller; job: [name, low, high] in CAD; where: where the price range is typical; season: 'summer' for March to July only (summer_).
 var SVC_HVAC = /furnace|heat|hvac|cool|air con|a\/c|mechanical/, SVC_PLUMB = /plumb|water heater/, SVC_DRAIN = /drain|sewer/, SVC_ELEC = /electric/;
 var SERVICES = [
   { trade: SVC_HVAC, key: 'furnace replacement', search: 'furnace replacement', seeds: ['furnace replacement', 'new furnace', 'furnace installation'], about: /furnace/,
@@ -1754,6 +1755,12 @@ var SERVICES = [
     job: ['a tankless water heater installation', 2500, 5000], where: 'Canadian' },
   { trade: SVC_PLUMB, key: 'sewer line repair', search: 'sewer line repair', seeds: ['sewer line repair', 'sewer line replacement'], about: /sewer/, big: /line|replac|lining|repair/,
     small: /smell|clean|camera only/, job: ['a sewer line repair', 2000, 7500], where: 'Calgary-area' },
+  // Nov 16, 2026 keyword research: about 590 Calgary searches a month for water softener installation at about US$7 a
+  // click. Price: HomeStars' Canadian guide, $1,200 to $3,500 for a standard unit installed by a plumber.
+  { trade: SVC_PLUMB, key: 'water softener installation', search: 'water softener installation', seeds: ['water softener installation', 'water softener install', 'water softener installation cost'],
+    about: /softener|water conditioner/, big: /install|replac|new|system|cost|price|quote/,
+    small: /repair|salt|resin|regenerat|not working|beep|error|parts?\b|rent|bypass|how to|diy|manual|portable|shower|\brv\b/,
+    job: ['a water softener installation', 1200, 3500], where: 'Canadian' },
   { trade: SVC_DRAIN, key: 'sewer line repair', search: 'sewer line repair', seeds: ['sewer line repair', 'sewer line replacement'], about: /sewer/, big: /line|replac|lining|repair/,
     small: /smell|clean|camera only/, job: ['a sewer line repair', 2000, 7500], where: 'Calgary-area' },
   { trade: SVC_ELEC, key: 'panel upgrade', search: 'electrical panel upgrade', seeds: ['electrical panel upgrade', 'panel upgrade', 'electrical panel replacement'],
@@ -1768,7 +1775,9 @@ var SERVICES = [
   { trade: /garage door/, key: 'new garage door', search: 'garage door installation', seeds: ['garage door installation', 'new garage door', 'garage door replacement'], about: /garage door/,
     big: /install|replac|new|cost|price|insulated|buy/, small: /repair|spring|opener|remote|cable|roller|off track|stuck|seal/, job: ['a new garage door', 2400, 3300], where: 'Calgary-area' }
 ];
-function summer_() { var m = Number(Utilities.formatDate(new Date(), tz_(), 'M')); return m >= 4 && m <= 9; }
+// Air conditioning season: Calgary's AC installation searches run highest from March to July and fall off from August
+// (keyword research, Nov 2025 to Oct 2026). It was April to September before that.
+function summer_() { var m = Number(Utilities.formatDate(new Date(), tz_(), 'M')); return m >= 3 && m <= 7; }
 // The big jobs for a kind of business, its usual one first (in season only, unless allSeasons). [] when it has none.
 function servicesFor_(trade, siteHint, allSeasons) {
   var t = String(trade || '').toLowerCase();
@@ -3962,30 +3971,45 @@ function findFromMaps_(area) {
   cost += vol.cost;
   if (vol.error) errors.push('search estimates: ' + vol.error);
   var known = knownDomains_(), limit = Number(setting_('PROSPECTS_PER_WEEK') || 15), added = 0, seen = 0;
-  for (var round = 0; added < limit && pools.some(function (p) { return p.length > round; }); round++) {
-    pools.forEach(function (p) {
-      var s = p[round];
-      if (!s || added >= limit) return;
-      seen++;
-      if (!s.domain || NOT_PROSPECTS.test(s.domain) || CHAIN_NAMES.test(s.business) || known.indexOf(s.domain) > -1 || isDnc_(s.domain) || s.reviews < 10) return;
-      // Its own trade and town, from its Google listing: an HVAC shop in a plumber search is audited as HVAC, a Calgary
-      // shop in a Chestermere search as Calgary. A kind of business we don't do, or a town outside AREAS, is left out.
-      var tr = tradeFromCategory_(s.category), ck = townKey_(s.city);
-      if (tr === false) return;
-      if (tr) s.trade = tr;
-      if (ck && TOWNS[ck][2] !== town.name) {
-        if (!areaTowns_()[TOWNS[ck][2]]) return;
-        s.area = TOWNS[ck][2];
-      }
-      s.home_town = ck ? TOWNS[ck][2] : '';
-      known.push(s.domain);
-      addProspect_(s, area);
-      added++;
+  // From December to March the trades in SEASON_FOCUS (heating and garage doors: their searches run above a typical month
+  // then) get two shops a round to every other trade's one.
+  var focus = seasonFocus_(), next = pools.map(function () { return 0; });
+  var take = function (k) {
+    var p = pools[k], s = p[next[k]];
+    next[k]++;
+    if (!s || added >= limit) return;
+    seen++;
+    if (!s.domain || NOT_PROSPECTS.test(s.domain) || CHAIN_NAMES.test(s.business) || known.indexOf(s.domain) > -1 || isDnc_(s.domain) || s.reviews < 10) return;
+    // Its own trade and town, from its Google listing: an HVAC shop in a plumber search is audited as HVAC, a Calgary
+    // shop in a Chestermere search as Calgary. A kind of business we don't do, or a town outside AREAS, is left out.
+    var tr = tradeFromCategory_(s.category), ck = townKey_(s.city);
+    if (tr === false) return;
+    if (tr) s.trade = tr;
+    if (ck && TOWNS[ck][2] !== town.name) {
+      if (!areaTowns_()[TOWNS[ck][2]]) return;
+      s.area = TOWNS[ck][2];
+    }
+    s.home_town = ck ? TOWNS[ck][2] : '';
+    known.push(s.domain);
+    addProspect_(s, area);
+    added++;
+  };
+  while (added < limit && pools.some(function (p, k) { return next[k] < p.length; })) {
+    pools.forEach(function (p, k) {
+      take(k);
+      if (focus.indexOf(String(trades[k]).toLowerCase()) > -1) take(k);
     });
   }
   appendRow_(TAB.jobs, HEAD.jobs, { job_id: newId_('J'), kind: 'find', lead_id: '', area: area, status: 'done', attempts: 1, created: new Date(), updated: new Date(),
     est_cost_usd: cost, detail: 'Google Maps: ' + added + ' new' + (errors.length ? ' | ' + errors.join('; ') : '') });
   logEvent_('', '', 'prospects_found', area + ': ' + added + ' new of ' + seen + ' on Google Maps');
+}
+
+// The trades that get a double share of new prospects this month: SEASON_FOCUS from December to March, none otherwise.
+function seasonFocus_() {
+  var m = Number(Utilities.formatDate(new Date(), tz_(), 'M'));
+  if (m >= 4 && m <= 11) return [];
+  return String(setting_('SEASON_FOCUS') || '').split(',').map(function (t) { return t.trim().toLowerCase(); }).filter(String);
 }
 
 // The towns the AREAS setting covers ("Calgary NE" counts as Calgary).

@@ -15,7 +15,23 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 16, afternoon): the account is logan@ledgecommunications.com now
+## Where you are (Nov 16, evening): what the keyword research changed
+
+- **Water softener installs for plumbers.** About 590 Calgary searches a month at about US$7 a click. A plumber whose home
+  page offers softeners can now be measured on them, priced at $1,200 to $3,500 (HomeStars' Canadian guide; sources in
+  `engine/value-sources.md`). Water heaters stay the usual plumbing job.
+- **Air conditioning season is March to July** (it was April to September), the months Calgary's AC installation
+  searches run highest.
+- **Winter focus in prospecting (`SEASON_FOCUS`, heating and cooling, garage doors).** From December to March those two
+  trades get two new prospects for every one in plumbing and electrical, since their searches run above a typical month
+  then. Empty the cell for an even split.
+- **Not added: garage door openers.** Opener repair searches cost about US$51 a click. At garage trades' usual rates,
+  that's about $3,600 in ads per booked job, more than an opener job brings in, so the money box would never show.
+
+Ship it: paste `Code.gs` and save (nothing here runs in the web app, so no new deployment), then upload `Code.gs` and
+`SETUP.md` to GitHub. The `SEASON_FOCUS` row appears on the Settings tab after the next run.
+
+## Where you were (Nov 16, afternoon): the account is logan@ledgecommunications.com now
 
 The Gmail account that runs the hub was upgraded to Google Workspace, so its own address is now
 logan@ledgecommunications.com, and ledgecommunications@gmail.com is a second address on it. Two things followed:
@@ -134,7 +150,7 @@ Done: www, plain http, and the old workers.dev address move to https://ledgecomm
 - **Each shop in its own town and trade:** the city on its Google listing or website and its Google category decide,
   not the search that found it. Shops outside `AREAS` are left out.
 - **Each shop on its biggest job:** the second search and the value box go on whichever big job its site offers would
-  book the most work in its town (heat pumps, air conditioners from April to September, tankless water heaters, sewer
+  book the most work in its town (heat pumps, air conditioners from March to July, tankless water heaters, sewer
   lines, EV chargers). Prices and sources are in `engine/value-sources.md`.
 - **Speed:** up to `SHOPS_PER_RUN` (15) shops a run, plus a short extra pass 15 minutes later while work is with Claude
   (`QUICK_RUNS`; set it to no if the Sheet ever says "Service using too much computer time for one day").
