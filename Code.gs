@@ -77,7 +77,7 @@ var HEAD = {
   // months: searches a month for the last 12 months, oldest first; peak_month: the busiest of them.
   research: ['set', 'kind', 'keyword', 'volume', 'cpc_usd', 'bid_low_usd', 'bid_high_usd', 'competition', 'months', 'peak_month', 'location', 'fetched']
 };
-var SCHEMA_VERSION = '28';
+var SCHEMA_VERSION = '29';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -322,6 +322,8 @@ function ensureSchema_(force) {
   // 26: first reads that came within SCANNER_WINDOW_MIN of our email were link scanners: they stop counting as reads.
   if (from > 0 && from < 26) props_().setProperty('SCANNER_RECHECK_PENDING', '1');
   // 27: the account's old address stays ours, and the shops our own emails were taken for replies from go back.
+  // 29: an unsubscribe by the footer link that came in between the Nov 16 misread and its clean-up stands again.
+  if (from > 0 && from < 29) props_().setProperty('UNSUB_RECHECK_PENDING', '1');
   if (from > 0 && from < 27) {
     var had = String(prop_('OUR_ADDRESSES') || '').split(',').filter(String);
     if (had.indexOf('ledgecommunications@gmail.com') < 0) props_().setProperty('OUR_ADDRESSES', had.concat(['ledgecommunications@gmail.com']).join(','));
@@ -642,8 +644,9 @@ function runHourly() {
     step_('undoFalseReplies', function () { if (prop_('REPLY_RECHECK_PENDING') && undoFalseReplies_(runLeft_() - 200000)) props_().deleteProperty('REPLY_RECHECK_PENDING'); });
     step_('undoScannerReads', function () { if (prop_('SCANNER_RECHECK_PENDING')) { undoScannerReads_(); props_().deleteProperty('SCANNER_RECHECK_PENDING'); } });
     step_('undoOwnEmailReplies', function () { if (prop_('OWN_EMAIL_RECHECK_PENDING') && undoOwnEmailReplies_(runLeft_() - 200000)) props_().deleteProperty('OWN_EMAIL_RECHECK_PENDING'); });
+    step_('restoreLinkUnsubscribes', function () { if (prop_('UNSUB_RECHECK_PENDING')) { restoreLinkUnsubscribes_(); props_().deleteProperty('UNSUB_RECHECK_PENDING'); } });
     step_('checkReplies', checkReplies_);
-    step_('checkAliasReplies', checkAliasReplies_);
+    step_('checkStrayReplies', checkStrayReplies_);
     step_('checkBounces', checkBounces_);
     step_('checkCalendar', checkCalendar_);
     step_('pollBatches', pollBatches_);
@@ -1263,6 +1266,8 @@ function sendFollowUps_() {
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
     var seq = SEQUENCES[l.status];
     if (!seq || !l.next_touch || new Date(l.next_touch) > now || l.attention || held.indexOf(l.id) > -1) return;
+    // An address put on the Do not contact tab (by hand, or by any route the hub missed) gets nothing more.
+    if (isDnc_(l.email)) { stopLead_(l, 'unsubscribed', 'On the Do not contact tab'); return; }
     var t = Number(l.touches || 1);
     var stepDef = seq[t];
     if (!stepDef) {
@@ -1332,24 +1337,27 @@ function checkReplies_() {
   });
 }
 
-// A safety net once SENDER_EMAIL is in use: replies to it reach this account by forwarding, and normally land in the lead's
-// thread (checkReplies_ reads them there). One that arrives outside its thread (a mail app that drops the reply headers) is
-// matched by the sender's address and handled the same way.
-function checkAliasReplies_() {
-  var alias = senderSetting_();
-  if (!alias) return;
+// Email from a shop that isn't in its thread: a new message to any of our addresses, or the "Unsubscribe" email some mail
+// apps send from the footer's link (Nov 16, 2026: two shops asked to stop that way, and the hub never saw it). Matched by
+// the sender's address and read like a reply in the thread; an unsubscribe stops a shop whatever stage it's at.
+function checkStrayReplies_() {
   var byEmail = {};
   readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
-    if (l.thread_id && l.email && DONE_STATUSES.indexOf(l.status) === -1) byEmail[String(l.email).toLowerCase()] = l;
+    if (l.email && ['unsubscribed', 'bounced'].indexOf(l.status) === -1) byEmail[String(l.email).toLowerCase()] = l;
   });
-  GmailApp.search('to:' + alias + ' newer_than:3d', 0, 50).forEach(function (t) {
+  var us = fromUs_(myEmail_());
+  GmailApp.search('newer_than:7d -in:sent -in:drafts -in:chats', 0, 100).forEach(function (t) {
     t.getMessages().forEach(function (m) {
-      if (m.isDraft && m.isDraft()) return;
+      if ((m.isDraft && m.isDraft()) || us(m)) return;
       var l = byEmail[addrOf_(m.getFrom())];
       if (!l || t.getId() === String(l.thread_id) || m.getDate().getTime() <= Number(l.last_reply_at || 0)) return;
+      var unsub = OPT_OUT.test(String(m.getSubject() || '')) || OPT_OUT.test(topOfReply_(m.getPlainBody() || ''));
+      if ((DONE_STATUSES.indexOf(l.status) > -1 && !unsub) || ['won', 'booked'].indexOf(l.status) > -1) return;
       updateLead_(l, { last_reply_at: m.getDate().getTime() });
       logEvent_(l.id, l.email, 'reply_outside_thread', String(m.getSubject() || '').slice(0, 120));
-      handleReply_(findLead_('id', l.id), m);
+      l = findLead_('id', l.id);
+      if (unsub) { stopLead_(l, 'unsubscribed', 'Emailed: ' + String(m.getSubject() || topOfReply_(m.getPlainBody() || '')).slice(0, 150)); return; }
+      handleReply_(l, m);
     });
   });
 }
@@ -1431,10 +1439,13 @@ function undoFalseReplies_(budget) {
 function undoOwnEmailReplies_(budget) {
   var start = Date.now(), now = new Date(), since = new Date('2026-11-15T00:00:00-07:00');
   var us = fromUs_(myEmail_());
-  var hit = {};
-  readRows_(TAB.events, HEAD.events).forEach(function (e) { if (/^reply_/.test(e.event) && e.lead_id && new Date(e.timestamp) >= since) hit[e.lead_id] = true; });
+  var hit = {}, linked = {};
+  readRows_(TAB.events, HEAD.events).forEach(function (e) {
+    if (/^reply_/.test(e.event) && e.lead_id && new Date(e.timestamp) >= since) hit[e.lead_id] = true;
+    if (e.event === 'unsubscribed' && /link|emailed|subject|do not contact/i.test(String(e.detail || ''))) linked[e.lead_id] = true;
+  });
   var todo = readRows_(TAB.leads, HEAD.leads).filter(function (l) {
-    return hit[l.id] && l.thread_id && ['unsubscribed', 'not_interested', 'replied'].indexOf(l.status) > -1;
+    return hit[l.id] && !linked[l.id] && l.thread_id && ['unsubscribed', 'not_interested', 'replied'].indexOf(l.status) > -1;
   });
   for (var i = 0; i < todo.length; i++) {
     if (Date.now() - start > budget) return false;
@@ -1458,6 +1469,26 @@ function undoOwnEmailReplies_(budget) {
       .filter(function (a, k, arr) { return arr.indexOf(a) === k; }).join(', '));
   }
   return true;
+}
+
+// Once, after the Nov 16, 2026 clean-up: any shop that ever used the unsubscribe link but isn't marked unsubscribed now
+// (the clean-up put back shops our own emails were taken for; one could have used the link in between) is stopped again.
+function restoreLinkUnsubscribes_() {
+  var linked = {}, engaged = {};
+  readRows_(TAB.events, HEAD.events).forEach(function (e) {
+    if (!e.lead_id) return;
+    var at = new Date(e.timestamp).getTime();
+    if (e.event === 'unsubscribed' && /link/i.test(String(e.detail || ''))) linked[e.lead_id] = Math.max(linked[e.lead_id] || 0, at);
+    // They got in touch again afterwards (a quote request, a yes, a booking): that stands.
+    if (/^(quote_requested|inbound_request|reply_positive|booked|won|proposal_approved)$/.test(e.event)) engaged[e.lead_id] = Math.max(engaged[e.lead_id] || 0, at);
+  });
+  var n = 0;
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (!linked[l.id] || (engaged[l.id] || 0) > linked[l.id] || ['unsubscribed', 'bounced', 'won', 'booked'].indexOf(l.status) > -1) return;
+    stopLead_(l, 'unsubscribed', 'Unsubscribe link (restored after the Nov 16 clean-up)');
+    n++;
+  });
+  return n;
 }
 
 // Statuses whose automatic emails stop once Logan writes in the thread himself.
@@ -1494,6 +1525,7 @@ function noteStops_(l, when, detail) {
 function handleReply_(l, msg) {
   if (/mailer-daemon|postmaster/i.test(String(msg.getFrom()))) { stopLead_(l, 'bounced', 'Delivery failed'); return; }
   var subject = String(msg.getSubject() || '');
+  if (OPT_OUT.test(subject)) { logEvent_(l.id, l.email, 'reply_unsubscribe', 'Subject: ' + subject.slice(0, 150)); stopLead_(l, 'unsubscribed', 'Subject: ' + subject.slice(0, 150)); return; }
   var auto = String(msg.getHeader('Auto-Submitted') || '').toLowerCase();
   if ((auto && auto !== 'no') || AUTO_SUBJECT.test(subject)) { logEvent_(l.id, l.email, 'auto_reply', subject); return; }
   // No name yet: the reply's From line usually has one ("Mike Lambert <info@...>"), so the next email says "Hi Mike".
@@ -1676,10 +1708,18 @@ var SEARCH_TERMS = [
   [/appliance/, ['appliance repair', 'fridge repair']],
   [/snow|landscap|lawn/, ['snow removal', 'landscaping'], ['landscaping', 'lawn care']],
   [/pest|extermin/, ['pest control', 'exterminator']],
-  [/paint/, ['house painters', 'interior painting']],
-  [/window|door/, ['window replacement', 'door installation']],
+  // Listings that only look like ours (a paint store, a window cleaner): their rows match no TRADES entry, so a Maps result
+  // with one of these categories is left out (tradeFromCategory_).
+  [/paint (store|supplier|manufacturer|shop)|paintball|auto (body|paint)|car paint|body shop|painting (studio|class|lessons)/, ['paint store', 'paint supplies']],
+  [/window (clean|wash|tint)|pressure wash|window film/, ['window cleaning', 'window washing']],
+  // Painting: interior searches run highest from October to January, exterior ones in April and May (keyword research, Nov 2026).
+  [/paint/, ['house painters', 'interior painting'], ['house painters', 'exterior painting']],
+  [/window|door/, ['window replacement', 'window installation']],
+  [/radon/, ['radon mitigation', 'radon testing']],
   [/floor/, ['flooring installation', 'flooring store']],
-  [/basement|renovat|remodel/, ['basement development', 'home renovation']],
+  [/waterproof|foundation/, ['foundation repair', 'basement waterproofing']],
+  [/basement/, ['basement development', 'basement renovation']],
+  [/renovat|remodel/, ['home renovation', 'basement development']],
   [/concrete/, ['concrete contractor', 'concrete driveway']],
   [/fence|deck/, ['fence builder', 'deck builder']],
   [/movers|moving/, ['movers', 'moving company']],
@@ -1695,8 +1735,8 @@ var SEARCH_TERMS = [
 ];
 // Chains and directories are never prospects.
 // Chains, franchises, and national brands by name (a Home Depot Heating & Cooling listing points to a local installer's site).
-var CHAIN_NAMES = /\b(home depot|reliance|enercare|direct energy|mr\.? ?rooter|roto-?rooter|mr\.? ?electric|mister sparky|mr\.? ?appliance|one hour|benjamin franklin|aire serv|service ?master|service experts|lowe'?s|costco|sears|canadian tire|best buy|culligan|ars rescue|furnace family)\b/i;
-var NOT_PROSPECTS = /reliance|enercare|directenergy|mrrooter|mr-rooter|mrelectric|mrappliance|onehour|benjaminfranklin|aireserv|servicemaster|homedepot|lowes|costco|sears|canadiantire|bestbuy|facebook\.com|instagram\.com|yelp\.|homestars|houzz|google\.|yellowpages|kijiji/;
+var CHAIN_NAMES = /\b(home depot|reliance|enercare|direct energy|mr\.? ?rooter|roto-?rooter|mr\.? ?electric|mister sparky|mr\.? ?appliance|one hour|benjamin franklin|aire serv|service ?master|service experts|lowe'?s|costco|sears|canadian tire|best buy|culligan|ars rescue|furnace family|certapro|college pro|student works|five star painting|renewal by andersen|canadian choice|ecoline|all weather windows|ply ?gem|jeld-?wen|pella|sherwin|cloverdale|benjamin moore|airthings)\b/i;
+var NOT_PROSPECTS = /reliance|enercare|directenergy|mrrooter|mr-rooter|mrelectric|mrappliance|onehour|benjaminfranklin|aireserv|servicemaster|homedepot|lowes|costco|sears|canadiantire|bestbuy|facebook\.com|instagram\.com|yelp\.|homestars|houzz|google\.|yellowpages|kijiji|certapro|collegepro|studentworks|fivestarpainting|renewalbyandersen|canadianchoice|ecolinewindows|allweatherwindows|plygem|jeld-wen|pella\.|sherwin-williams|cloverdalepaint|benjaminmoore|airthings/;
 
 /* ── what the searches are worth ── */
 // Typical Calgary-area prices in CAD: the everyday job most of these searches turn into, and the big job that comes up,
@@ -1716,8 +1756,10 @@ var JOB_VALUES = [
   [/pest|extermin/, 'pest control', ['a pest control treatment', 150, 400], ['an annual pest control plan', 500, 1200], null],
   [/carpet/, 'carpet cleaning', ['a carpet cleaning', 250, 400], null, [9, 18, 12]],
   [/clean|maid/, 'house cleaning', ['a house cleaning', 230, 300], ['a deep or move-out clean', 400, 550], [9, 18, 12]],
-  [/paint/, 'painting', ['painting a room', 400, 800], ['a full interior or exterior repaint', 3000, 6000], [6, 11, 19]],
-  [/window|door/, 'window and door work', ['a foggy window glass replacement', 700, 1200], ['new windows for a whole house', 10000, 16000], [6, 4, 12]],
+  [/paint/, 'painting', ['painting a room', 400, 800], ['a full interior repaint', 3000, 7000], [6, 11, 30]],
+  [/window|door/, 'window and door work', ['a single window replacement', 700, 1200], ['a window replacement project', 5000, 12000], [6, 4.4, 40]],
+  [/radon/, 'radon mitigation', ['a professional radon test', 150, 300], ['a radon mitigation system', 1800, 3000], [6, 8, 14]],
+  [/basement/, 'basement development', ['a basement bathroom', 8000, 18000], ['a basement development', 45000, 95000], [6, 2.6, 28]],
   [/concrete/, 'concrete work', ['a concrete repair', 1000, 3000], ['a new driveway', 6000, 10000], [6, 3, 7]],
   [/fence|deck/, 'fence and deck work', ['a fence repair', 430, 1300], ['a new fence', 4000, 8000], [6, 3, 7]],
   [/snow/, 'snow removal', ['a season of snow removal', 500, 1000], null, [5, 6, 12]],
@@ -1737,6 +1779,9 @@ function jobValueFor_(trade, siteHint) {
 //   start from; about / big / small: words that make a related search about this job, about the big job, or about something
 //   smaller; job: [name, low, high] in CAD; where: where the price range is typical; season: 'summer' for March to July only (summer_).
 var SVC_HVAC = /furnace|heat|hvac|cool|air con|a\/c|mechanical/, SVC_PLUMB = /plumb|water heater/, SVC_DRAIN = /drain|sewer/, SVC_ELEC = /electric/;
+var SVC_PAINT = /paint/, SVC_WINDOW = /window|door/, SVC_RADON = /radon/, SVC_BASEMENT = /basement/;
+// Words that mark a painting search as a store, a brand, or a do-it-yourself job rather than hiring a painter.
+var PAINT_NOT = /sherwin|cloverdale|benjamin moore|behr|dulux|\baura\b|store|supply|supplies|\bcar\b|auto|\bart\b|diy|how to|spray(er)?\b|roller|brush|kit\b|nail|face/;
 var SERVICES = [
   { trade: SVC_HVAC, key: 'furnace replacement', search: 'furnace replacement', seeds: ['furnace replacement', 'new furnace', 'furnace installation'], about: /furnace/,
     big: /replac|install|new|high efficiency|cost|price|quote|buy/, small: /repair|clean|service|filter|noise|smell|pilot|reset|blow|not working|parts?\b/,
@@ -1773,7 +1818,28 @@ var SERVICES = [
   { trade: /roof/, key: 'roof replacement', search: 'roof replacement', seeds: ['roof replacement', 'new roof'], about: /roof/, big: /replac|new|install|cost|price|shingle/,
     small: /repair|leak|rack|top tent/, job: ['a roof replacement', 10000, 16000], where: 'Calgary-area' },
   { trade: /garage door/, key: 'new garage door', search: 'garage door installation', seeds: ['garage door installation', 'new garage door', 'garage door replacement'], about: /garage door/,
-    big: /install|replac|new|cost|price|insulated|buy/, small: /repair|spring|opener|remote|cable|roller|off track|stuck|seal/, job: ['a new garage door', 2400, 3300], where: 'Calgary-area' }
+    big: /install|replac|new|cost|price|insulated|buy/, small: /repair|spring|opener|remote|cable|roller|off track|stuck|seal/, job: ['a new garage door', 2400, 3300], where: 'Calgary-area' },
+  // Nov 2026 industry research (engine/value-sources.md). After the garage door entry, so a garage door shop isn't read as windows.
+  { trade: SVC_WINDOW, key: 'window replacement', search: 'window replacement', seeds: ['window replacement', 'replacement windows', 'window installation'], about: /window/,
+    big: /replac|install|new|compan|contractor|cost|price|quote|triple|energy|vinyl|retrofit|near me/,
+    small: /repair|glass|fog|screen|seal|crank|handle|latch|lock|parts?\b|film|tint|clean|blind|shutter|well|egress|\bcar\b|auto|truck|condensation|caulk|how to|diy|garage|mart|ply ?gem|andersen|pella|jeld|depot/,
+    job: ['a window replacement project', 5000, 12000], where: 'Calgary-area' },
+  { trade: SVC_BASEMENT, key: 'basement development', search: 'basement development', seeds: ['basement development', 'basement renovation', 'basement finishing'], about: /basement|cellar/,
+    big: /develop|renovat|\breno|finish|remodel|contractor|compan|builder|legal|suite|cost|price|quote/,
+    small: /^basement suites?$|ideas|diy|how to|subfloor|framing|\brent|walkout|waterproof|flood|leak|crack|mou?ld|dehumid|sump|egress|window|insulat|paint|floor|ceiling/,
+    job: ['a basement development', 45000, 95000], where: 'Calgary-area' },
+  { trade: SVC_PAINT, key: 'interior painting', search: 'interior painting', seeds: ['interior painting', 'interior house painters', 'house painters'], about: /paint/,
+    big: /painter|painting (compan|contractor|service)|interior|whole house|house painting|home painting|repaint|cost|price|quote|estimate/,
+    small: new RegExp('exterior|outside|outdoor|deck|fence|stain|cabinet|cupboard|' + PAINT_NOT.source),
+    job: ['a full interior repaint', 3000, 7000], where: 'Canadian' },
+  { trade: SVC_PAINT, key: 'exterior painting', search: 'exterior painting', seeds: ['exterior painting', 'exterior house painters', 'house painters'], about: /paint/,
+    big: /exterior|outside|outdoor|stucco|siding|house painting|painter|cost|price|quote|estimate/,
+    small: new RegExp('interior|inside|room|cabinet|cupboard|deck|fence|stain|' + PAINT_NOT.source),
+    job: ['an exterior repaint', 2500, 6000], where: 'Canadian', season: 'summer' },
+  { trade: SVC_RADON, key: 'radon mitigation', search: 'radon mitigation', seeds: ['radon mitigation', 'radon mitigation system', 'radon reduction'], about: /radon/,
+    big: /mitigat|reduc|remedi|abate|remov|eliminat|system|install|contractor|compan|professional|cost|price|quote|\bfan\b/,
+    small: /test ?kit|detector|monitor|\bmap\b|levels?\b|symptom|cancer|what is|diy|how to|airthings|depot|canadian tire|amazon|irrigation|pump/,
+    job: ['a radon mitigation system', 1800, 3000], where: 'Calgary-area' }
 ];
 // Air conditioning season: Calgary's AC installation searches run highest from March to July and fall off from August
 // (keyword research, Nov 2025 to Oct 2026). It was April to September before that.
@@ -1951,7 +2017,7 @@ function oppWords_(p) {
 
 // The whole search market for a kind of business in a town: Google's related searches with their monthly estimates,
 // keeping only ones about the work (not jobs, how-tos, stores, or other towns). One call per town and trade, kept 60 days.
-var MARKET_SKIP = /\b(jobs?|hiring|salary|salaries|wages?|careers?|courses?|schools?|training|apprentic\w*|certificat\w*|union|how to|how do|diy|do it yourself|youtube|reddit|wiki\w*|meaning|definition|parts?|supply|supplies|store|depot|rona|lowes|canadian tire|costco|walmart|amazon|kijiji|marketplace|used|for sale|rentals?|rent|manual|reviews?|complaints?|login|portal|tool|tools)\b/;
+var MARKET_SKIP = /\b(jobs?|hiring|salary|salaries|wages?|careers?|courses?|schools?|training|apprentic\w*|certificat\w*|union|how to|how do|diy|do it yourself|youtube|reddit|wiki\w*|meaning|definition|parts?|supply|supplies|store|depot|rona|lowes|canadian tire|costco|walmart|amazon|kijiji|marketplace|used|for sale|rentals?|rent|manual|reviews?|complaints?|login|portal|tool|tools|kits?|sherwin\w*|cloverdale|benjamin moore|behr|dulux|airthings)\b/;
 var MARKET_PLACES = ['calgary', 'edmonton', 'red deer', 'lethbridge', 'medicine hat', 'grande prairie', 'fort mcmurray', 'st albert', 'st. albert',
   'sherwood park', 'spruce grove', 'leduc', 'camrose', 'brooks', 'lloydminster', 'vancouver', 'victoria', 'kelowna', 'kamloops', 'regina',
   'saskatoon', 'winnipeg', 'toronto', 'ottawa', 'montreal', 'halifax'];
@@ -2278,9 +2344,13 @@ function tradeFromCategory_(cat) {
   if (!c) return '';
   var row = tradeRow_(c, '');
   if (row < 0) return '';
-  var hit = String(setting_('TRADES') || '').split(',').map(function (t) { return t.trim(); }).filter(function (t) { return t && tradeRow_(t, '') === row; })[0];
+  var trades = String(setting_('TRADES') || '').split(',').map(function (t) { return t.trim(); }).filter(String);
+  var hit = trades.filter(function (t) { return tradeRow_(t, '') === row; })[0];
+  // Many basement developers are listed as a remodeler or renovation contractor.
+  CATEGORY_ALSO.forEach(function (pair) { if (!hit && pair[0].test(c)) hit = trades.filter(function (t) { return pair[1].test(t.toLowerCase()); })[0]; });
   return hit || false;
 }
+var CATEGORY_ALSO = [[/renovat|remodel/, /basement/]];
 
 // The two searches for a kind of business. When the form says "Another trade" or "Another local business", the shop's
 // own page title and wording pick the searches instead; if nothing fits, there are no searches (the audit still builds).

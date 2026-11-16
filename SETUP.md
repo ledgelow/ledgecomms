@@ -15,7 +15,40 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 16, evening): what the keyword research changed
+## Where you are (Nov 16, late afternoon): unsubscribes by email, and four industries ready to try
+
+**Unsubscribes now stop the emails however they come in.** Two shops asked to stop on Nov 16. Some mail apps turn
+our footer's unsubscribe link into a new email titled "Unsubscribe", and that email lands outside the shop's thread,
+where the hub never looked. Now:
+- Any email from a shop's address counts as their reply, wherever it lands. If it says unsubscribe, stop, or remove me
+  (in the subject or the first lines), the shop is marked `unsubscribed` and added to the Do not contact tab.
+- A reply titled "Unsubscribe" with nothing in it counts too.
+- Before any follow-up goes out, the hub checks the Do not contact tab, so an address you add there by hand always stops them.
+- One time, on the first run after the update: any shop that used the unsubscribe link and was put back by the Nov 16
+  clean-up is marked unsubscribed again. A shop that got back in touch afterwards (a quote request, a yes) is left alone.
+
+**Four industries are ready to add to `TRADES`:** windows and doors, basement development, painting, and radon mitigation.
+The research and the numbers are in the "New industries" doc. Each one now has the searches a customer types, a sourced
+big job with Calgary click prices that pay at least twice over, the chains and franchises left out of prospecting, and the
+Google categories that belong to it (a paint store, a window cleaner, or a waterproofing company is left out). Sources are
+in `engine/value-sources.md`. Audits never write about the health side of the work (radon and lung cancer, for example).
+
+Suggested order:
+- **Now:** add `windows and doors, radon mitigation, basement development` to `TRADES`. Their searches peak from
+  November to March, and basements have long decisions, so winter is the time to start.
+- **Late February:** add `painting`, for the April and May exterior peak.
+- Optional: add `windows and doors, radon mitigation` to `SEASON_FOCUS` so they get the winter double share too.
+
+The website's trade list is unchanged (its "Another trade" option already covers these shops). Cold prospecting doesn't
+need it; add them to the site once one of them books a call.
+
+Ship it:
+1. Paste `Code.gs` and `Templates.gs` into the Apps Script editor (replace everything in each), save, and deploy a new
+   version (the audit and rebuild links use the new job values).
+2. Set the Leads status for the two shops who asked on Nov 16 to `unsubscribed`, if it doesn't say that already.
+3. Upload `Code.gs`, `Templates.gs`, and `SETUP.md` to GitHub.
+
+## Where you were (Nov 16, evening): what the keyword research changed
 
 - **Water softener installs for plumbers.** About 590 Calgary searches a month at about US$7 a click. A plumber whose home
   page offers softeners can now be measured on them, priced at $1,200 to $3,500 (HomeStars' Canadian guide; sources in
