@@ -9,7 +9,7 @@ Built from the segment or the offer: {offer_line}, {offer_noun}, {audit_price_li
 For the account audit: {manager_id} (ADS_MANAGER_ID), {report_url}, {report_finding} (the report's biggest finding), and {report_value_para} (what the ads bring in, when the report has an estimate).
 {value_para} is the audit's estimate as one sentence, left out when there's no estimate. The first cold email doesn't carry it: the money is on the audit page and in cold email 3.
 {personal_para} is the line you add before a site-form audit goes out (left out when you don't add one).
-Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com, and a one-click unsubscribe link.
+Every email also gets the footer: your name, mailing address, the site, the address it went from (SENDER_EMAIL once it's set up, otherwise ledgecommunications@gmail.com), and a one-click unsubscribe link.
 
 The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your markup) and this file gets regenerated.
 

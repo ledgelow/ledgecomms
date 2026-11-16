@@ -11,7 +11,7 @@ Built from the segment or the offer: {offer_line}, {offer_noun}, {audit_price_li
 For the account audit: {manager_id} (ADS_MANAGER_ID), {report_url}, {report_finding} (the report's biggest finding), and {report_value_para} (what the ads bring in, when the report has an estimate).
 {value_para} is the audit's estimate as one sentence, left out when there's no estimate. The first cold email doesn't carry it: the money is on the audit page and in cold email 3.
 {personal_para} is the line you add before a site-form audit goes out (left out when you don't add one).
-Every email also gets the footer: your name, mailing address, the site, ledgecommunications@gmail.com, and a one-click unsubscribe link.
+Every email also gets the footer: your name, mailing address, the site, the address it went from (SENDER_EMAIL once it's set up, otherwise ledgecommunications@gmail.com), and a one-click unsubscribe link.
 
 The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your markup) and this file gets regenerated.
 
@@ -41,7 +41,10 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Following up on the audit I sent. If you only do one thing from it, I'd start here: {fix_1}.
+> Following up on the audit I sent:
+> {audit_url}
+>
+> If you only do one thing from it, I'd start here: {fix_1}.
 >
 > Happy to set it up for you or share more details. Just let me know, and I'll send a plan for how I'd recommend running it.
 >
@@ -57,6 +60,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > {more_para}
 >
 > If you'd like one, just reply and let me know.{booking_line}
+>
+> Your audit is still up if you want another look:
+> {audit_url}
 >
 > All the best,
 > {sign}
@@ -100,7 +106,10 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Following up on the audit I sent. From the outside I can see where your ads show up. From the inside I can see why: which searches you're paying for, and what a call costs you.
+> Following up on the audit I sent:
+> {audit_url}
+>
+> From the outside I can see where your ads show up. From the inside I can see why: which searches you're paying for, and what a call costs you.
 >
 > {audit_price_line}
 >
@@ -116,6 +125,9 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 > Hi {first},
 >
 > One more thought on your audit. If you only take one thing away from it, I'd start here: {fix_1}.
+>
+> It's still up here:
+> {audit_url}
 >
 > If you'd like the details, just reply and let me know.{booking_line}
 >

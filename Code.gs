@@ -34,7 +34,8 @@
 var TAB = {
   settings: 'Settings', leads: 'Leads', audits: 'Audits', proposals: 'Proposals',
   jobs: 'Engine jobs', events: 'Events', dnc: 'Do not contact', evidence: 'Evidence', volumes: 'Search volumes',
-  exports: 'Ads exports', reports: 'Account reports', clients: 'Clients', invoices: 'Invoices', shots: 'Search screenshots'
+  exports: 'Ads exports', reports: 'Account reports', clients: 'Clients', invoices: 'Invoices', shots: 'Search screenshots',
+  research: 'Keyword research'
 };
 // New columns only ever go on the end, so older sheets can be extended in place (see ensureSchema_).
 var HEAD = {
@@ -71,9 +72,12 @@ var HEAD = {
     'last_report', 'last_invoice'],
   // Monthly management invoices. The first column is always filled (rows with an empty first cell are skipped).
   invoices: ['lead_id', 'month', 'item', 'amount', 'status', 'invoice_id', 'invoice_number', 'created', 'sent_at', 'paid_at'],
-  reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json']
+  reports: ['slug', 'lead_id', 'export_id', 'created', 'status', 'spec_json'],
+  // Ledge menu > Research keywords: Google's related searches for each trade and each industry we might add, in Calgary.
+  // months: searches a month for the last 12 months, oldest first; peak_month: the busiest of them.
+  research: ['set', 'kind', 'keyword', 'volume', 'cpc_usd', 'bid_low_usd', 'bid_high_usd', 'competition', 'months', 'peak_month', 'location', 'fetched']
 };
-var SCHEMA_VERSION = '25';
+var SCHEMA_VERSION = '26';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -105,6 +109,8 @@ var SETTINGS_DEFAULTS = [
   ['COLD_SUBJECT_B', 'Made this for {business}', 'A second subject line to test on cold first emails. While it\'s filled in, every other cold first email goes out with it instead of the usual subject (A), and Where the audits are and the Monday digest compare the two: sent, read their audit, replied. Placeholders: {business} (the shop\'s name, shortened), {search} (its first search), {town}, {job} (the big job its audit is on). Clear the cell to stop the test.'],
   ['READ_PULLS_FOLLOWUP', 'yes', 'yes moves a cold prospect\'s next follow-up up to the next business morning when they read their audit for the first time (never sooner than 2 business days after the last email), so it lands while they\'re thinking about it. no keeps the usual gaps.'],
   ['READ_ALERTS', 'yes', 'yes emails you the moment a cold prospect reads their audit for the first time (and hasn\'t replied), with a suggested personal note. A note you write in their thread stops the automatic emails to that shop. no turns the alerts off.'],
+  ['SCANNER_WINDOW_MIN', '3', 'A first view of an audit this many minutes or less after our email went out is taken for a work mail system\'s link scanner, not a person: no read alert, no follow-up moved up, and it isn\'t counted as a read. 0 counts every view.'],
+  ['SENDER_EMAIL', '', 'The address new emails to shops go out from, like logan@ledgecommunications.com. Add it in this Gmail account first (Settings > Accounts and Import > Send mail as; SETUP.md has the steps). Empty: this account\'s own address. A thread already started keeps the address it started from.'],
   ['FIT_CHECK', 'yes', 'yes has the small model read each prospect\'s home page before any searches run. Cold prospects that mostly work for businesses, industry, or builders, or don\'t do their trade for homeowners, are held. Every shop\'s second search and value box go on the most valuable homeowner job its site offers (heat pumps, tankless water heaters, sewer lines, EV chargers), when that beats its trade\'s usual one.'],
   ['AUDIT_MIN_PRIORITY', '55', 'Cold prospects scoring below this (out of 100) once their searches are in are held instead of written up, so the audits you review are the strongest. Lower it and they come back on the next run.'],
   ['SHOPS_PER_RUN', '15', 'Shops researched per run, as many as fit in the run\'s time.'],
@@ -223,9 +229,11 @@ function onOpen() {
     .addItem('Run now', 'runHourly')
     .addItem('Find prospects now', 'weeklyProspects')
     .addItem('Check one shop', 'checkOneShop')
+    .addItem('Research keywords (trades and new industries)', 'researchKeywords')
     .addItem('Make a management proposal', 'makeManagementProposal')
     .addItem('Run an account audit', 'runAccountAudit')
     .addItem('Rebuild audits that haven\'t gone out', 'rebuildWaitingAudits')
+    .addItem('Email me the audits waiting on me', 'emailWaitingAudits')
     .addItem('Where the audits are', 'showAuditStatus')
     .addItem('Searches that need a phone screenshot', 'showSearchShotsNeeded')
     .addItem('Read new search screenshots now', 'readSearchShotsNow')
@@ -309,6 +317,8 @@ function ensureSchema_(force) {
   if (from > 0 && from < 22) props_().setProperty('FIT_PENDING', '1');
   // 25: leads marked as replied by a copy of our own email (see fromUs_) go back into their sequence, on the next hourly run.
   if (from > 0 && from < 25) props_().setProperty('REPLY_RECHECK_PENDING', '1');
+  // 26: first reads that came within SCANNER_WINDOW_MIN of our email were link scanners: they stop counting as reads.
+  if (from > 0 && from < 26) props_().setProperty('SCANNER_RECHECK_PENDING', '1');
 }
 
 // Once (21): a cold audit queued to send that Logan never approved (it went in on its own after the first reviews were
@@ -499,12 +509,22 @@ function ownerSays_(f) {
   return parts.join('; ');
 }
 
+var PRE_SEND = ['', 'requested', 'researching', 'audit_ready', 'awaiting_review', 'audit_approved', 'ready_to_send', 'held', 'skipped', 'error'];
 var ASK_LABEL = { account_audit: 'the account audit', starting_plan: 'a starting plan', details: 'the details' };
 
 function handleQuoteRequest_(id, t, notes, offer, budget, runningAds, addons) {
   if (!id || t !== token_(id)) return { ok: false, error: 'bad_token' };
   var lead = findLead_('id', id);
   if (!lead) return { ok: false, error: 'not_found' };
+  // Before the audit has gone to them, the only person on the page is Logan checking it (Nov 1, 2026: a test click sent a
+  // real shop a "got it, thanks" for a request it never made). Nothing goes to the shop and nothing is queued or counted.
+  if (lead.source === 'cold' && !Number(lead.touches || 0) && PRE_SEND.indexOf(String(lead.status || '')) > -1) {
+    logEvent_(lead.id, lead.email, 'quote_preview', offer || '');
+    ownerMail_('Plan button used on an unsent audit: ' + (lead.business || lead.email),
+      'Someone used the plan button on ' + (lead.business || lead.email) + '\'s audit before it was emailed to them, so nothing was sent to them and no proposal was made. ' +
+      'If that was you checking the page, there\'s nothing to do.\n\nIf you shared the link with them yourself, reply to them directly.');
+    return { ok: true, preview: true };
+  }
   notes = String(notes || '').trim().slice(0, 1000);
   budget = String(budget || '').trim().slice(0, 40);
   runningAds = String(runningAds || '').trim().slice(0, 20);
@@ -582,6 +602,7 @@ function quickRun() {
     ensureSchema_();
     step_('pollBatches', pollBatches_);
     step_('gatherEvidence', function () { gatherEvidence_(45000); });
+    step_('expireShotWaits', expireShotWaits_);
     step_('submitJobs', submitJobs_);
     step_('deliverAudits', deliverAudits_);
   } finally {
@@ -610,7 +631,9 @@ function runHourly() {
   try {
     ensureSchema_();
     step_('undoFalseReplies', function () { if (prop_('REPLY_RECHECK_PENDING') && undoFalseReplies_(runLeft_() - 200000)) props_().deleteProperty('REPLY_RECHECK_PENDING'); });
+    step_('undoScannerReads', function () { if (prop_('SCANNER_RECHECK_PENDING')) { undoScannerReads_(); props_().deleteProperty('SCANNER_RECHECK_PENDING'); } });
     step_('checkReplies', checkReplies_);
+    step_('checkAliasReplies', checkAliasReplies_);
     step_('checkBounces', checkBounces_);
     step_('checkCalendar', checkCalendar_);
     step_('pollBatches', pollBatches_);
@@ -621,6 +644,7 @@ function runHourly() {
     step_('rankWaiting', function () { if (prop_('RANK_PENDING')) { rankWaitingLeads_(); props_().deleteProperty('RANK_PENDING'); } });
     step_('gatherEvidence', gatherEvidence_);
     step_('gatherSiteChecks', gatherSiteChecks_);
+    step_('expireShotWaits', expireShotWaits_);
     step_('submitJobs', submitJobs_);
     step_('askForShots', askForShots_);
     step_('deliverAudits', deliverAudits_);
@@ -720,11 +744,12 @@ function holdLines_(l, until) {
 }
 
 // Several audits ready in the same run: one email, one block per shop, and the full email wording for the first.
-function requestAuditReviews_(list) {
+// again: Logan asked for everything still waiting (Ledge menu), so nothing is re-held or logged as a new request.
+function requestAuditReviews_(list, again) {
   var adsLabel = { running_ads: 'running ads', no_ads: 'no ads found', unknown: 'not sure about ads' };
   var blocks = list.map(function (l, i) {
-    var until = holdAudit_(l);
-    logEvent_(l.id, l.email, 'review_requested', 'audit');
+    var until = again ? (l.next_touch ? new Date(l.next_touch) : null) : holdAudit_(l);
+    if (!again) logEvent_(l.id, l.email, 'review_requested', 'audit');
     return (i + 1) + '. ' + l.business + ' (' + (l.source === 'cold' ? 'cold prospect' : 'asked on the site') + ', ' + (l.area || '') + ', ' +
       (adsLabel[l.segment] || adsLabel.unknown) + ')\n' +
       '   Audit: ' + auditUrl_(l) + ME_ + '\n' +
@@ -745,7 +770,7 @@ function requestAuditReviews_(list) {
     allLine = 'Approve all ' + clean.length + ' with nothing flagged: ' + prop_('WEB_APP_URL') + '?action=approve_batch&id=' + bid + '&t=' + token_(bid) + '\n' +
       'Open the ones you want to read first. Anything marked NEEDS YOU has its own links below.\n\n';
   }
-  ownerMail_('Check these ' + list.length + ' audits', allLine +
+  ownerMail_((again ? 'Waiting on you: ' : 'Check these ') + list.length + ' audit' + (list.length === 1 ? '' : 's'), allLine +
     (reviewsLeft_('audit') > 0 ? 'These are among the first ' + setting_('REVIEW_AUDITS_FIRST') + ' audits, so each waits for your OK. '
       : 'Site-form audits wait a few hours in case you want to add a personal line. ') +
     (!list.some(function (l) { return l.source === 'cold'; }) ? '' :
@@ -755,6 +780,19 @@ function requestAuditReviews_(list) {
     (first.source === 'cold' ? previewEmail_(first, 'cold_1') : previewEmail_(first, 'inbound_audit')) + '\n────────\n' +
     (first.source === 'cold' && subjectB_(first) ? 'Every other one goes out with the test subject instead: ' + subjectB_(first) + '\n' : '') + '\n' +
     'Want a change to how audits are written? Tell Claude in the Ledge project and it\'ll update the instructions.');
+}
+
+// Ledge menu > Email me the audits waiting on me: every audit waiting for Logan's OK in one email, strongest first, with the
+// approve-all link, so he doesn't have to dig through the review emails they first came in.
+function emailWaitingAudits() {
+  ensureSchema_();
+  var list = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.status === 'awaiting_review'; })
+    .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); });
+  var msg = list.length ? 'Sent you one email with the ' + list.length + ' audit' + (list.length === 1 ? '' : 's') + ' waiting on you, strongest first.' +
+    (list.length > 1 ? ' Its approve-all link covers the ones with nothing flagged.' : '') : 'No audits are waiting on you.';
+  if (list.length) requestAuditReviews_(list, true);
+  try { SpreadsheetApp.getUi().alert(msg); } catch (err) { Logger.log(msg); }
+  return msg;
 }
 
 function releaseAudit_(l) {
@@ -818,12 +856,19 @@ function ownerApproveAudit_(l) {
 }
 
 // The audit page reports it was on screen for a few seconds (worker /api/viewed). Before the audit goes out, the only
-// person looking is Logan checking it, so those views don't count.
+// person looking is Logan checking it, so those views don't count. Nor does a first view within SCANNER_WINDOW_MIN of our
+// email going out: that's a work mail system's link scanner opening it (5 of the first 14 reads in November 2026 came
+// 1 to 3 minutes after the send), so it fires no read alert, moves no follow-up, and isn't counted as read.
 function handleViewed_(id, t) {
   if (!id || t !== token_(id)) return { ok: false, error: 'bad_token' };
   var l = findLead_('id', id);
   if (!l) return { ok: false, error: 'not_found' };
   if (!Number(l.touches || 0)) return { ok: true, counted: false };
+  var since = l.last_touch ? Date.now() - new Date(l.last_touch).getTime() : Infinity;
+  if (!l.audit_opened && since >= 0 && since < scannerWindowMs_()) {
+    logEvent_(l.id, l.email, 'audit_view_fast', Math.round(since / 1000) + 's after our email, likely a link scanner');
+    return { ok: true, counted: false };
+  }
   var fields = { audit_opens: Number(l.audit_opens || 0) + 1 }, firstRead = !l.audit_opened;
   if (firstRead) { fields.audit_opened = new Date(); logEvent_(l.id, l.email, 'audit_opened', ''); }
   updateLead_(l, fields);
@@ -834,6 +879,28 @@ function handleViewed_(id, t) {
   }
   return { ok: true, counted: true };
 }
+
+// Once, after the update: a first read that came within the scanner window of the email before it, with no view since,
+// stops counting (the read alert and moved follow-up already happened; the read rates and subject test stop counting it).
+function undoScannerReads_() {
+  var win = scannerWindowMs_();
+  if (!win) return 0;
+  var ev = readRows_(TAB.events, HEAD.events), sends = {};
+  ev.forEach(function (e) { if (/^sent_/.test(e.event) && e.lead_id) (sends[e.lead_id] = sends[e.lead_id] || []).push(new Date(e.timestamp).getTime()); });
+  var n = 0;
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (!l.audit_opened || Number(l.audit_opens || 0) > 1) return;
+    var at = new Date(l.audit_opened).getTime();
+    var before = (sends[l.id] || []).filter(function (t) { return t <= at; }).sort(function (a, b) { return b - a; })[0];
+    if (before == null || at - before >= win) return;
+    updateLead_(l, { audit_opened: '', audit_opens: 0 });
+    logEvent_(l.id, l.email, 'audit_view_fast', Math.round((at - before) / 1000) + 's after our email (an earlier read, no longer counted)');
+    n++;
+  });
+  return n;
+}
+
+function scannerWindowMs_() { return Math.max(0, Number(setting_('SCANNER_WINDOW_MIN') || 0)) * 60e3; }
 
 // A cold prospect who just read their audit hears from us sooner, with no step for Logan: the next follow-up moves up to
 // the next business morning (never sooner than 2 business days after the last email). Returns {from, to} when it moved.
@@ -875,7 +942,7 @@ function readAlert_(l, moved) {
     (noted ? 'You wrote to them yourself on ' + day(noted.timestamp) + ', so they read it after your note. If they haven\'t replied in a few days, one more short line from you is the next step.\n\n'
       : 'Nothing needed from you: the next email goes on its own' + (moved ? ', sooner now that they\'ve read it' : '') + '.\n\n' +
         'If you\'d rather write to them yourself, reply in their thread' + (subject ? ' (search for "' + subject + '")' : '') +
-        ', from Superhuman as ' + myEmail_() + ' as usual: two or three lines and one easy question, like "Hi ' + vars.first + ', quick question: ' + ask + '" ' +
+        ', from Superhuman as ' + (threadFrom_(l.thread_id) || myEmail_()) + ' as usual: two or three lines and one easy question, like "Hi ' + vars.first + ', quick question: ' + ask + '" ' +
         'Don\'t mention that you saw them read it. Then tap this, so a template doesn\'t land on top of your note:\n' + ownerLink_('noted', l) + '\n\n') +
     'To stop these alerts, set READ_ALERTS to no on the Settings tab.');
   logEvent_(l.id, l.email, 'read_alert', '');
@@ -1236,14 +1303,36 @@ function checkReplies_() {
   });
 }
 
+// A safety net once SENDER_EMAIL is in use: replies to it reach this account by forwarding, and normally land in the lead's
+// thread (checkReplies_ reads them there). One that arrives outside its thread (a mail app that drops the reply headers) is
+// matched by the sender's address and handled the same way.
+function checkAliasReplies_() {
+  var alias = senderSetting_();
+  if (!alias) return;
+  var byEmail = {};
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) {
+    if (l.thread_id && l.email && DONE_STATUSES.indexOf(l.status) === -1) byEmail[String(l.email).toLowerCase()] = l;
+  });
+  GmailApp.search('to:' + alias + ' newer_than:3d', 0, 50).forEach(function (t) {
+    t.getMessages().forEach(function (m) {
+      if (m.isDraft && m.isDraft()) return;
+      var l = byEmail[addrOf_(m.getFrom())];
+      if (!l || t.getId() === String(l.thread_id) || m.getDate().getTime() <= Number(l.last_reply_at || 0)) return;
+      updateLead_(l, { last_reply_at: m.getDate().getTime() });
+      logEvent_(l.id, l.email, 'reply_outside_thread', String(m.getSubject() || '').slice(0, 120));
+      handleReply_(findLead_('id', l.id), m);
+    });
+  });
+}
+
 // Which messages in a lead's thread are really from them. A mail app on the Ledge inbox can leave things in a thread that
 // aren't: Superhuman, once the inbox was added to it in November 2026, left a copy of our last email in 21 threads two days
 // after it went, and the hub took each for a reply (the follow-ups stopped and they all landed in the needs-you email). So
 // a message counts only when it isn't a draft, has a sender, isn't from us (this account, or Logan's own OWNER_EMAIL), and
 // doesn't just repeat one of our own emails.
 function fromUs_(me) {
-  var owner = String(setting_('OWNER_EMAIL') || '').toLowerCase().trim();
-  return function (m) { var f = String(m.getFrom() || '').toLowerCase(); return f.indexOf(me) > -1 || (!!owner && f.indexOf(owner) > -1); };
+  var owner = String(setting_('OWNER_EMAIL') || '').toLowerCase().trim(), alias = senderSetting_();
+  return function (m) { var f = String(m.getFrom() || '').toLowerCase(); return f.indexOf(me) > -1 || (!!owner && f.indexOf(owner) > -1) || (!!alias && f.indexOf(alias) > -1); };
 }
 function theirs_(m, us, ours) {
   if (m.isDraft && m.isDraft()) return false;
@@ -1420,14 +1509,14 @@ function checkCalendar_() {
   var id = setting_('CALENDAR_ID') || 'primary';
   var cal = id === 'primary' ? CalendarApp.getDefaultCalendar() : CalendarApp.getCalendarById(id);
   if (!cal) return;
-  var me = myEmail_(), owner = String(setting_('OWNER_EMAIL') || '').toLowerCase();
+  var me = myEmail_(), owner = String(setting_('OWNER_EMAIL') || '').toLowerCase(), alias = senderSetting_();
   var match = String(setting_('BOOKING_EVENT_MATCH') || '').toLowerCase();
   var seen = JSON.parse(prop_('EVENTS_SEEN') || '[]');
   cal.getEvents(new Date(Date.now() - 864e5), new Date(Date.now() + 60 * 864e5)).forEach(function (ev) {
     var key = ev.getId() + '|' + ev.getStartTime().getTime();
     if (seen.indexOf(key) > -1) return;
     var guests = ev.getGuestList().map(function (g) { return String(g.getEmail()).toLowerCase(); })
-      .filter(function (g) { return g && g !== me && g !== owner; });
+      .filter(function (g) { return g && g !== me && g !== owner && g !== alias; });
     if (!guests.length) return;
     seen.push(key);
     guests.forEach(function (g) {
@@ -1867,6 +1956,138 @@ function oppSane_(p) {
     price_where: p.price_where, cpc_usd: 0, rates: { click: p.click, lead: p.lead, book: p.book, cpc: p.cpc }, budget: p.plan_budget });
   if (q) q.cpc_from = p.cpc_from;
   return q;
+}
+
+/* ══════════════════════════ keyword research ══════════════════════════ */
+// Ledge menu > Research keywords: for each trade in TRADES and each industry we might add, Google's related searches in
+// Calgary (DataForSEO's copy of Keyword Planner: exact volumes, cost per click, and 12 months of history), into the
+// Keyword research tab. It feeds the trade briefs: which big jobs to add to SERVICES, when each trade's searches peak, and
+// which industry to try next. About US$0.09 a set; a set fetched in the last 30 days isn't fetched again.
+var RESEARCH_SETS = [
+  { set: 'heating and cooling', kind: 'trade', seeds: ['furnace repair', 'furnace replacement', 'furnace installation', 'furnace maintenance', 'heat pump installation',
+    'air conditioner installation', 'air conditioning repair', 'boiler repair', 'boiler replacement', 'hydronic heating', 'hvac contractor', 'duct cleaning',
+    'humidifier installation', 'thermostat installation', 'high efficiency furnace'] },
+  { set: 'plumbing', kind: 'trade', seeds: ['plumber', 'emergency plumber', 'hot water tank replacement', 'tankless water heater', 'drain cleaning', 'sewer line repair',
+    'sump pump installation', 'water softener installation', 'leak repair', 'toilet installation', 'poly b replacement', 'water line replacement',
+    'basement plumbing rough in', 'gas line installation', 'backflow testing'] },
+  { set: 'electrical', kind: 'trade', seeds: ['electrician', 'emergency electrician', 'electrical panel upgrade', 'ev charger installation', 'pot lights installation',
+    'house rewiring', 'knob and tube replacement', 'aluminum wiring replacement', 'hot tub wiring', 'generator installation', 'electrical inspection',
+    'basement electrical', '200 amp service upgrade', 'outlet installation', 'light fixture installation'] },
+  { set: 'garage doors', kind: 'trade', seeds: ['garage door repair', 'garage door spring repair', 'garage door opener installation', 'garage door opener repair',
+    'new garage door', 'garage door installation', 'garage door replacement', 'garage door cable repair', 'insulated garage door', 'garage door company'] },
+  { set: 'roofing and eavestroughs', kind: 'candidate', seeds: ['roof replacement', 'roofer', 'roof repair', 'new roof', 'roofing company', 'hail damage roof',
+    'eavestrough installation', 'eavestrough repair', 'metal roofing', 'shingle replacement'] },
+  { set: 'windows and doors', kind: 'candidate', seeds: ['window replacement', 'new windows', 'window installation', 'triple pane windows', 'foggy window repair',
+    'door replacement', 'front door installation', 'patio door replacement', 'window company'] },
+  { set: 'siding and exteriors', kind: 'candidate', seeds: ['siding replacement', 'vinyl siding', 'hardie board siding', 'siding repair', 'hail damage siding',
+    'stucco repair', 'soffit and fascia', 'siding contractor'] },
+  { set: 'basement development', kind: 'candidate', seeds: ['basement development', 'basement finishing', 'basement renovation', 'basement suite', 'legal basement suite',
+    'basement contractor', 'basement development cost'] },
+  { set: 'fencing and decks', kind: 'candidate', seeds: ['fence installation', 'fence company', 'wood fence', 'vinyl fence', 'fence repair', 'deck builder',
+    'deck installation', 'composite deck', 'pergola'] },
+  { set: 'landscaping and hardscaping', kind: 'candidate', seeds: ['landscaping', 'landscaper', 'landscaping company', 'landscape design', 'retaining wall',
+    'paving stones', 'patio installation', 'artificial turf', 'sod installation', 'xeriscaping'] },
+  { set: 'concrete', kind: 'candidate', seeds: ['concrete driveway', 'concrete contractor', 'concrete repair', 'driveway replacement', 'concrete patio',
+    'stamped concrete', 'concrete sidewalk', 'garage pad', 'concrete leveling', 'concrete company'] },
+  { set: 'foundation repair and waterproofing', kind: 'candidate', seeds: ['foundation repair', 'foundation crack repair', 'basement waterproofing', 'basement leak repair',
+    'weeping tile', 'sump pump installation', 'foundation contractor', 'basement flooding'] },
+  { set: 'radon mitigation', kind: 'candidate', seeds: ['radon mitigation', 'radon testing', 'radon reduction', 'radon mitigation cost', 'radon mitigation contractor'] },
+  { set: 'water treatment', kind: 'candidate', seeds: ['water softener', 'water softener installation', 'water filtration system', 'reverse osmosis system',
+    'water treatment', 'iron filter', 'well water treatment', 'water softener repair'] },
+  { set: 'restoration', kind: 'candidate', seeds: ['water damage restoration', 'flood cleanup', 'water damage repair', 'fire damage restoration', 'mold removal',
+    'basement flood cleanup', 'sewage backup cleanup', 'restoration company'] },
+  { set: 'pest control', kind: 'candidate', seeds: ['pest control', 'exterminator', 'mice removal', 'wasp nest removal', 'bed bug treatment', 'ant control',
+    'rodent control', 'wildlife removal'] },
+  { set: 'painting', kind: 'candidate', seeds: ['house painters', 'interior painting', 'exterior painting', 'painting contractor', 'painting company', 'cabinet painting',
+    'deck staining'] },
+  { set: 'flooring', kind: 'candidate', seeds: ['flooring installation', 'hardwood flooring', 'vinyl plank flooring', 'laminate flooring installation', 'carpet installation',
+    'tile installation', 'flooring company'] },
+  { set: 'moving', kind: 'candidate', seeds: ['movers', 'moving company', 'local movers', 'long distance movers', 'moving services', 'piano movers', 'packing services'] }
+];
+var RESEARCH_TOWN = 'Calgary', RESEARCH_KEEP = 150, RESEARCH_FRESH_DAYS = 30;
+
+function researchKeywords() {
+  var msg = researchKeywords_(240e3);
+  try { SpreadsheetApp.getUi().alert('Keyword research', msg, SpreadsheetApp.getUi().ButtonSet.OK); } catch (err) { Logger.log(msg); }
+  return msg;
+}
+
+// The sets due (the trades in TRADES first, then the industries to try), as many as fit in the time; the tab is rewritten
+// once at the end. Google Ads data allows 12 requests a minute, so calls are at least 5.5 seconds apart.
+function researchKeywords_(budgetMs) {
+  ensureSchema_();
+  if (!dfsConfigured_()) return 'Search data isn\'t set up (DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD in Script Properties).';
+  var started = Date.now(), trades = String(setting_('TRADES') || '').toLowerCase();
+  var sets = RESEARCH_SETS.filter(function (r) { return r.kind !== 'trade' || trades.indexOf(r.set) > -1; })
+    .sort(function (a, b) { return (a.kind === 'trade' ? 0 : 1) - (b.kind === 'trade' ? 0 : 1); });
+  var have = readRows_(TAB.research, HEAD.research), fresh = {};
+  have.forEach(function (r) { if (Date.now() - new Date(r.fetched).getTime() < RESEARCH_FRESH_DAYS * 864e5) fresh[r.set] = true; });
+  var due = sets.filter(function (r) { return !fresh[r.set]; });
+  var done = [], failed = [], rows = {}, cost = 0, last = 0;
+  for (var i = 0; i < due.length; i++) {
+    if (Date.now() - started > budgetMs) break;
+    var wait = 5500 - (Date.now() - last);
+    if (last && wait > 0) Utilities.sleep(wait);
+    last = Date.now();
+    var r = due[i], got = researchSet_(r);
+    cost += got.cost || 0;
+    if (got.error) { failed.push(r.set + ' (' + got.error + ')'); continue; }
+    rows[r.set] = got.rows;
+    done.push(r.set);
+  }
+  if (done.length) {
+    var kept = have.filter(function (h) { return !rows[h.set]; }).map(function (h) { return HEAD.research.map(function (k) { return h[k]; }); });
+    done.forEach(function (set) { kept = kept.concat(rows[set]); });
+    writeAllRows_(TAB.research, HEAD.research, kept);
+  }
+  var left = due.length - done.length - failed.length, total = done.reduce(function (n, set) { return n + rows[set].length; }, 0);
+  logEvent_('', '', 'keyword_research', done.length + ' sets, ' + total + ' searches, US$' + cost.toFixed(2) + (failed.length ? '; failed: ' + failed.join(', ') : ''));
+  return (done.length ? 'Researched ' + done.length + ' (' + oxford_(done) + '): ' + total + ' searches, about US$' + cost.toFixed(2) + '. They\'re on the Keyword research tab.'
+      : due.length ? 'Nothing researched this time.' : 'Everything was researched in the last ' + RESEARCH_FRESH_DAYS + ' days, so nothing new was fetched.') +
+    (failed.length ? ' Didn\'t work: ' + failed.join(', ') + '.' : '') +
+    (left > 0 ? ' ' + left + ' still to do: run it again and it picks up where it stopped.' :
+      ' To send it to Claude: File > Download > Microsoft Excel (.xlsx), then drop the file in the Ledge project chat.');
+}
+
+// One set: related searches about the work (not jobs, how-tos, stores, or other towns), biggest first.
+function researchSet_(r) {
+  var loc = RESEARCH_TOWN + ',Alberta,Canada';
+  var d = dfsRead_(UrlFetchApp.fetch('https://api.dataforseo.com/v3/keywords_data/google_ads/keywords_for_keywords/live',
+    dfsReq_('keywords_data/google_ads/keywords_for_keywords/live', { keywords: r.seeds.slice(0, 20), location_name: loc, language_code: 'en', sort_by: 'search_volume' })));
+  if (!d.ok) return { error: d.error || 'no answer', cost: d.cost };
+  var town = RESEARCH_TOWN.toLowerCase();
+  var places = MARKET_PLACES.concat(Object.keys(TOWNS).map(function (k) { return TOWNS[k][2].toLowerCase(); }))
+    .filter(function (p, i, all) { return p !== town && all.indexOf(p) === i; });
+  var other = new RegExp('\\b(' + places.map(function (p) { return p.replace('.', '\\.'); }).join('|') + ')\\b');
+  var mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], now = new Date(), seen = {};
+  var keep = d.result.filter(function (v) {
+    var k = String(v && v.keyword || '').toLowerCase();
+    if (!k || !(Number(v.search_volume) > 0) || seen[k] || MARKET_SKIP.test(k) || other.test(k)) return false;
+    seen[k] = true;
+    return true;
+  }).sort(function (a, b) { return b.search_volume - a.search_volume; }).slice(0, RESEARCH_KEEP);
+  var rows = keep.map(function (v) {
+    var m = (v.monthly_searches || []).filter(function (x) { return x && x.year && x.month; })
+      .sort(function (a, b) { return a.year - b.year || a.month - b.month; }).slice(-12);
+    var peak = m.reduce(function (best, x) { return !best || Number(x.search_volume) > Number(best.search_volume) ? x : best; }, null);
+    var row = { set: r.set, kind: r.kind, keyword: String(v.keyword).toLowerCase(), volume: Number(v.search_volume), cpc_usd: Number(v.cpc) || '',
+      bid_low_usd: Number(v.low_top_of_page_bid) || '', bid_high_usd: Number(v.high_top_of_page_bid) || '', competition: v.competition || '',
+      months: m.map(function (x) { return x.year + '-' + ('0' + x.month).slice(-2) + ':' + Number(x.search_volume || 0); }).join(', '),
+      peak_month: peak && Number(peak.search_volume) > 0 ? mon[peak.month - 1] : '', location: loc, fetched: now };
+    return HEAD.research.map(function (k) { return row[k]; });
+  });
+  return { rows: rows, cost: d.cost };
+}
+
+// Rewrites a whole tab below its header in one go (blanking any rows left over from before).
+function writeAllRows_(name, headers, rows) {
+  var sh = sheet_(name);
+  if (!sh) { ensureSchema_(true); sh = sheet_(name); }
+  var old = Math.max(0, sh.getLastRow() - 1), need = 1 + Math.max(rows.length, old);
+  if (sh.getMaxRows() < need) sh.insertRowsAfter(sh.getMaxRows(), need - sh.getMaxRows());
+  if (rows.length) sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  if (old > rows.length) sh.getRange(2 + rows.length, 1, old - rows.length, headers.length).setValues(
+    Array.apply(null, Array(old - rows.length)).map(function () { return headers.map(function () { return ''; }); }));
 }
 
 function dfsConfigured_() { return !!(prop_('DATAFORSEO_LOGIN') && prop_('DATAFORSEO_PASSWORD')); }
@@ -2978,6 +3199,23 @@ function shotsWanted_() {
     });
   });
   return want;
+}
+// A cold audit that waited out COLD_SHOT_WAIT_HOURS goes ahead without the screenshots, so it's judged as it stands: one
+// that only waited because a screenshot might have lifted it over AUDIT_MIN_PRIORITY is held as lower priority rather than
+// written up (and sent to Logan to review).
+function expireShotWaits_() {
+  if (!yes_(setting_('REQUIRE_SHOTS'))) return;
+  var wait = coldShotWaitMs_(), leads = {};
+  if (wait === Infinity) return;
+  readRows_(TAB.leads, HEAD.leads).forEach(function (l) { leads[l.id] = l; });
+  readRows_(TAB.jobs, HEAD.jobs).forEach(function (j) {
+    var l = leads[j.lead_id];
+    if (j.kind !== 'audit' || j.status !== 'queued' || !l || l.source !== 'cold' || l.status === 'held') return;
+    if (Date.now() - new Date(j.created || l.created).getTime() <= wait) return;
+    var ev = freshEvidence_(j.lead_id);
+    if (!ev || !holdReason_(l, ev, { priority: true })) return;
+    if (holdLead_(l, ev, { priority: true })) updateRow_(TAB.jobs, HEAD.jobs, j, { status: 'done', detail: 'Held: no phone screenshots in time', updated: new Date() });
+  });
 }
 function coldShotWaitMs_() {
   var h = String(setting_('COLD_SHOT_WAIT_HOURS')).trim(), n = h === '' ? 24 : Number(h);
@@ -5333,11 +5571,11 @@ var EMAILS = {
       'Want me to send over where I\'d start?{pass_line}\n\nThanks,\n{sign}'
   },
   cold_2: {
-    body: 'Hi {first},\n\nFollowing up on the audit I sent. If you only do one thing from it, I\'d start here: {fix_1}.\n\n' +
+    body: 'Hi {first},\n\nFollowing up on the audit I sent:\n{audit_url}\n\nIf you only do one thing from it, I\'d start here: {fix_1}.\n\n' +
       'Happy to set it up for you or share more details. Just let me know, and I\'ll send a plan for how I\'d recommend running it.\n\nAll the best,\n{sign}'
   },
   cold_3: {
-    body: 'Hi {first},\n\n{more_para}\n\nIf you\'d like one, just reply and let me know.{booking_line}\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\n{more_para}\n\nIf you\'d like one, just reply and let me know.{booking_line}\n\nYour audit is still up if you want another look:\n{audit_url}\n\nAll the best,\n{sign}'
   },
   cold_4: {
     body: 'Hi {first},\n\nI\'ll leave it here so I\'m not clogging up your inbox. Your audit will stay up if you want to review when the timing is better: {audit_url}\n\n' +
@@ -5350,12 +5588,12 @@ var EMAILS = {
       'Want me to send over what I\'d look at first in your account?{pass_line}\n\nThanks,\n{sign}'
   },
   cold_ads_2: {
-    body: 'Hi {first},\n\nFollowing up on the audit I sent. From the outside I can see where your ads show up. From the inside I can see why: ' +
+    body: 'Hi {first},\n\nFollowing up on the audit I sent:\n{audit_url}\n\nFrom the outside I can see where your ads show up. From the inside I can see why: ' +
       'which searches you\'re paying for, and what a call costs you.\n\n{audit_price_line}\n\nIf you\'d like the details, just let me know and I\'ll send them through.\n\nAll the best,\n{sign}'
   },
   cold_ads_3: {
     body: 'Hi {first},\n\nOne more thought on your audit. If you only take one thing away from it, I\'d start here: {fix_1}.\n\n' +
-      'If you\'d like the details, just reply and let me know.{booking_line}\n\nAll the best,\n{sign}'
+      'It\'s still up here:\n{audit_url}\n\nIf you\'d like the details, just reply and let me know.{booking_line}\n\nAll the best,\n{sign}'
   },
   cold_ads_4: {
     body: 'Hi {first},\n\nI\'ll leave it here so I\'m not clogging up your inbox. Your audit will stay up if you want to review when the timing is better: {audit_url}\n\n' +
@@ -5527,10 +5765,10 @@ function fillText_(s, vars) {
   return String(s).replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
 }
 
-function footer_(l) {
+function footer_(l, from) {
   var title = setting_('SENDER_TITLE');
   return '\n\n--\n' + (setting_('SENDER_NAME') || 'Logan') + ' | ' + (title ? title + ', ' : '') + 'Ledge Communications\n' +
-    (setting_('MAILING_ADDRESS') ? String(setting_('MAILING_ADDRESS')).trim() + '\n' : '') + 'ledgecommunications.com\n' + myEmail_() + '\n' +
+    (setting_('MAILING_ADDRESS') ? String(setting_('MAILING_ADDRESS')).trim() + '\n' : '') + 'ledgecommunications.com\n' + (from || senderEmail_()) + '\n' +
     'Rather not hear from me? Unsubscribe: ' + unsubUrl_(l);
 }
 
@@ -5671,14 +5909,15 @@ function sendTestColdEmail_(list) {
   test.id = 'test-' + Utilities.getUuid().slice(0, 8);
   var tpl = EMAILS[trackKey_(l, 'cold_1')], vars = emailVars_(l);
   if (vars.audit_url) vars.audit_url = auditUrl_(l) + ME_;
-  var subject = fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text = fillText_(tpl.body, vars) + footer_(test);
+  var from = senderEmail_();
+  var subject = fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text = fillText_(tpl.body, vars) + footer_(test, from);
   var subjects = [subject].concat(subjectB_(l) ? [subjectB_(l)] : []);
   var sent = [], failed = [];
   to.forEach(function (a) {
-    try { subjects.forEach(function (sj) { gmailSend_(a, sj, text, { unsubUrl: unsubUrl_(test) }); }); sent.push(a); } catch (err) { failed.push(a + ' (' + String(err && err.message || err).slice(0, 60) + ')'); }
+    try { subjects.forEach(function (sj) { gmailSend_(a, sj, text, { unsubUrl: unsubUrl_(test), from: from }); }); sent.push(a); } catch (err) { failed.push(a + ' (' + String(err && err.message || err).slice(0, 60) + ')'); }
   });
   logEvent_('', '', 'test_cold_email', 'The ' + (sentEv ? 'one sent to ' : 'one queued for ') + (l.business || l.email) + ', to ' + sent.join(', ') + (failed.length ? '; failed: ' + failed.join(', ') : ''));
-  return 'Sent "' + subjects.join('" and "') + '" (the email ' + (l.business || 'a shop') + (sentEv ? ' got' : ' will get') + (subjects.length > 1 ? ', with each subject' : '') + ') to ' + (sent.join(', ') || 'nobody') + '.' +
+  return 'Sent "' + subjects.join('" and "') + '" (the email ' + (l.business || 'a shop') + (sentEv ? ' got' : ' will get') + (subjects.length > 1 ? ', with each subject' : '') + ') from ' + from + ' to ' + (sent.join(', ') || 'nobody') + '.' +
     (failed.length ? ' Failed: ' + failed.join(', ') + '.' : '') +
     ' Give it a few minutes, then check each inbox: Inbox, Promotions or Other, or Spam. For mail-tester, go back to its page and check your score.';
 }
@@ -5688,12 +5927,14 @@ function sendLeadEmail_(l, key, extra) {
   var actual = trackKey_(l, key);
   var tpl = EMAILS[actual], vars = emailVars_(l);
   Object.keys(extra || {}).forEach(function (k) { vars[k] = extra[k]; });
-  var text = fillText_(tpl.body, vars) + footer_(l);
+  // A follow-up goes from the address its thread started from; a new thread from SENDER_EMAIL (once it's set up).
+  var inThread = !!(l.thread_id && !tpl.subject), from = inThread ? threadFrom_(l.thread_id) || myEmail_() : senderEmail_();
+  var text = fillText_(tpl.body, vars) + footer_(l, from);
   var res;
-  if (l.thread_id && !tpl.subject) {
-    res = gmailSend_(l.email, 'Re: ' + threadSubject_(l.thread_id), text, { threadId: l.thread_id, inReplyTo: l.last_msg_id, unsubUrl: unsubUrl_(l) });
+  if (inThread) {
+    res = gmailSend_(l.email, 'Re: ' + threadSubject_(l.thread_id), text, { threadId: l.thread_id, inReplyTo: l.last_msg_id, unsubUrl: unsubUrl_(l), from: from });
   } else {
-    res = gmailSend_(l.email, vars.subject_override || fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text, { unsubUrl: unsubUrl_(l) });
+    res = gmailSend_(l.email, vars.subject_override || fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text, { unsubUrl: unsubUrl_(l), from: from });
   }
   updateLead_(l, { thread_id: res.threadId, last_msg_id: res.messageId || l.last_msg_id, last_touch: new Date() });
   logEvent_(l.id, l.email, 'sent_' + key, actual !== key ? actual : '');
@@ -5703,6 +5944,48 @@ function safeSend_(l, key, extra) {
   try { sendLeadEmail_(l, key, extra); } catch (err) { logEvent_(l && l.id, l && l.email, 'error', 'Email ' + key + ' failed: ' + (err && err.message || err)); }
 }
 
+// The address a thread's first email from us went out from (this account or SENDER_EMAIL), so its follow-ups match.
+function threadFrom_(threadId) {
+  try {
+    var mine = [myEmail_(), senderSetting_()].filter(String);
+    var msgs = GmailApp.getThreadById(threadId).getMessages();
+    for (var i = 0; i < msgs.length; i++) {
+      var f = addrOf_(msgs[i].getFrom());
+      if (mine.indexOf(f) > -1) return f;
+    }
+  } catch (err) {}
+  return '';
+}
+function addrOf_(from) { var s = String(from || '').toLowerCase(), m = s.match(/<([^>]+)>/); return (m ? m[1] : s).trim(); }
+
+// SENDER_EMAIL as typed (lowercase), or '' when it's empty or this account's own address.
+function senderSetting_() {
+  var s = String(setting_('SENDER_EMAIL') || '').trim().toLowerCase();
+  return s && s !== myEmail_() ? s : '';
+}
+// Where new threads to shops go out from: SENDER_EMAIL once Gmail has it as a verified "Send mail as" address, else this
+// account. Checked once a run. When it isn't ready, the emails still go (from this account) and Logan hears once a day.
+var _sender = null;
+function senderEmail_() {
+  if (_sender) return _sender;
+  var want = senderSetting_();
+  if (!want) return (_sender = myEmail_());
+  var ok = false, why = '';
+  try {
+    var sa = Gmail.Users.Settings.SendAs.get('me', want);
+    ok = !!sa && (sa.isPrimary || String(sa.verificationStatus || '').toLowerCase() === 'accepted');
+    if (!ok) why = 'it\'s added but not verified yet (status: ' + (sa && sa.verificationStatus || 'unknown') + ')';
+  } catch (err) { why = 'it isn\'t a "Send mail as" address in this Gmail account yet'; }
+  if (!ok) {
+    var day = Utilities.formatDate(new Date(), tz_(), 'yyyy-MM-dd');
+    if (prop_('SENDER_WARNED') !== day) {
+      props_().setProperty('SENDER_WARNED', day);
+      logEvent_('', want, 'error', 'SENDER_EMAIL is ' + want + ', but ' + why + ', so emails go from ' + myEmail_() + ' for now. SETUP.md has the steps.');
+    }
+  }
+  return (_sender = ok ? want : myEmail_());
+}
+
 function threadSubject_(threadId) {
   try { return String(GmailApp.getThreadById(threadId).getFirstMessageSubject()).replace(/^(re:\s*)+/i, ''); } catch (err) { return 'Ledge Communications'; }
 }
@@ -5710,7 +5993,7 @@ function threadSubject_(threadId) {
 // Sends through the Gmail API so follow-ups land in the same thread for the recipient too.
 function gmailSend_(to, subject, text, opts) {
   opts = opts || {};
-  var me = myEmail_();
+  var me = opts.from || myEmail_();
   var name = (setting_('SENDER_NAME') || 'Ledge Communications').replace(/["\r\n]/g, '');
   var boundary = 'ledge' + Utilities.getUuid().replace(/-/g, '');
   var headers = [
@@ -5789,7 +6072,7 @@ function sendDigest() {
     '• Audits built: ' + count('audit_built') + ', skipped: ' + count('skipped') + '\n' +
     '• Site audit requests: ' + count('inbound_request') + '\n' +
     '• Cold first emails sent: ' + count('sent_cold_1') + ' (today\'s cap ' + (yes_(setting_('COLD_EMAIL_ON')) ? coldCapToday_() : 'cold email is off') + ')\n' +
-    '• Audits opened for the first time: ' + count('audit_opened') + '\n' +
+    '• Audits opened for the first time: ' + count('audit_opened') + (count('audit_view_fast') ? ' (plus ' + count('audit_view_fast') + ' opened by link scanners within minutes of the email, not counted)' : '') + '\n' +
     '• Replies: ' + ev.filter(function (e) { return /^reply_/.test(e.event); }).length + '\n' +
     '• Asked for a price: ' + count('quote_requested') + '\n' +
     '• Proposals approved: ' + count('won') + '\n' +

@@ -15,69 +15,62 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 12): false replies fixed, nothing waits on you
+## Where you are (Nov 16): follow-ups link the audit, scanners don't count, a domain sender ready
 
-- **The 21 "replies" weren't replies.** Since the Ledge inbox went into Superhuman, a copy of our own last email turned up
-  in prospects' threads two days after it went (most likely a Superhuman draft or reminder). The hub read each as their
-  reply, so 21 shops stopped getting follow-ups and landed in your needs-you email. None were real. Now a message only
-  counts as theirs when it isn't a draft, has a sender, isn't from the Ledge address or yours (`OWNER_EMAIL`), and
-  doesn't just repeat one of our emails. On the first run after the update, the 21 go back into their sequence (a
-  follow-up that came due meanwhile goes the next business morning), and the Events tab logs what each copy was
-  (`false_reply_undone`).
-- **Screenshots no longer hold anything up (`COLD_SHOT_WAIT_HOURS`, 24).** A cold audit waits a day for your phone
-  screenshots, then gets written without them (it then says nothing about who advertises on that search). The 9 audits
-  waiting since Nov 10 (Airdrie garage doors, Cochrane plumbers, KaiTech) go on the next run. 0 waits as long as it takes.
-- **Read alerts need nothing from you (`READ_PULLS_FOLLOWUP`, yes).** When a prospect reads their audit for the first
-  time, their next follow-up moves up to the next business morning (never sooner than 2 business days after the last
-  email), and the alert says so. Writing to them yourself is optional. Prospects who already read theirs get the same
-  move on the first run after the update.
+- **Emails 2 and 3 carry the audit link again.** All 14 reads so far came after email 1, and neither follow-up linked
+  back to the audit. Email 2 now opens with the link and email 3 ends with it (the running-ads follow-ups too). Shops
+  already in a sequence get the new copy on their next email.
+- **Link scanners aren't reads (`SCANNER_WINDOW_MIN`, 3).** A first view within 3 minutes of our email going out is a
+  work mail system's scanner (5 of the first 14 reads came 1 to 3 minutes after the send). It fires no read alert,
+  moves no follow-up, and isn't counted; the Events tab logs it as `audit_view_fast`. On the first run after the update,
+  earlier reads like that stop counting too, so the read rates and the subject test are honest.
+- **Test clicks on an unsent audit go nowhere.** On Nov 1 a test of the plan button on Son-Rise Plumbing's audit, before
+  it was sent, emailed them a real "Got it, thanks". Now the button on a cold audit that hasn't gone out sends the shop
+  nothing, makes no proposal, and isn't counted. You get a one-line note instead.
+- **Ledge > Email me the audits waiting on me.** One email with every audit waiting for your OK, strongest first, with
+  the approve-all link, so you don't have to dig through the review emails.
+- **Ledge > Research keywords (trades and new industries).** Google's related searches in Calgary for each trade and 15
+  industries we might add: searches a month, cost per click, competition, and the last 12 months, on a new Keyword
+  research tab. About US$0.09 a set, under US$2 for all 19, and 3 to 4 minutes. If it stops partway, run it again.
+- **Ready for logan@ledgecommunications.com (`SENDER_EMAIL`).** Once the address is set up (step 5a), new first emails go
+  from it. Shops already emailed keep hearing from the Gmail address their thread started on. Until Gmail has the
+  address verified, everything keeps going from Gmail and the Events tab says why, once a day.
 
 Ship it:
 1. Paste `Code.gs` into the Apps Script editor (replace everything) and save.
-2. **Deploy > Manage deployments >** pencil icon **> Version: New version > Deploy** (the read change runs in the web app).
-3. Upload `Code.gs` and `SETUP.md` to GitHub.
+2. **Deploy > Manage deployments >** pencil icon **> Version: New version > Deploy** (the read and plan-button changes
+   run in the web app).
+3. **Ledge > Email me the audits waiting on me.** If Google asks you to approve access, approve it. Skip Tru Electric
+   and Stronghold Electric (the check flagged both as builder and commercial shops); approve the rest that read right.
+4. Recommended: Settings, `REVIEW_ALL` to **no**. Audits the check passes then go straight to the send queue, and only
+   flagged ones wait for you.
+5. **Ledge > Research keywords**, then **File > Download > Microsoft Excel** and drop the file in the Ledge chat.
+6. Upload `Code.gs`, `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md` to GitHub.
 
-Two things to clear by hand: **Skip** Tru Electric and Stronghold Electric (waiting for review since Nov 3; the check
-flagged both as builder and commercial shops), and approve or skip the four audits from Nov 9 and 10 (Macleod's,
-5th Element, Timberline, Our Electrician).
+The `SCANNER_WINDOW_MIN` and `SENDER_EMAIL` rows appear on the Settings tab after the next run.
+
+## Where you were (Nov 12): false replies fixed, nothing waits on you
+
+- **The 21 "replies" weren't replies.** Copies of our own last email that Superhuman left in threads were read as
+  replies. Now a message counts as theirs only when it isn't a draft, has a sender, isn't from us or `OWNER_EMAIL`, and
+  doesn't repeat one of our emails. The 21 went back into their sequence (`false_reply_undone` on the Events tab).
+- **Screenshots no longer hold anything up (`COLD_SHOT_WAIT_HOURS`, 24).** A cold audit waits a day for phone
+  screenshots, then gets written without them. 0 waits as long as it takes.
+- **Read alerts need nothing from you (`READ_PULLS_FOLLOWUP`, yes).** A first read moves the next follow-up up to the
+  next business morning (never sooner than 2 business days after the last email). A note of your own is optional.
 
 ## Where you were (Nov 9, afternoon): a shorter first email, read alerts, old pages cleared
 
-- **A shorter first cold email (about 80 words).** It opens with the finding ("I searched "furnace repair calgary" on a
-  phone in Calgary, and one thing stood out: ..."), then the audit link, then one plain ask ("Want me to send over where
-  I'd start?"). The dollar estimate and the 10+ years line are out of it; the money stays on the audit and in email 3.
-  Email 2 now reads "If you only do one thing from it, I'd start here: get on Local Services Ads." Audits already in the
-  queue go out with the new copy.
-- **Better hellos.** No more "Hi there" on cold emails: the name from the audit, else one read from the address
-  (mike@ is "Hi Mike"), else the shop's team ("Hi Lamberts HVAC team"). A name you type in `first_name` on the Leads tab
-  wins. When a shop replies, the first name in their From line is saved, so the thank-you says "Thanks Dana".
-- **Shared inboxes** (info@, office@, service@) with no name get one extra line: "If someone else looks after marketing,
-  I'd appreciate you passing this along."
-- **Read alerts (`READ_ALERTS`, on).** The first time a cold prospect who hasn't replied reads their audit, you get
-  "[Ledge] Lamberts HVAC just read their audit": when they were emailed, their priority, the next automatic email, the
-  audit link, and a suggested two-line note. Reply in their thread from Superhuman as usual, and never mention that you
-  saw them read it.
-- **Your note stops the templates.** After sending it, tap the alert's "so the automatic emails stop" link, and nothing
-  more goes to that shop on its own (the row's notes say so). The tap matters: notes sent from Superhuman go out through
-  ledgelow@gmail.com, so the hub never sees them. A note written straight from the ledgecommunications@gmail.com inbox is
-  noticed on its own within the hour. For a proposal, the nudge is dropped, and a quiet proposal still comes back to you
-  after 5 business days.
-- **Dead domains are skipped.** Before a first cold email, the address's domain is checked with Google's public DNS. One
-  that doesn't exist or takes no email is skipped ("Email domain doesn't accept email"), and the next shop takes its slot.
-  It can't tell when one mailbox is gone on a working domain, so the odd bounce still happens.
-- **The old Squarespace pages.** The blog (posts, tags, and categories), /new-gallery, and the content marketing page now
-  answer "410 Gone", which tells Google they were taken down on purpose. The four old service pages redirect: digital
-  marketing and SEO to the home page, website development and landing pages to pricing.
-
-Ship it:
-1. Paste `Code.gs` into the Apps Script editor (replace everything) and save. `Templates.gs` hasn't changed.
-2. **Deploy > Manage deployments >** pencil icon **> Version: New version > Deploy.** The read alert runs in the web app,
-   so it starts only once the new version is deployed.
-3. Upload `Code.gs`, `worker.js`, `cold-sequence.md`, `inbound-sequence.md`, and `SETUP.md` to GitHub (the Worker
-   rebuilds in about a minute).
-4. Search Console: **Indexing > Pages > Not found (404) > Validate fix.** Google takes a week or two to work through it.
-
-The `READ_ALERTS` row appears on the Settings tab after the next hourly run.
+- **A shorter first cold email (about 80 words):** the finding first ("I searched "furnace repair calgary" on a phone in
+  Calgary, and one thing stood out: ..."), the audit link, one plain ask. The money stays on the audit and in email 3.
+- **Better hellos:** the name from the audit, else one read from the address (mike@ is "Hi Mike"), else the shop's team.
+  A name typed in `first_name` wins, and a reply's From line fills it in. Shared inboxes with no name get a pass-along line.
+- **Read alerts (`READ_ALERTS`, on):** "[Ledge] Lamberts HVAC just read their audit", with the next automatic email and a
+  suggested two-line note. After a note of your own, tap the alert's link so the templates stop (notes from Superhuman
+  go out through ledgelow@gmail.com, so the hub can't see them). Never mention that you saw them read it.
+- **Dead domains are skipped:** a domain that doesn't exist or takes no email is skipped before the first cold email.
+- **The old Squarespace pages:** the blog, /new-gallery, and the content marketing page answer "410 Gone"; the four old
+  service pages redirect to the home page or pricing.
 
 ## Where you were (Nov 9, morning): Search Console after the site switch
 
@@ -86,147 +79,36 @@ Done: www, plain http, and the old workers.dev address move to https://ledgecomm
 (the per-shop audit, proposal, and report pages) and "Alternate page with proper canonical tag" or "Page with redirect"
 (other addresses for the same page) are expected and stay.
 
-## Where you were (Nov 5, night): a subject line test
+## Where you were (Nov 4 and 5): analytics, a spam check, a subject test
 
-- **`COLD_SUBJECT_B`** (Settings tab, starts as `Made this for {business}`): while it's filled in, every other cold first
-  email goes out with it instead of the usual subject, alternating down the send queue so both get the same mix of shops.
-  Placeholders: `{business}` (the shop's name, shortened: "Lamberts HVAC Ltd. Heating & Air Conditioning" becomes
-  "Lamberts HVAC"), `{search}`, `{town}`, `{job}`. A shop whose placeholder can't be filled gets the usual subject.
-  Follow-ups reply in the same thread, so they carry whichever subject the shop got. Clear the cell to stop the test.
-- **The results** show in **Where the audits are** and the Monday digest, one line per subject: sent, bounced, read their
-  audit, replied. A new `subject_test` column on the Leads tab says which one each shop got. There's no open tracking
-  (no tracking pixel), so "read their audit" is the measure: it takes an open and a click.
-- **Send a test cold email** now sends both subjects, so you can see each in your inbox.
-- At 10 a day, each subject gets about 25 a week. Treat the first two weeks as a rough read, not a verdict.
+- **Subject test (`COLD_SUBJECT_B`, "Made this for {business}"):** every other cold first email goes out with it. The
+  results (sent, bounced, read their audit, replied) are in **Where the audits are** and the Monday digest, and
+  `subject_test` on the Leads tab says which one each shop got. Clear the cell to stop the test.
+- **Ledge > Send a test cold email (spam check):** the latest first email, sent the same way, to up to five addresses you
+  type (a fresh mail-tester.com address for a score, plus your own inboxes). Nothing on the shop's row changes.
+- **Google Analytics (`GA4_ID` in Cloudflare):** every page carries GA4, each in a content group (Home, Pricing, Audit,
+  Proposal, and so on), with the events `generate_lead`, `quote_request`, `proposal_approved`, and `book_call_click`.
+  Query strings aren't sent. A browser that opens any page with `?ledge_me=1` is left out from then on, and its views
+  don't count as a shop reading its audit (`?ledge_me=0` undoes it). Who read their audit stays on the Leads tab.
+- **Privacy page** at /privacy/, linked from every footer (Google Analytics' terms require one).
 
-Ship it: replace `Code.gs` in Apps Script (and GitHub), then Deploy > Manage deployments > edit > New version > Deploy.
+## Where you were (Nov 3): stronger prospects, each in its own town, trade, and biggest job, reviewed in batches
 
-## Where you were (Nov 5): checking the cold emails land
-
-- **Ledge menu > Send a test cold email (spam check).** Sends the first cold email exactly as a shop got it (the latest
-  one sent), through the same send path, to up to five addresses you type: a fresh mail-tester.com address for a spam
-  score, and inboxes of your own on Gmail, Outlook or Hotmail, Yahoo, and a work account. Nothing on the shop's row
-  changes, its unsubscribe links do nothing, and opening its audit link doesn't count as the shop reading it. Each test
-  is logged on the Events tab as `test_cold_email`.
-- **Your own views no longer count as a shop reading its audit,** from any browser that's opened a page with
-  `?ledge_me=1` (the same switch that leaves it out of Google Analytics).
-
-Ship it: replace `Code.gs` and `Templates.gs` in Apps Script, upload both and `SETUP.md` to GitHub, reload the Sheet so
-the new menu item shows, and deploy a new version of the web app (Deploy > Manage deployments > edit > New version >
-Deploy). Anything opened from a link (audit pages, approve links, the site form) runs on the deployed version.
-
-## Where you were (Nov 4): Google Analytics and a privacy page
-
-The new site had no analytics: the GA4 tag lived in Squarespace, so the property has shown nothing since the switch on
-Oct 28. Now the Worker adds GA4 to every page (site, audits, proposals, reports) once `GA4_ID` is set in Cloudflare.
-- **Each page is in a content group** (Home, Pricing, Privacy, Audit, Proposal, Account report, the samples), so audit
-  visits read apart from the site's own pages. In GA4: Reports > Engagement > Pages and screens, then switch the first
-  column to "Content group".
-- **Events:** `generate_lead` (the site's audit form went through), `quote_request` (the ask on an audit, with the offer
-  picked), `proposal_approved`, and `book_call_click` (any booking link).
-- **Nothing a link carries reaches GA:** page addresses are sent without their query string (utm tags kept).
-- **Your own visits are left out.** Any browser that opens a page with `?ledge_me=1` sends nothing from then on (a note
-  at the bottom confirms it). The audit, proposal, and report links in the pipeline's emails to you carry it, so
-  checking an audit from a review email never counts. Links to shops never carry it. `?ledge_me=0` undoes it.
-- **Per-shop opens stay on the Leads tab** (`audit_opened`, `audit_opens`): that's who read their audit. GA is the
-  overall picture.
-- **Privacy page** at /privacy/, linked from every footer: what we collect, the service providers, Google Analytics with
-  Google's opt-out, and how to ask for a copy or deletion. Google Analytics' terms require one.
-
-Set up Nov 4 and 5 (done): `GA4_ID` in Cloudflare, the key events, and your browsers left out with `?ledge_me=1`
-(`?ledge_me=0` undoes it). Optional: GA4 > Admin > Data collection > Data retention, set to 14 months.
-
-## Where you were (Nov 3, night): homeowner shops only, each measured on its biggest job
-
-The first wave had shops that don't really do homeowner work (a commercial overhead door company, a luxury general
-contractor listed as an electrician, an electrical shop for builders), and every shop was measured on its trade's broad
-searches. Now:
-- **The home page is read first.** Before any search money is spent, the small model reads each prospect's home page:
-  does it do its trade for homeowners, which of our priced big jobs it offers, and who it mostly works for. A cold
-  prospect that mostly serves businesses, industry, or builders, or doesn't do the trade for homes, is held as
-  `Held (not residential)` with what its page says. Site-form leads are never held. A page that can't be read (too
-  little text, a script-built site) holds nothing. Turn it off with `FIT_CHECK`.
-- **Each shop is measured on its biggest job.** The second search and the value box go on whichever big job its site
-  offers would book the most work in its town at typical rates: heat pump installs, air conditioners (April to
-  September), tankless water heaters, sewer lines, EV chargers, or the trade's usual one when nothing beats it. Prices
-  and sources are in `engine/value-sources.md`.
-- **Screenshots only for strong prospects.** The "Phone screenshots needed" email leaves out any prospect that would be
-  held anyway, even with the most a screenshot could add to its score. Those are held right away instead of waiting.
-- **On the first run after the update,** prospects you haven't approved get the home page read: non-residential ones
-  are held (an approve link for one then says it's already handled), and ones whose site offers a bigger job worth more
-  in their town get fresh searches on it and a new audit. Prospects held as lower priority get the same chance.
-  **Where the audits are** now breaks the held count down by reason.
-
-This version also carries everything from the evening update below, so paste this one in place of it.
-
-## Where you were (Nov 3, evening): every cold audit waits for your OK
-
-What went wrong: `REVIEW_AUDITS_FIRST` was 10 and 14 audits had been approved, so from then on any audit the check
-passed went straight into the send queue without a review email. About 33 audits were queued that you'd never seen.
-Now:
-- **`REVIEW_ALL` (yes):** every cold audit waits for your OK, however many you've approved. The batch email's
-  approve-all link keeps that to one click.
-- **On the first run after the update,** audits queued without your OK come back (status `audit_ready`) and arrive in
-  one "Check these N audits" email. The ones you approved stay queued. Chains are held even if approved (Home Depot
-  Heating & Cooling: the email found belonged to the installer behind the listing). The audit that ran out of room
-  is written again with more.
-- **Where the audits are** now shows the whole line: being researched, written, checked, waiting for your review (and
-  when it'll reach your inbox), approved and queued to send, emailed so far, and held.
-
-## Where you were (Nov 3, afternoon): faster, fewer, stronger, reviewed in batches
-
-The cycle was too slow (every step waited for the next hourly run) and weak prospects took the same slow, costly path
-as strong ones. Now:
-- **Only strong prospects get written up.** Before any audit is written, a cold prospect is held (status `held`, the
-  reason in `priority_why`) when it's a chain or national brand (Home Depot, Reliance, Enercare, Mr. Rooter, and the
-  like), its website doesn't load or shows a placeholder ("domain isn't connected"), its work can't pay for search ads,
-  or it scores under `AUDIT_MIN_PRIORITY` (55). Dead sites are caught before any search money is spent. Lower the bar
-  and the held ones come back on the next run.
-- **More per run, less waiting.** Each run researches up to `SHOPS_PER_RUN` (15) shops instead of 6, and while work is
-  with Claude a short extra pass runs 15 minutes later (`QUICK_RUNS`), so writing, the check, and its second read each
-  take about 15 minutes to pick up instead of an hour. A wave of audits now takes an hour or two, not most of a day.
-- **One review email per wave** (`REVIEW_BATCH`). Finished cold audits are held until the wave in progress is done, 10
-  are ready, or the oldest has waited 4 hours, then come in one "Check these N audits" email, strongest first, with
-  **one link that approves every audit in it with nothing flagged**. Flagged ones keep their own links. Site-form
-  audits still come right away.
-- **On the first run after the update,** chains and shops without a working site already in the pipeline (not approved)
-  are held, and prospects not yet written up are held under the bar.
-
-If the Sheet ever shows "Service using too much computer time for one day" (a free Gmail account gets 90 minutes of
-script time a day), set `QUICK_RUNS` to no.
-
-Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now**.
-
-## Where you were (Nov 3): each shop audited in its own town and trade
-
-From the 9 audits on Nov 3:
-- **Town:** a cold prospect was audited in the area we were searching when we found it, so a Calgary shop that came
-  up in a Chestermere search got Chestermere's (much smaller) numbers. Now the shop's own town decides: the city on its
-  Google listing, then its website (a street address with "AB" and the page title count most; a town it lists among
-  the places it serves doesn't move it). New prospects outside the towns in `AREAS` are left out.
-- **Trade:** same story. An HVAC shop found in a plumber search was audited as a plumber. Its Google category now sets
-  the trade (HVAC contractor is heating and cooling), and a kind of business we don't do is left out or held.
-- **Failed searches** ("Search 2 didn't run") are tried again on the spot, and the check no longer asks you for a
-  screenshot when one didn't run.
-- **The home page picture** (the phone capture from PageSpeed) now goes to both the writer and the check, so a site
-  built with scripts (where our scan reads nothing) is judged from what a visitor actually sees.
-- **Ads under a different legal name** ("CRC Electric LTD" for Colz) are matched by the shop's website, so they're
-  theirs. The check no longer flags that.
-- **Small towns:** with the corrected search totals, a town where the big job's searches book fewer than three a
-  year gets no value box (rather than "two jobs a year from about $0 a month"). That's not the same as a money-loser:
-  those shops aren't held, they just score lower.
-- **No more doubled asks** in "NEEDS YOU".
-
-On the first run after the update, every cold prospect that hasn't been emailed is checked against its own site and
-listing: wrong town, wrong trade, or a failed search means fresh searches and a new audit (an audit already with
-Claude for the old town is set aside). Flagged audits that were right are read again by the check with what it
-knows now.
-
-**Higher-value prospects:** small towns have small search markets, so their shops score lower (and should). To fill the
-pipeline with stronger prospects, put the Calgary quadrants first in `AREAS` (or only them for now), then
-**Find prospects now**: each run finds up to `PROSPECTS_PER_WEEK` shops in the next area on the list.
-
-Ship it: replace `Code.gs` and `Templates.gs` in Apps Script and GitHub, then **Run now**.
+- **Held before any writing** (status `held`, the reason in `priority_why`): chains and national brands, sites that
+  don't load, shops that mostly serve businesses or builders (`FIT_CHECK` reads the home page first), work that can't
+  pay for search ads, and scores under `AUDIT_MIN_PRIORITY` (55). Lower the bar and held ones come back on the next run.
+- **Each shop in its own town and trade:** the city on its Google listing or website and its Google category decide,
+  not the search that found it. Shops outside `AREAS` are left out.
+- **Each shop on its biggest job:** the second search and the value box go on whichever big job its site offers would
+  book the most work in its town (heat pumps, air conditioners from April to September, tankless water heaters, sewer
+  lines, EV chargers). Prices and sources are in `engine/value-sources.md`.
+- **Speed:** up to `SHOPS_PER_RUN` (15) shops a run, plus a short extra pass 15 minutes later while work is with Claude
+  (`QUICK_RUNS`; set it to no if the Sheet ever says "Service using too much computer time for one day").
+- **Reviews in batches (`REVIEW_BATCH`, `REVIEW_ALL`):** finished cold audits come in one "Check these N audits" email,
+  strongest first, with one link that approves every one with nothing flagged. With `REVIEW_ALL` at yes, every cold
+  audit waits for your OK.
+- **Prospecting:** each **Find prospects now** run finds up to `PROSPECTS_PER_WEEK` shops in the next area in `AREAS`, so
+  the strongest areas (the Calgary quadrants) go first.
 
 ## Where you were (Nov 2, night and evening): the check edits; the value box only when the money adds up
 
@@ -692,6 +574,47 @@ there and you reply as Ledge. The hub keeps its own copy and keeps working.
 
 A few inboxes (mostly Outlook) may show those replies as sent "on behalf of" the other address. It's cosmetic. The hub
 notices a lead's reply on its own copy and stops its follow-ups, so you and the hub won't talk over each other.
+
+## 5a. Sending from logan@ledgecommunications.com (about 45 minutes, plus up to 2 days for Google)
+
+Cold email from a free Gmail address costs some trust, and one free account carries all the sending risk. This moves new
+first emails to your own domain without moving the hub: the Workspace mailbox forwards everything to
+ledgecommunications@gmail.com, and that account sends as the new address through Workspace, so the mail is signed for
+ledgecommunications.com. Do it on a computer.
+
+Before you start: the domain's mail records already point at Google, which usually means a Google Workspace was set up
+for it before (often through Squarespace). If you had one, sign in at admin.google.com with that address and reuse it; a
+fresh signup can't claim a domain another Workspace still holds.
+
+1. **Workspace.** At workspace.google.com, sign up with your existing domain and create `logan@ledgecommunications.com`.
+   One user on the smallest plan is enough.
+2. **Prove the domain.** Setup gives you a TXT record. Cloudflare: **ledgecommunications.com > DNS > Records > Add
+   record**, type TXT, name `@`, paste the value. Leave the existing `google-site-verification` record (Search Console).
+3. **Mail records**, in the same place:
+   - MX: the five Google records already there work. If setup asks for `smtp.google.com` (priority 1), add it and
+     delete the old five.
+   - TXT, name `@`: `v=spf1 include:_spf.google.com ~all`
+   - TXT, name `_dmarc`: `v=DMARC1; p=none; rua=mailto:logan@ledgecommunications.com`
+4. **DKIM.** admin.google.com **> Apps > Google Workspace > Gmail > Authenticate email > Generate new record** (2048).
+   Add it in Cloudflare as TXT, name `google._domainkey`, then click **Start authentication**. It can take up to 48 hours.
+5. **Forward to the hub.** Signed in as logan@: Gmail **> Settings > See all settings > Forwarding and POP/IMAP > Add a
+   forwarding address >** `ledgecommunications@gmail.com`. Confirm with the code sent there, then pick **Forward a copy
+   of incoming mail** and **keep Gmail's copy in the Inbox**.
+6. **An app password.** Still as logan@: myaccount.google.com **> Security**, turn on **2-Step Verification**, then
+   search **App passwords** and create one named Ledge hub. It goes straight into the next step, never into chat.
+7. **Send mail as.** Signed in as ledgecommunications@gmail.com: Gmail **> Settings > See all settings > Accounts and
+   Import > Send mail as > Add another email address.** Name: your full name; address: `logan@ledgecommunications.com`;
+   leave **Treat as an alias** ticked. SMTP server `smtp.gmail.com`, port 587, username `logan@ledgecommunications.com`,
+   password: the app password, **TLS**. Google emails a confirmation to logan@, which forwards to this inbox: click it.
+8. **Switch it on.** Once the Admin console shows DKIM as authenticating: Settings tab, `SENDER_EMAIL` =
+   `logan@ledgecommunications.com`. Then **Ledge > Send a test cold email** to a fresh mail-tester.com address and your
+   own inbox. The From line should be the new address, and mail-tester should show SPF, DKIM, and DMARC passing.
+9. **Superhuman (optional).** Repeat step 7 in ledgelow@gmail.com (same SMTP details; a second app password is fine), so
+   replies you write in Superhuman go out as logan@ too. "Reply from the same address the message was sent to" is
+   already on.
+
+Replies to the new address reach the hub through the forward in step 5 and land in each shop's thread. One that arrives
+outside its thread is matched by the sender's address (`reply_outside_thread` on the Events tab).
 
 ## 6. Superhuman booking page (10 minutes, optional)
 
