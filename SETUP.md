@@ -15,7 +15,33 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 16, late afternoon): unsubscribes by email, and four industries ready to try
+## Where you are (Nov 18): the queue keeps itself full
+
+**Why it ran dry.** New shops were only found once a week, in one area. Monday's run was Okotoks: 29 new shops, 24 of
+them held (lower priority or not residential), so the whole week produced 3 audits while cold email can send 50 first
+emails. Sending itself is fine: follow-ups go out on schedule (about 70 due Nov 19 to 25).
+
+**Now:**
+- **`QUEUE_TARGET` (50).** Shops on their way to a first email: being researched or written, waiting for your OK, or
+  approved. When there are fewer, every weekday hourly run from 6 AM to 5 PM searches the next area in `AREAS` (every
+  trade) and adds up to twice the gap, since about half get held. It stops at `PROSPECTS_PER_WEEK` new shops in any 7
+  days, or after a full round of the areas finds nothing new (Monday starts it again).
+- **Deeper searches.** Both of each trade's searches, 100 results deep (it was one search, 40 deep), so areas searched
+  before still have shops to give, and the three new trades get their first searches.
+- **Ledge > Find prospects now** works through the areas until the queue has what it needs (at least 20 new shops).
+- **Where the audits are** shows the queue against `QUEUE_TARGET` and the week's new shops against `PROSPECTS_PER_WEEK`.
+- **The reply count was wrong.** "69 replied" counted the false replies from Nov 12 and Nov 16 that were undone. Where
+  the audits are, the subject test, and the Monday digest now count real replies only. So far that's none from 82 shops
+  (6 unsubscribed, 8 read their audit).
+
+Optional: `AUDIT_MIN_PRIORITY` at 50 brings back 26 held shops that scored 50 to 54 (Airdrie 8, Calgary SW 7, Cochrane
+6, Okotoks 4, Calgary SE 1; mostly electricians and plumbers), on the next run.
+
+Ship it: paste `Code.gs` and save (nothing here runs in the web app, so no new deployment). Then **Ledge > Find
+prospects now**. Upload `Code.gs` and `SETUP.md` to GitHub. The `QUEUE_TARGET` row appears on the Settings tab after the
+first run.
+
+## Where you were (Nov 16, late afternoon): unsubscribes by email, and four industries ready to try
 
 **Unsubscribes now stop the emails however they come in.** Two shops asked to stop on Nov 16. Some mail apps turn
 our footer's unsubscribe link into a new email titled "Unsubscribe", and that email lands outside the shop's thread,

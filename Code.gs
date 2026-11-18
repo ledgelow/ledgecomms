@@ -77,7 +77,7 @@ var HEAD = {
   // months: searches a month for the last 12 months, oldest first; peak_month: the busiest of them.
   research: ['set', 'kind', 'keyword', 'volume', 'cpc_usd', 'bid_low_usd', 'bid_high_usd', 'competition', 'months', 'peak_month', 'location', 'fetched']
 };
-var SCHEMA_VERSION = '29';
+var SCHEMA_VERSION = '30';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -124,7 +124,8 @@ var SETTINGS_DEFAULTS = [
   ['COLD_EMAIL_ON', 'no', 'yes starts cold emails. Leave it at no until you\'re happy with the first audits.'],
   ['COLD_PER_DAY_START', '5', 'Cold emails per weekday in the first week.'],
   ['COLD_PER_DAY_MAX', '10', 'Ceiling after adding 5 a week. Raise it once replies look healthy.'],
-  ['PROSPECTS_PER_WEEK', '40', 'New shops to look for each Monday. Keep it about one and a half times the week\'s cold emails: 40 at 5 a day, 75 at 10. Each one gets an audit, so engine spend rises with it.'],
+  ['PROSPECTS_PER_WEEK', '40', 'Most new shops to add in any 7 days. The hub finds them as the queue needs them (QUEUE_TARGET). About half are held, so keep it about twice the week\'s cold first emails: 100 at 10 a day. Each one the hub doesn\'t hold gets an audit, so engine spend rises with it.'],
+  ['QUEUE_TARGET', '50', 'Shops to keep on their way to a first cold email: being researched or written, waiting for your OK, or approved and queued. When there are fewer, the hub looks for new shops (one area an hour on weekdays, 6 AM to 5 PM) until it\'s full again or PROSPECTS_PER_WEEK is reached. 50 is about a week of first emails at 10 a day.'],
   ['AREAS', 'Calgary NE, Calgary NW, Calgary SE, Calgary SW, Airdrie, Chestermere, Cochrane, Okotoks', 'Areas to work through, in order.'],
   ['TRADES', 'heating and cooling, plumbing, electrical, garage doors',
     'Kinds of business to look for, comma separated. Each one gets its own Google searches. Cold prospects in a trade that isn\'t here are held (and come back if it\'s added again). Roofing and eavestroughs are off for the winter; add them back in March. Appliance repair is off: its jobs are too small for search ads to pay.'],
@@ -655,6 +656,7 @@ function runHourly() {
     step_('fitWaiting', function () { if (prop_('FIT_PENDING') && fitWaiting_(runLeft_() - 150000)) props_().deleteProperty('FIT_PENDING'); });
     step_('refitWaiting', function () { if (prop_('REFIT_PENDING') && refitWaitingLeads_(runLeft_() - 150000)) props_().deleteProperty('REFIT_PENDING'); });
     step_('rankWaiting', function () { if (prop_('RANK_PENDING')) { rankWaitingLeads_(); props_().deleteProperty('RANK_PENDING'); } });
+    step_('topUpProspects', function () { topUpProspects_(false); });
     step_('gatherEvidence', gatherEvidence_);
     step_('gatherSiteChecks', gatherSiteChecks_);
     step_('expireShotWaits', expireShotWaits_);
@@ -3252,7 +3254,8 @@ function showAuditStatus() {
   var review = allLeads.filter(function (l) { return l.status === 'awaiting_review' || (l.status === 'audit_ready' && qaState_(l) !== 'waiting'); }).length;
   var queued = allLeads.filter(function (l) { return l.status === 'ready_to_send'; }).length;
   var sent = allLeads.filter(function (l) { return l.source === 'cold' && Number(l.touches || 0) > 0; }).length;
-  var replies = allLeads.filter(function (l) { return l.source === 'cold' && Number(l.last_reply_at || 0) > 0; }).length;
+  var real = realRepliers_(), replies = allLeads.filter(function (l) { return l.source === 'cold' && real[l.id]; }).length;
+  var room = prospectRoom_();
   var heldN = allLeads.filter(function (l) { return l.status === 'held'; }).length, whyN = {};
   allLeads.forEach(function (l) { if (l.status === 'held') { var w = (String(l.priority_why || '').match(/^Held \(([^)]+)\)/) || [])[1] || 'other'; whyN[w] = (whyN[w] || 0) + 1; } });
   var whyList = Object.keys(whyN).sort(function (a, b) { return whyN[b] - whyN[a]; }).map(function (w) { return whyN[w] + ' ' + w; });
@@ -3266,6 +3269,8 @@ function showAuditStatus() {
     'Being checked before they come to you: ' + checking,
     'Back and waiting for your review: ' + review + (review ? ' (' + reviewWhen_() + ')' : ''),
     'Approved, queued to send: ' + queued + (queued ? ' (' + (yes_(setting_('COLD_EMAIL_ON')) ? coldCapToday_() + ' a weekday, 8 AM to 5 PM, highest score first' : 'cold email is off') + ')' : ''),
+    'Queue: ' + room.have + ' of ' + room.target + ' (QUEUE_TARGET) on their way to a first email; ' + Math.max(0, Number(setting_('PROSPECTS_PER_WEEK') || 0) - room.weekLeft) +
+      ' of ' + setting_('PROSPECTS_PER_WEEK') + ' new shops found in the last 7 days' + (room.gap > 0 && room.weekLeft > 0 ? ' (more are found each weekday hour, 6 AM to 5 PM, until it\'s full)' : ''),
     'Emailed so far: ' + sent + (sent ? ', ' + replies + ' replied' : ''),
     'Held (not worth an audit right now): ' + heldN + (heldN ? ' (' + whyList.join(', ') + '; each one\'s reason is in priority_why on the Leads tab)' : ''),
     'Engine spend this month: US$' + monthSpend_().toFixed(2) + ' of ' + setting_('MONTHLY_ENGINE_BUDGET_USD')
@@ -4002,35 +4007,98 @@ function rankWaitingLeads_() {
   });
 }
 
+// Monday 5 am, and Ledge > Find prospects now: work through the areas in order until the queue is full (QUEUE_TARGET), at
+// least 20 new shops are in, or PROSPECTS_PER_WEEK is reached for the last 7 days.
 function weeklyProspects() {
   ensureSchema_();
   _settings = null;
-  var areas = String(setting_('AREAS') || '').split(',').map(function (s) { return s.trim(); }).filter(String);
-  if (!areas.length) return;
-  var i = (Number(prop_('AREA_INDEX') || -1) + 1) % areas.length;
-  props_().setProperty('AREA_INDEX', String(i));
-  if (dfsConfigured_()) findFromMaps_(areas[i]);
-  else queueJob_('find', '', areas[i]);
+  props_().deleteProperty('PROSPECT_DRY');
+  var started = Date.now(), r = { added: 0, areas: [] };
+  if (!dfsConfigured_()) {
+    var areas = areasList_();
+    if (!areas.length) return;
+    var i = (Number(prop_('AREA_INDEX') || -1) + 1) % areas.length;
+    props_().setProperty('AREA_INDEX', String(i));
+    queueJob_('find', '', areas.at(i));
+    return;
+  }
+  var room = prospectRoom_();
+  var want = Math.min(room.weekLeft, Math.max(2 * room.gap, 20));
+  var tried = 0, areasN = areasList_().length;
+  while (want > 0 && tried < areasN && Date.now() - started < 240000) {
+    var one = findNextArea_(want);
+    r.added += one.added; r.areas.push(one.area + ' ' + one.added);
+    want -= one.added; tried++;
+  }
+  var msg = room.weekLeft <= 0 ? 'PROSPECTS_PER_WEEK (' + setting_('PROSPECTS_PER_WEEK') + ') new shops are already in from the last 7 days, so none were added. Raise it on the Settings tab to find more now.'
+    : r.added + ' new shops (' + r.areas.join(', ') + '). ' + room.have + ' were already on their way to a first email; QUEUE_TARGET is ' + room.target + '.';
+  try { SpreadsheetApp.getUi().alert('Find prospects', msg, SpreadsheetApp.getUi().ButtonSet.OK); } catch (err) {}
+  return r;
 }
 
-// New shops from Google Maps: one search per trade in the area, independent shops with a website and 10+ reviews.
-function findFromMaps_(area) {
+// Every hourly run on weekdays from 6 AM to 5 PM: when fewer shops than QUEUE_TARGET are on their way to a first cold email,
+// one more area is searched (about half of new shops are held, so it looks for twice the gap). It stops for the week once
+// PROSPECTS_PER_WEEK are in, or once a full round of the areas finds nothing new (Monday starts it again).
+function topUpProspects_() {
+  if (!dfsConfigured_()) return null;
+  var now = new Date(), day = Number(Utilities.formatDate(now, tz_(), 'u')), hour = Number(Utilities.formatDate(now, tz_(), 'H'));
+  if (day > 5 || hour < 6 || hour >= 17) return null;
+  var room = prospectRoom_();
+  if (room.gap <= 0 || room.weekLeft <= 0) return null;
+  if (Number(prop_('PROSPECT_DRY') || 0) >= areasList_().length) return null;
+  var one = findNextArea_(Math.min(room.weekLeft, 2 * room.gap));
+  props_().setProperty('PROSPECT_DRY', String(one.added ? 0 : Number(prop_('PROSPECT_DRY') || 0) + 1));
+  return one;
+}
+
+function areasList_() { return String(setting_('AREAS') || '').split(',').map(function (s) { return s.trim(); }).filter(String); }
+
+// How full the queue is: shops on their way to a first cold email, the target, and how many more the week allows.
+function prospectRoom_() {
+  var leads = readRows_(TAB.leads, HEAD.leads), weekAgo = Date.now() - 7 * 864e5;
+  var have = leads.filter(function (l) {
+    return l.source === 'cold' && !Number(l.touches || 0) && ['researching', 'audit_ready', 'awaiting_review', 'audit_approved', 'ready_to_send'].indexOf(l.status) > -1;
+  }).length;
+  var week = leads.filter(function (l) { return l.source === 'cold' && l.created && new Date(l.created).getTime() > weekAgo; }).length;
+  var t = String(setting_('QUEUE_TARGET') == null ? '' : setting_('QUEUE_TARGET')).trim();
+  var target = t === '' ? 5 * Number(setting_('COLD_PER_DAY_MAX') || 10) : Number(t) || 0;
+  return { have: have, target: target, gap: target - have, weekLeft: Number(setting_('PROSPECTS_PER_WEEK') || 40) - week };
+}
+
+function findNextArea_(limit) {
+  var areas = areasList_();
+  if (!areas.length) return { area: '', added: 0 };
+  var i = (Number(prop_('AREA_INDEX') || -1) + 1) % areas.length;
+  props_().setProperty('AREA_INDEX', String(i));
+  return { area: areas.at(i), added: findFromMaps_(areas.at(i), limit) };
+}
+
+// New shops from Google Maps: both of each trade's searches in the area, 100 results deep (a second pass over an area finds
+// shops the first didn't reach), independent shops with a website and 10+ reviews. Returns how many were added.
+function findFromMaps_(area, limitArg) {
   var town = townFor_({ area: area }, '');
   var trades = String(setting_('TRADES') || '').split(',').map(function (s) { return s.trim(); }).filter(String);
-  if (!trades.length) return;
-  var resps = UrlFetchApp.fetchAll(trades.map(function (t) {
-    return dfsReq_('serp/google/maps/live/advanced', { keyword: keywordsFor_(t, town.name)[0], location_coordinate: town.lat + ',' + town.lng + ',13z', language_code: 'en', depth: 40 });
-  }));
-  var cost = 0, errors = [];
-  var pools = resps.map(function (r, k) {
-    var d = dfsRead_(r);
+  if (!trades.length) return 0;
+  var reqs = [];
+  trades.forEach(function (t, k) {
+    keywordsFor_(t, town.name).slice(0, 2).forEach(function (kw) {
+      reqs.push({ k: k, req: dfsReq_('serp/google/maps/live/advanced', { keyword: kw, location_coordinate: town.lat + ',' + town.lng + ',13z', language_code: 'en', depth: 100 }) });
+    });
+  });
+  var resps = UrlFetchApp.fetchAll(reqs.map(function (r) { return r.req; }));
+  var cost = 0, errors = [], lists = trades.map(function () { return []; });
+  resps.forEach(function (r, n) {
+    var d = dfsRead_(r), k = reqs[n].k;
     cost += d.cost;
     if (!d.ok) errors.push(trades[k] + ': ' + d.error);
-    var list = d.items.filter(function (it) { return it.type === 'maps_search'; }).map(function (it, i) {
+    d.items.filter(function (it) { return it.type === 'maps_search'; }).forEach(function (it, i) {
       var e = entry_(it.title, it.domain || it.url, it.rating);
-      return { business: e.name, website: it.url || (e.domain ? 'https://' + e.domain : ''), domain: e.domain || '', reviews: e.reviews || 0, trade: trades[k], rank: i + 1,
-        city: String((it.address_info || {}).city || ''), category: String(it.category || '') };
+      lists[k].push({ business: e.name, website: it.url || (e.domain ? 'https://' + e.domain : ''), domain: e.domain || '', reviews: e.reviews || 0, trade: trades[k], rank: i + 1,
+        city: String((it.address_info || {}).city || ''), category: String(it.category || '') });
     });
+  });
+  var pools = lists.map(function (all) {
+    var seenD = {}, list = all.filter(function (s) { var key = s.domain || s.business; if (seenD[key]) return false; seenD[key] = true; return true; });
     // Best prospects first: established shops (20+ reviews) that sit below the top 3 on the map, then the rest by rank.
     // Shops already at the top of the map have the least to gain.
     var tier = function (s) { return s.reviews >= 20 && s.rank > 3 ? 0 : s.rank > 3 ? 1 : 2; };
@@ -4040,7 +4108,7 @@ function findFromMaps_(area) {
   var vol = volumesFor_([].concat.apply([], trades.map(function (t) { return relatedKeywords_(keywordsFor_(t, town.name), town.name); })), town.name);
   cost += vol.cost;
   if (vol.error) errors.push('search estimates: ' + vol.error);
-  var known = knownDomains_(), limit = Number(setting_('PROSPECTS_PER_WEEK') || 15), added = 0, seen = 0;
+  var known = knownDomains_(), limit = limitArg || Number(setting_('PROSPECTS_PER_WEEK') || 15), added = 0, seen = 0;
   // From December to March the trades in SEASON_FOCUS (heating and garage doors: their searches run above a typical month
   // then) get two shops a round to every other trade's one.
   var focus = seasonFocus_(), next = pools.map(function () { return 0; });
@@ -4073,6 +4141,7 @@ function findFromMaps_(area) {
   appendRow_(TAB.jobs, HEAD.jobs, { job_id: newId_('J'), kind: 'find', lead_id: '', area: area, status: 'done', attempts: 1, created: new Date(), updated: new Date(),
     est_cost_usd: cost, detail: 'Google Maps: ' + added + ' new' + (errors.length ? ' | ' + errors.join('; ') : '') });
   logEvent_('', '', 'prospects_found', area + ': ' + added + ' new of ' + seen + ' on Google Maps');
+  return added;
 }
 
 // The trades that get a double share of new prospects this month: SEASON_FOCUS from December to March, none otherwise.
@@ -6072,12 +6141,23 @@ function subjectB_(l) {
 function nextSubjectVariant_(counts) {
   return String(setting_('COLD_SUBJECT_B') || '').trim() && counts.B < counts.A ? 'B' : 'A';
 }
+// Shops that really replied: a reply event that wasn't later undone as a misread (our own emails, or a mail app's copies,
+// read as replies on Nov 12 and Nov 16, 2026).
+function realRepliers_() {
+  var r = {};
+  readRows_(TAB.events, HEAD.events).forEach(function (e) {
+    if (!e.lead_id) return;
+    if (/^reply_/.test(e.event) && e.event !== 'reply_burst_held') r[e.lead_id] = true;
+    if (e.event === 'false_reply_undone') delete r[e.lead_id];
+  });
+  return r;
+}
+
 // The test so far, one line per subject: sent, bounced, read their audit, replied.
 function subjectTestLines_() {
   var leads = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.subject_test === 'A' || l.subject_test === 'B'; });
   if (!leads.length) return [];
-  var replied = {};
-  readRows_(TAB.events, HEAD.events).forEach(function (e) { if (/^reply_/.test(e.event)) replied[e.lead_id] = true; });
+  var replied = realRepliers_();
   var label = { A: 'A (the usual "Who shows up for ...")', B: 'B ("' + (String(setting_('COLD_SUBJECT_B') || '').trim() || 'test subject, now off') + '")' };
   return ['A', 'B'].map(function (v) {
     var g = leads.filter(function (l) { return l.subject_test === v; });
@@ -6242,6 +6322,7 @@ function sendDigest() {
   var since = new Date(Date.now() - 7 * 864e5);
   var ev = readRows_(TAB.events, HEAD.events).filter(function (e) { return new Date(e.timestamp) >= since; });
   var count = function (name) { return ev.filter(function (e) { return e.event === name; }).length; };
+  var real = realRepliers_();
   var leads = readRows_(TAB.leads, HEAD.leads);
   var by = {};
   leads.forEach(function (l) { by[l.status] = (by[l.status] || 0) + 1; });
@@ -6255,7 +6336,7 @@ function sendDigest() {
     '• Site audit requests: ' + count('inbound_request') + '\n' +
     '• Cold first emails sent: ' + count('sent_cold_1') + ' (today\'s cap ' + (yes_(setting_('COLD_EMAIL_ON')) ? coldCapToday_() : 'cold email is off') + ')\n' +
     '• Audits opened for the first time: ' + count('audit_opened') + (count('audit_view_fast') ? ' (plus ' + count('audit_view_fast') + ' opened by link scanners within minutes of the email, not counted)' : '') + '\n' +
-    '• Replies: ' + ev.filter(function (e) { return /^reply_/.test(e.event); }).length + '\n' +
+    '• Replies: ' + ev.filter(function (e) { return /^reply_/.test(e.event) && e.event !== 'reply_burst_held' && real[e.lead_id]; }).length + '\n' +
     '• Asked for a price: ' + count('quote_requested') + '\n' +
     '• Proposals approved: ' + count('won') + '\n' +
     '• Calls booked: ' + count('booked') + '\n' +
