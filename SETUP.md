@@ -25,8 +25,9 @@ from 41 (10%): too few to call, but the one with the shop's name is ahead.
 - **Home page pictures.** The "Your website on a phone" section only shows when there's a picture, and most audits had
   none: the hub took three pictures at the end of each run, usually after Claude had written the audit. Now each audit's
   picture is taken just before it goes to Claude (up to 25 at once), so the write-up sees it, and the end of each run adds
-  pictures to audits already written (8 a run, strongest first). Pages are drawn when they're opened, so those audits show
-  the section from then on. If PageSpeed can't take one after two tries, the Events tab says why (`site_shot_failed`). A
+  pictures to audits already written (8 a run; audits not emailed yet first). Pages are drawn when they're opened, so those
+  audits show the section from then on. **Ledge > Take missing home page pictures now** does the rest in one go (25 at a
+  time for about four minutes; run it again if it says some are left). If PageSpeed can't take one after two tries, the Events tab says why (`site_shot_failed`). A
   429 there means `PAGESPEED_API_KEY` is missing from Script Properties (setup step 4, "Before your first site audit").
 - **Subject A is a setting (`COLD_SUBJECT_A`, "How does {business} show up on Google?").** It replaces "Who shows up for
   ..." on both tracks and takes turns with `COLD_SUBJECT_B` ("Made this for {business}"). Changing either one starts a
@@ -47,7 +48,11 @@ Ship it:
    older web app would move it back.
 2. The `COLD_SUBJECT_A` row appears on the Settings tab after the next run.
 3. Upload `Code.gs`, `cold-sequence.md`, and `SETUP.md` to GitHub.
-4. Optional: sign up at zerobounce.net, then add the API key to Script Properties as `ZEROBOUNCE_API_KEY`.
+4. Optional: sign up at zerobounce.net, then **Ledge > Save the ZeroBounce key** and paste it. The editor won't add new
+   Script Properties once there are more than 50, so the menu saves it for you, after checking with ZeroBounce that the
+   key works (it shows the credits left). Leave the prompt blank to remove the key.
+
+Later on Nov 20: the two menu items above (paste `Code.gs`, save, and reload the Sheet to see them; no new deployment).
 
 ## Where you were (Nov 18): the queue keeps itself full
 

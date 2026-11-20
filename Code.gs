@@ -244,11 +244,13 @@ function onOpen() {
     .addItem('Re-read screenshots that didn\'t match', 'rereadUnmatchedShots')
     .addItem('Rebuild audits that now have screenshots', 'rebuildForNewShots')
     .addItem('Check the waiting audits again', 'recheckWaitingAudits')
+    .addItem('Take missing home page pictures now', 'takeSiteShotsNow')
     .addItem('Connect FreshBooks', 'connectFreshBooks')
     .addItem('Send a test invoice to myself', 'testFreshBooksInvoice')
     .addItem('Send a test cold email (spam check)', 'testColdEmail')
     .addItem('Send me the weekly digest now', 'sendDigest')
     .addItem('Check settings', 'showSettingsCheck')
+    .addItem('Save the ZeroBounce key', 'saveZeroBounceKey')
     .addToUi();
 }
 
@@ -3727,8 +3729,10 @@ function captureSiteShots_(max, backfill, only) {
   var ids;
   if (only) ids = only;
   else if (backfill) {
+    // Audits not emailed yet first (the ones you're about to review or send), then the rest, strongest first.
+    var unsent = function (l) { return !Number(l.touches || 0) ? 1 : 0; };
     ids = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.audit_slug && SHOT_LIVE.indexOf(l.status) > -1; })
-      .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); }).map(function (l) { return l.id; });
+      .sort(function (a, b) { return unsent(b) - unsent(a) || Number(b.priority || 0) - Number(a.priority || 0); }).map(function (l) { return l.id; });
   } else {
     ids = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) { return j.kind === 'audit' && (j.status === 'queued' || j.status === 'submitted'); })
       .map(function (j) { return j.lead_id; });
@@ -3766,6 +3770,55 @@ function captureSiteShots_(max, backfill, only) {
   saveSiteShotTried_(tried);
   return todo.length;
 }
+// Ledge menu > Take missing home page pictures now: what the end of each run does 8 at a time, in rounds of 25 for up to
+// about four and a half minutes. Audits not emailed yet go first. Run it again if it says some are left.
+function takeSiteShotsNow() {
+  ensureSchema_();
+  var started = Date.now(), before = siteShotStats_(), rounds = 0;
+  while (Date.now() - started < 200000 && captureSiteShots_(25, true) > 0) rounds++;
+  var after = siteShotStats_();
+  var failed = readRows_(TAB.events, HEAD.events).filter(function (e) { return e.event === 'site_shot_failed' && new Date(e.timestamp).getTime() >= started; });
+  var msg = (after.have - before.have) + ' new home page pictures. ' + after.have + ' of ' + after.total + ' audits that can still be read have one now' +
+    (after.left ? '; ' + after.left + ' still to try, so run it again (or let the hourly runs finish them).' : '.') +
+    (failed.length ? '\n\nPageSpeed couldn\'t take ' + failed.length + ' after two tries: ' + failed.slice(0, 3).map(function (e) { return e.detail; }).join('; ') +
+      (failed.length > 3 ? '; and more on the Events tab.' : '.') : '');
+  try { SpreadsheetApp.getUi().alert('Home page pictures', msg, SpreadsheetApp.getUi().ButtonSet.OK); } catch (err) { Logger.log(msg); }
+  return after;
+}
+// Audits whose pages can still be read: how many have a picture, and how many are still to try.
+function siteShotStats_() {
+  var tried = siteShotTried_();
+  var list = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.audit_slug && SHOT_LIVE.indexOf(l.status) > -1 && siteUrlOf_(l.website); });
+  return { total: list.length, have: list.filter(function (l) { return tried[l.id] === 9; }).length,
+    left: list.filter(function (l) { return tried[l.id] !== 9 && (tried[l.id] || 0) < 2; }).length };
+}
+
+// Ledge menu > Save the ZeroBounce key: the key goes straight from the prompt into Script Properties (the editor only lets
+// you add properties while there are fewer than 50), and ZeroBounce is asked how many credits are left to confirm it works.
+function saveZeroBounceKey() {
+  var ui = SpreadsheetApp.getUi();
+  var r = ui.prompt('Save the ZeroBounce key', 'Paste your ZeroBounce API key. It goes straight into Script Properties as ZEROBOUNCE_API_KEY. ' +
+    'Leave it blank and press OK to remove the key.', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  var key = r.getResponseText().trim();
+  if (!key) { props_().deleteProperty('ZEROBOUNCE_API_KEY'); ui.alert('Removed. Addresses aren\'t checked with ZeroBounce until a key is saved again.'); return; }
+  if (/\s/.test(key) || key.length < 20) { ui.alert('That doesn\'t look like a ZeroBounce key (no spaces, about 32 characters). Nothing was saved.'); return; }
+  var credits = zeroBounceCredits_(key);
+  if (credits === null) { ui.alert('ZeroBounce didn\'t accept that key, so nothing was saved. Copy it again from the API page in your ZeroBounce account.'); return; }
+  props_().setProperty('ZEROBOUNCE_API_KEY', key);
+  ui.alert('Saved. ZeroBounce has ' + credits + ' credits left. From now on, each cold audit\'s address is checked when the audit comes back, ' +
+    'and one that won\'t take mail is skipped before it reaches you.');
+}
+// Credits left on a ZeroBounce key, or null when the key doesn't work.
+function zeroBounceCredits_(key) {
+  try {
+    var r = UrlFetchApp.fetch('https://api.zerobounce.net/v2/getcredits?api_key=' + encodeURIComponent(key), { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return null;
+    var n = Number(JSON.parse(r.getContentText()).Credits);
+    return isNaN(n) || n < 0 ? null : n;
+  } catch (err) { return null; }
+}
+
 // Each shop's tries at a home page picture: 1 or 2 tries so far, 9 once it has one.
 function siteShotTried_() { try { return JSON.parse(prop_('SITE_SHOT_TRIED') || '{}'); } catch (err) { return {}; } }
 function saveSiteShotTried_(tried) {
