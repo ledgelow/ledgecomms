@@ -77,7 +77,7 @@ var HEAD = {
   // months: searches a month for the last 12 months, oldest first; peak_month: the busiest of them.
   research: ['set', 'kind', 'keyword', 'volume', 'cpc_usd', 'bid_low_usd', 'bid_high_usd', 'competition', 'months', 'peak_month', 'location', 'fetched']
 };
-var SCHEMA_VERSION = '30';
+var SCHEMA_VERSION = '31';
 // Settings whose default changed. On upgrade, a cell still holding an old default gets the new one; anything else is left alone.
 var OLD_DEFAULTS = {
   MGMT_TIERS: ['1000:500, 2000:800, 4000:1200, 8000:15%'], MIN_AD_BUDGET: ['1000'],
@@ -106,6 +106,7 @@ var SETTINGS_DEFAULTS = [
   ['SHOT_WAIT_HOURS', '4', 'How long a site-form audit waits for your phone screenshots before it\'s built without them, so it still goes out on the day promised.'],
   ['COLD_SHOT_WAIT_HOURS', '24', 'How long a cold audit waits for your phone screenshots before it\'s built without them (it then says nothing about who advertises on those searches). 0 waits for them however long it takes.'],
   ['REVIEW_ALL', 'yes', 'yes: every cold audit waits for your OK before it can be emailed (the review email\'s approve-all link makes that one click). no: after the first REVIEW_AUDITS_FIRST, audits the check passes go into the send queue on their own.'],
+  ['COLD_SUBJECT_A', 'How does {business} show up on Google?', 'The usual subject on cold first emails (A), for both tracks. Placeholders: {business} (the shop\'s name, shortened), {search} (its first search), {town}, {job} (the big job its audit is on). Clear the cell to go back to the built-in ones ("Who shows up for "furnace repair airdrie"", or "Your ads on ..." for shops running ads). Changing it, or COLD_SUBJECT_B, starts a fresh even split; earlier subjects stay in the results.'],
   ['COLD_SUBJECT_B', 'Made this for {business}', 'A second subject line to test on cold first emails. While it\'s filled in, every other cold first email goes out with it instead of the usual subject (A), and Where the audits are and the Monday digest compare the two: sent, read their audit, replied. Placeholders: {business} (the shop\'s name, shortened), {search} (its first search), {town}, {job} (the big job its audit is on). Clear the cell to stop the test.'],
   ['READ_PULLS_FOLLOWUP', 'yes', 'yes moves a cold prospect\'s next follow-up up to the next business morning when they read their audit for the first time (never sooner than 2 business days after the last email), so it lands while they\'re thinking about it. no keeps the usual gaps.'],
   ['READ_ALERTS', 'yes', 'yes emails you the moment a cold prospect reads their audit for the first time (and hasn\'t replied), with a suggested personal note. A note you write in their thread stops the automatic emails to that shop. no turns the alerts off.'],
@@ -325,6 +326,8 @@ function ensureSchema_(force) {
   // 27: the account's old address stays ours, and the shops our own emails were taken for replies from go back.
   // 29: an unsubscribe by the footer link that came in between the Nov 16 misread and its clean-up stands again.
   if (from > 0 && from < 29) props_().setProperty('UNSUB_RECHECK_PENDING', '1');
+  // 31: cold emails 2 and 3 swapped places. A shop whose email 2 went before the swap gets the money line as its email 3.
+  if (from > 0 && from < 31 && !prop_('COLD_SWAP_AT')) props_().setProperty('COLD_SWAP_AT', String(Date.now()));
   if (from > 0 && from < 27) {
     var had = String(prop_('OUR_ADDRESSES') || '').split(',').filter(String);
     if (had.indexOf('ledgecommunications@gmail.com') < 0) props_().setProperty('OUR_ADDRESSES', had.concat(['ledgecommunications@gmail.com']).join(','));
@@ -671,7 +674,7 @@ function runHourly() {
     step_('sendColdEmails', sendColdEmails_);
     step_('sendFollowUps', sendFollowUps_);
     step_('sendNeedsYou', sendNeedsYou_);
-    step_('captureSiteShots', function () { if (runLeft_() > 90000) captureSiteShots_(); });
+    step_('backfillSiteShots', function () { if (runLeft_() > 90000) captureSiteShots_(8, true); });
     step_('readSearchShots', function () { if (runLeft_() > 60000) readSearchShots_(8, runLeft_() - 45000); });
   } finally {
     RUN_STARTED = 0;
@@ -1201,8 +1204,7 @@ function sendColdEmails_() {
   var perRun = Math.max(1, Math.ceil(cap / 9));
   var room = Math.min(cap - sentToday, perRun);
   if (room <= 0) return;
-  var all = readRows_(TAB.leads, HEAD.leads), counts = { A: 0, B: 0 };
-  all.forEach(function (l) { if (l.subject_test === 'A' || l.subject_test === 'B') counts[l.subject_test]++; });
+  var all = readRows_(TAB.leads, HEAD.leads), round = subjectRound_();
   var queue = all.filter(function (l) { return l.status === 'ready_to_send'; })
     .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); }); // strongest first
   for (var i = 0, sent = 0; i < queue.length && sent < room; i++) {
@@ -1210,12 +1212,36 @@ function sendColdEmails_() {
     if (isDnc_(l.email)) { stopLead_(l, 'skipped', 'On do-not-contact list'); continue; }
     if (!mailDomainOk_(l.email)) { stopLead_(l, 'skipped', 'Email domain doesn\'t accept email'); continue; }
     // The subject line test: every other first email goes out with COLD_SUBJECT_B, so the two stay even.
-    var subjectB = nextSubjectVariant_(counts) === 'B' ? subjectB_(l) : '', variant = subjectB ? 'B' : 'A';
-    sendLeadEmail_(l, 'cold_1', subjectB ? { subject_override: subjectB } : null);
-    counts[variant]++;
+    var pick = coldSubject_(l, round);
+    sendLeadEmail_(l, 'cold_1', pick.subject ? { subject_override: pick.subject } : null);
+    round[pick.variant]++;
+    props_().setProperty('SUBJECT_ROUND', JSON.stringify({ pair: round.pair, A: round.A, B: round.B }));
     sent++;
-    updateLead_(l, { status: 'in_sequence', touches: 1, next_touch: addBusinessDays_(new Date(), 3), subject_test: String(setting_('COLD_SUBJECT_B') || '').trim() ? variant : '' });
+    updateLead_(l, { status: 'in_sequence', touches: 1, next_touch: addBusinessDays_(new Date(), 3), subject_test: round.b ? pick.variant + ': ' + pick.text : '' });
   }
+}
+
+// Nov 20, 2026: cold emails 2 and 3 swapped places (the money line moved up). A shop whose email 2 went out before the
+// swap already has the one-thing-to-do email, so its email 3 is the money one instead of that email again.
+function swappedKey_(l, key) {
+  var at = Number(prop_('COLD_SWAP_AT') || 0);
+  return key === 'cold_3' && at && l.segment !== 'running_ads' && l.last_touch && new Date(l.last_touch).getTime() < at ? 'cold_2' : key;
+}
+
+// Whether one address really takes mail, from ZeroBounce, once ZEROBOUNCE_API_KEY is in Script Properties (otherwise
+// nothing is asked). A published address can still bounce: 8 of the first 102 cold emails did (Nov 2026), and bounces hurt
+// how mail from the domain is treated. Asked once, when a cold audit comes back with the address, so a dead one is skipped
+// before review. Only addresses it calls invalid, a spam trap, or abuse are skipped; shared inboxes (info@, office@),
+// catch-all domains, and unknown answers go ahead, and so does any trouble asking.
+function emailVerdict_(email) {
+  var key = prop_('ZEROBOUNCE_API_KEY');
+  if (!key || !email) return '';
+  try {
+    var r = UrlFetchApp.fetch('https://api.zerobounce.net/v2/validate?api_key=' + encodeURIComponent(key) + '&email=' + encodeURIComponent(email) + '&ip_address=', { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) return '';
+    var d = JSON.parse(r.getContentText()), st = String(d.status || '').toLowerCase();
+    return ['invalid', 'spamtrap', 'abuse'].indexOf(st) > -1 ? st + (d.sub_status ? ', ' + d.sub_status : '') : '';
+  } catch (err) { return ''; }
 }
 
 // Whether an address's domain takes email at all: it has mail servers (MX records), or failing that a web address that
@@ -1280,7 +1306,7 @@ function sendFollowUps_() {
       } else updateLead_(l, { next_touch: '' });
       return;
     }
-    sendLeadEmail_(l, stepDef.key);
+    sendLeadEmail_(l, swappedKey_(l, stepDef.key));
     var last = t + 1 >= seq.length;
     var fields = { touches: t + 1, next_touch: last ? (l.status === 'proposal_sent' ? addBusinessDays_(now, 5) : '') : addBusinessDays_(now, stepDef.gap) };
     if (last && l.status !== 'proposal_sent') fields.status = 'sequence_done';
@@ -3689,39 +3715,62 @@ function showSearchShotsNeeded() {
     'Then use "Read new search screenshots now". Audits waiting on a search carry on by themselves at the next run.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
-// Hourly: a phone capture of each home page an audit is being built for, from Google's PageSpeed test, kept in Drive.
-function captureSiteShots_() {
-  var tried = {};
-  try { tried = JSON.parse(prop_('SITE_SHOT_TRIED') || '{}'); } catch (err) {}
+// A phone picture of each home page, from Google's PageSpeed test, kept in Drive. The audit page's "Your website on a phone"
+// section only shows with one. Taken for the audits going to Claude, just before they go (submitJobs_), so the write-up can
+// use it; then, with time left at the end of a run, for audits already written that don't have one (their pages pick it
+// up, since pages are drawn when they're opened). Up to `max` at a time, side by side; two tries a shop.
+// Until Nov 20, 2026 this ran last in the run, three at a time, for audits Claude had often finished, so most had none.
+var SHOT_LIVE = ['audit_ready', 'awaiting_review', 'audit_approved', 'ready_to_send', 'in_sequence', 'audit_sent', 'check_back', 'proposal_sent'];
+function captureSiteShots_(max, backfill, only) {
+  var tried = siteShotTried_();
   var folder = siteShotFolder_();
-  var ids = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) { return j.kind === 'audit' && (j.status === 'queued' || j.status === 'submitted'); })
-    .map(function (j) { return j.lead_id; }).filter(function (id, i, all) { return id && all.indexOf(id) === i && (tried[id] || 0) < 2; });
+  var ids;
+  if (only) ids = only;
+  else if (backfill) {
+    ids = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.audit_slug && SHOT_LIVE.indexOf(l.status) > -1; })
+      .sort(function (a, b) { return Number(b.priority || 0) - Number(a.priority || 0); }).map(function (l) { return l.id; });
+  } else {
+    ids = readRows_(TAB.jobs, HEAD.jobs).filter(function (j) { return j.kind === 'audit' && (j.status === 'queued' || j.status === 'submitted'); })
+      .map(function (j) { return j.lead_id; });
+  }
+  ids = ids.filter(function (id, i, all) { return id && all.indexOf(id) === i && (tried[id] || 0) < 2; });
   var todo = [];
-  for (var i = 0; i < ids.length && todo.length < 3; i++) {
+  for (var i = 0; i < ids.length && todo.length < max; i++) {
     var l = findLead_('id', ids[i]);
-    if (!l || !siteUrlOf_(l.website) || folder.getFilesByName(l.id + '.jpg').hasNext()) continue;
+    if (!l || !siteUrlOf_(l.website)) continue;
+    if (folder.getFilesByName(l.id + '.jpg').hasNext()) { tried[l.id] = 9; continue; } // already has one
     todo.push(l);
   }
-  if (!todo.length) return;
-  var key = prop_('PAGESPEED_API_KEY');
-  var resps = UrlFetchApp.fetchAll(todo.map(function (l) {
-    return { url: 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?strategy=mobile&category=performance&url=' + encodeURIComponent(siteUrlOf_(l.website)) +
-      (key ? '&key=' + encodeURIComponent(key) : ''), muteHttpExceptions: true };
-  }));
-  resps.forEach(function (r, n) {
-    var l = todo[n];
-    tried[l.id] = (tried[l.id] || 0) + 1;
-    try {
-      if (r.getResponseCode() !== 200) return;
-      var data = ((((JSON.parse(r.getContentText()).lighthouseResult || {}).audits || {})['final-screenshot'] || {}).details || {}).data || '';
-      var m = String(data).match(/^data:(image\/\w+);base64,(.+)$/);
-      if (!m) return;
-      var file = folder.createFile(Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], l.id + '.jpg'));
-      shareForPage_(file);
-    } catch (err) {}
-  });
+  if (todo.length) {
+    var key = prop_('PAGESPEED_API_KEY');
+    var resps = UrlFetchApp.fetchAll(todo.map(function (l) {
+      return { url: 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?strategy=mobile&category=performance&url=' + encodeURIComponent(siteUrlOf_(l.website)) +
+        (key ? '&key=' + encodeURIComponent(key) : ''), muteHttpExceptions: true };
+    }));
+    resps.forEach(function (r, n) {
+      var l = todo[n], why = '';
+      tried[l.id] = (tried[l.id] || 0) + 1;
+      try {
+        var code = r.getResponseCode();
+        if (code !== 200) why = 'PageSpeed answered ' + code + (code === 429 ? ' (too many requests: is PAGESPEED_API_KEY in Script Properties?)' : '');
+        else {
+          var data = ((((JSON.parse(r.getContentText()).lighthouseResult || {}).audits || {})['final-screenshot'] || {}).details || {}).data || '';
+          var m = String(data).match(/^data:(image\/\w+);base64,(.+)$/);
+          if (!m) why = 'PageSpeed ran but returned no picture (the site may block it)';
+          else { shareForPage_(folder.createFile(Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], l.id + '.jpg'))); tried[l.id] = 9; }
+        }
+      } catch (err) { why = String(err.message || err).slice(0, 120); }
+      if (why && tried[l.id] >= 2) logEvent_(l.id, l.email, 'site_shot_failed', why);
+    });
+  }
+  saveSiteShotTried_(tried);
+  return todo.length;
+}
+// Each shop's tries at a home page picture: 1 or 2 tries so far, 9 once it has one.
+function siteShotTried_() { try { return JSON.parse(prop_('SITE_SHOT_TRIED') || '{}'); } catch (err) { return {}; } }
+function saveSiteShotTried_(tried) {
   var keep = {};
-  Object.keys(tried).slice(-200).forEach(function (k) { keep[k] = tried[k]; });
+  Object.keys(tried).slice(-600).forEach(function (k) { keep[k] = tried[k]; });
   props_().setProperty('SITE_SHOT_TRIED', JSON.stringify(keep));
 }
 // The picture goes straight into the page (it's small), so it never depends on Drive's image links working from the site.
@@ -4211,6 +4260,8 @@ function submitJobs_() {
       (j.kind !== 'account_report' || !siteWaiting[j.lead_id]);
   }).sort(function (a, b) { return (rank[b.lead_id] || 0) - (rank[a.lead_id] || 0); }).slice(0, 25); // the strongest prospects first
   if (!jobs.length) return;
+  // Each audit's home page picture, taken now (side by side, 10 to 40 seconds) so the write-up can use it and the page shows it.
+  if (runLeft_() > 120000) captureSiteShots_(25, false, jobs.filter(function (j) { return j.kind === 'audit'; }).map(function (j) { return j.lead_id; }));
   var requests = [];
   jobs.forEach(function (j) {
     var params = jobParams_(j);
@@ -4370,6 +4421,8 @@ function applyAudit_(job, a) {
     var email = String(c.email || '').toLowerCase().trim();
     var reason = !email ? 'No published email' : c.no_solicitation_notice ? 'No-solicitation notice' : !c.proof_url ? 'No proof of where the email was published' :
       isDnc_(email) ? 'On do-not-contact list' : (findLead_('email', email) && findLead_('email', email).id !== l.id) ? 'Already in pipeline' : '';
+    var dead = reason ? '' : emailVerdict_(email);
+    if (dead) reason = 'Email doesn\'t take mail (ZeroBounce: ' + dead + ')';
     if (reason) {
       updateLead_(l, { status: 'skipped', notes: appendNote_(l.notes, reason) });
       logEvent_(l.id, email, 'skipped', reason);
@@ -5832,12 +5885,16 @@ var EMAILS = {
       'No cost and nothing to sign up for. I\'m {sign}, and I run Ledge Communications here in Alberta, setting up Google Ads for local trades. ' +
       'Want me to send over where I\'d start?{pass_line}\n\nThanks,\n{sign}'
   },
+  // Nov 20, 2026: the money line moved up to email 2 and the one-thing-to-do line down to email 3. Nearly every audit read so
+  // far came after email 1, so the first follow-up carries the one thing email 1 and the audit's first move don't: what a
+  // booked job costs in ads.
   cold_2: {
-    body: 'Hi {first},\n\nFollowing up on the audit I sent:\n{audit_url}\n\nIf you only do one thing from it, I\'d start here: {fix_1}.\n\n' +
-      'Happy to set it up for you or share more details. Just let me know, and I\'ll send a plan for how I\'d recommend running it.\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\n{more_para}\n\nIf you\'d like one, just reply and let me know. Your audit is here if you want another look:\n{audit_url}\n\nAll the best,\n{sign}'
   },
   cold_3: {
-    body: 'Hi {first},\n\n{more_para}\n\nIf you\'d like one, just reply and let me know.{booking_line}\n\nYour audit is still up if you want another look:\n{audit_url}\n\nAll the best,\n{sign}'
+    body: 'Hi {first},\n\nIf you only do one thing from your audit, I\'d start here: {fix_1}.\n\n' +
+      'Happy to set it up for you or share more details. Just let me know, and I\'ll send a plan for how I\'d recommend running it.{booking_line}\n\n' +
+      'Your audit is still up:\n{audit_url}\n\nAll the best,\n{sign}'
   },
   cold_4: {
     body: 'Hi {first},\n\nI\'ll leave it here so I\'m not clogging up your inbox. Your audit will stay up if you want to review when the timing is better: {audit_url}\n\n' +
@@ -6036,7 +6093,8 @@ function footer_(l, from) {
 
 function previewEmail_(l, key) {
   var tpl = EMAILS[trackKey_(l, key)], vars = emailVars_(l);
-  return (tpl.subject ? 'Subject: ' + fillText_(tpl.subject, vars) + '\n\n' : '') + fillText_(tpl.body, vars);
+  var subject = key === 'cold_1' && l.source === 'cold' && subjectA_(l) || (tpl.subject ? fillText_(tpl.subject, vars) : '');
+  return (subject ? 'Subject: ' + subject + '\n\n' : '') + fillText_(tpl.body, vars);
 }
 
 // Ledge menu > Send a test cold email: the first cold email exactly as a shop got it (the most recent one sent, or the top
@@ -6124,10 +6182,30 @@ function nameFromFrom_(from) {
   var tok = m[1].trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, '');
   return FIRST_NAMES[tok] ? tok.charAt(0).toUpperCase() + tok.slice(1) : '';
 }
-// Subject B for this shop (COLD_SUBJECT_B with its placeholders filled), or '' when the test is off or a placeholder has
+// A subject from the Settings tab for this shop, its placeholders filled, or '' when the cell is empty or a placeholder has
 // nothing to fill it (then the shop gets the usual subject).
-function subjectB_(l) {
-  var tpl = String(setting_('COLD_SUBJECT_B') || '').trim();
+function subjectB_(l) { return subjectFrom_(l, String(setting_('COLD_SUBJECT_B') || '').trim()); }
+function subjectA_(l) { return subjectFrom_(l, String(setting_('COLD_SUBJECT_A') || '').trim()); }
+// What the built-in subject is called in the results ("Who shows up for ..." or, for shops running ads, "Your ads on ...").
+var SUBJECT_BUILTIN = 'Who shows up for "{search}" (Your ads on "{search}" for shops running ads)';
+// Subjects stored before Nov 20, 2026 were just the letter.
+var SUBJECT_LEGACY = { A: SUBJECT_BUILTIN, B: 'Made this for {business}' };
+// The pair being tested and how many of each have gone out since it was set. A new pair starts again at 0 and 0.
+function subjectRound_() {
+  var a = String(setting_('COLD_SUBJECT_A') || '').trim(), b = String(setting_('COLD_SUBJECT_B') || '').trim(), pair = a + ' | ' + b, r = {};
+  try { r = JSON.parse(prop_('SUBJECT_ROUND') || '{}'); } catch (err) {}
+  if (r.pair !== pair) r = { pair: pair, A: 0, B: 0 };
+  return { pair: pair, a: a, b: b, A: Number(r.A || 0), B: Number(r.B || 0) };
+}
+// This shop's first-email subject: B when it's B's turn and B can be filled, otherwise A (COLD_SUBJECT_A, or the built-in one).
+// subject is '' for the built-in one; text is the subject as written on the Settings tab, for the results.
+function coldSubject_(l, round) {
+  round = round || subjectRound_();
+  if (round.b && round.B < round.A) { var b = subjectFrom_(l, round.b); if (b) return { variant: 'B', subject: b, text: round.b }; }
+  var a = round.a ? subjectFrom_(l, round.a) : '';
+  return { variant: 'A', subject: a, text: a ? round.a : SUBJECT_BUILTIN };
+}
+function subjectFrom_(l, tpl) {
   if (!tpl) return '';
   var spec = auditSpecOf_(l), kw = spec.searches && spec.searches[0] ? spec.searches[0].keyword : '';
   var town = spec.area || l.area || '', job = spec.opp && spec.opp.job ? String(spec.opp.job) : '';
@@ -6136,10 +6214,6 @@ function subjectB_(l) {
   var out = tpl.replace(/\{(\w+)\}/g, function (m, k) { if (!(k in vals) || !vals[k]) { missing = true; return m; } return vals[k]; });
   out = out.replace(/\s+/g, ' ').trim();
   return missing || !out ? '' : out.charAt(0).toUpperCase() + out.slice(1);
-}
-// Which subject the next cold first email gets: whichever of A and B has gone out less, so the two stay even.
-function nextSubjectVariant_(counts) {
-  return String(setting_('COLD_SUBJECT_B') || '').trim() && counts.B < counts.A ? 'B' : 'A';
 }
 // Shops that really replied: a reply event that wasn't later undone as a misread (our own emails, or a mail app's copies,
 // read as replies on Nov 12 and Nov 16, 2026).
@@ -6153,20 +6227,29 @@ function realRepliers_() {
   return r;
 }
 
-// The test so far, one line per subject: sent, bounced, read their audit, replied.
+// The test so far, one line per subject: sent, bounced, read their audit, replied. The pair being tested first (A, B), then
+// any subject used before ("Earlier"), each counted by its wording.
+function subjectTestOf_(v) {
+  var m = String(v || '').match(/^([AB])(?:: ([\s\S]+))?$/);
+  return m ? { variant: m[1], text: m[2] || SUBJECT_LEGACY[m[1]] } : null;
+}
 function subjectTestLines_() {
-  var leads = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return l.subject_test === 'A' || l.subject_test === 'B'; });
+  var leads = readRows_(TAB.leads, HEAD.leads).filter(function (l) { return subjectTestOf_(l.subject_test); });
   if (!leads.length) return [];
-  var replied = realRepliers_();
-  var label = { A: 'A (the usual "Who shows up for ...")', B: 'B ("' + (String(setting_('COLD_SUBJECT_B') || '').trim() || 'test subject, now off') + '")' };
-  return ['A', 'B'].map(function (v) {
-    var g = leads.filter(function (l) { return l.subject_test === v; });
+  var replied = realRepliers_(), round = subjectRound_(), groups = {}, order = [];
+  leads.forEach(function (l) { var k = subjectTestOf_(l.subject_test).text; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(l); });
+  var line = function (tag, text) {
+    var g = groups[text] || [];
     var bounced = g.filter(function (l) { return l.status === 'bounced'; }).length;
     var read = g.filter(function (l) { return l.audit_opened; }).length, rep = g.filter(function (l) { return replied[l.id]; }).length;
     var got = g.length - bounced;
     var pct = function (n) { return got ? ' (' + Math.round(100 * n / got) + '%)' : ''; };
-    return v + ': ' + g.length + ' sent' + (bounced ? ', ' + bounced + ' bounced' : '') + ', ' + read + ' read their audit' + pct(read) + ', ' + rep + ' replied' + pct(rep) + '. ' + label[v];
-  });
+    return tag + ': ' + g.length + ' sent' + (bounced ? ', ' + bounced + ' bounced' : '') + ', ' + read + ' read their audit' + pct(read) + ', ' + rep + ' replied' + pct(rep) + '. "' + text + '"';
+  };
+  var curA = round.a || SUBJECT_BUILTIN, out = [];
+  if (round.b) out.push(line('A', curA), line('B', round.b));
+  order.filter(function (k) { return !round.b || (k !== curA && k !== round.b); }).forEach(function (k) { out.push(line('Earlier', k)); });
+  return out;
 }
 
 function sendTestColdEmail_(list) {
@@ -6184,7 +6267,7 @@ function sendTestColdEmail_(list) {
   if (vars.audit_url) vars.audit_url = auditUrl_(l) + ME_;
   var from = senderEmail_();
   var subject = fillText_(tpl.subject || tpl.fallbackSubject || 'Ledge Communications', vars), text = fillText_(tpl.body, vars) + footer_(test, from);
-  var subjects = [subject].concat(subjectB_(l) ? [subjectB_(l)] : []);
+  var subjects = [subjectA_(l) || subject].concat(subjectB_(l) ? [subjectB_(l)] : []);
   var sent = [], failed = [];
   to.forEach(function (a) {
     try { subjects.forEach(function (sj) { gmailSend_(a, sj, text, { unsubUrl: unsubUrl_(test), from: from }); }); sent.push(a); } catch (err) { failed.push(a + ' (' + String(err && err.message || err).slice(0, 60) + ')'); }

@@ -1,6 +1,8 @@
 # Cold sequences
 
-Sent from ledgecommunications@gmail.com through Gmail, plain text, one thread per shop. Starts only when COLD_EMAIL_ON is yes. Weekdays 8 am to 5 pm Mountain, COLD_PER_DAY_START a day to start, plus 5 a week, up to COLD_PER_DAY_MAX. Stops on any reply, booking, bounce, or unsubscribe, and once you've written to the shop yourself. Before the first email, the address's domain is checked: one that doesn't exist or takes no email is skipped.
+Sent from logan@ledgecommunications.com (SENDER_EMAIL) through Gmail, plain text, one thread per shop. Starts only when COLD_EMAIL_ON is yes. Weekdays 8 am to 5 pm Mountain, COLD_PER_DAY_START a day to start, plus 5 a week, up to COLD_PER_DAY_MAX. Stops on any reply, booking, bounce, or unsubscribe, and once you've written to the shop yourself. Before the first email, the address's domain is checked: one that doesn't exist or takes no email is skipped. With ZEROBOUNCE_API_KEY in Script Properties, the address itself is checked when the audit comes back, and one that won't take mail is skipped before review.
+
+Subjects on the first email: COLD_SUBJECT_A (since Nov 20, "How does {business} show up on Google?") and COLD_SUBJECT_B ("Made this for {business}") take turns, and Where the audits are compares them. With COLD_SUBJECT_A empty, the built-in subject below goes out instead. Follow-ups are replies in the same thread.
 
 Two tracks, picked by the shop's segment on the Leads tab: shops already running Google Ads get the account audit track; everyone else (no ads found, or we couldn't tell) gets the starting plan track. Same timing for both.
 
@@ -9,7 +11,7 @@ Built from the audit's first search: {lead_line} ("I searched "furnace repair ai
 {pass_line} is " If someone else looks after marketing, I'd appreciate you passing this along." for a shared inbox (info@, office@, service@) with no name to go on, and empty otherwise.
 Built from the segment or the offer: {offer_line}, {offer_noun}, {audit_price_line} (from PRICE_ACCOUNT_AUDIT and ACCOUNT_AUDIT_CREDIT_DAYS), {proposal_intro}, and {kickoff_steps} (from the offer, on the proposal page too).
 For the account audit: {manager_id} (ADS_MANAGER_ID), {report_url}, {report_finding} (the report's biggest finding), and {report_value_para} (what the ads bring in, when the report has an estimate).
-{value_para} is the audit's estimate as one sentence, left out when there's no estimate. The first cold email doesn't carry it: the money is on the audit page and in cold email 3.
+{value_para} is the audit's estimate as one sentence, left out when there's no estimate. The first cold email doesn't carry it: the money is on the audit page and in cold email 2 (email 3 before Nov 20, 2026).
 {personal_para} is the line you add before a site-form audit goes out (left out when you don't add one).
 Every email also gets the footer: your name, mailing address, the site, the address it went from (SENDER_EMAIL once it's set up, otherwise ledgecommunications@gmail.com), and a one-click unsubscribe link.
 
@@ -41,12 +43,10 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> Following up on the audit I sent:
+> {more_para}
+>
+> If you'd like one, just reply and let me know. Your audit is here if you want another look:
 > {audit_url}
->
-> If you only do one thing from it, I'd start here: {fix_1}.
->
-> Happy to set it up for you or share more details. Just let me know, and I'll send a plan for how I'd recommend running it.
 >
 > All the best,
 > {sign}
@@ -57,11 +57,11 @@ The live copy is the EMAILS block in hub/Code.gs. Edit there (or send me your ma
 
 > Hi {first},
 >
-> {more_para}
+> If you only do one thing from your audit, I'd start here: {fix_1}.
 >
-> If you'd like one, just reply and let me know.{booking_line}
+> Happy to set it up for you or share more details. Just let me know, and I'll send a plan for how I'd recommend running it.{booking_line}
 >
-> Your audit is still up if you want another look:
+> Your audit is still up:
 > {audit_url}
 >
 > All the best,

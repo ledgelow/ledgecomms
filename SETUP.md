@@ -15,7 +15,41 @@ Opus) and DataForSEO search data (1 to 2 cents per shop). The hub counts both an
 The site runs as a Cloudflare **Worker** at `https://ledgecomms.ledgelow.workers.dev` until you're happy with it.
 Your Squarespace site stays up on ledgecommunications.com until step 9, so you can test and edit without anyone seeing.
 
-## Where you are (Nov 18): the queue keeps itself full
+## Where you are (Nov 20): home page pictures, a new subject test, and the follow-ups reordered
+
+**The first 102 cold emails:** 8 bounced (8%), 14 shops read their audit (15% of those delivered), 6 unsubscribed, and no
+real replies yet (one out-of-office). 17 of the 19 audit reads came after email 1, most within a few hours; the follow-ups
+have brought almost none. On subjects, "Made this for {business}" had 7 reads from 41 (17%) and "Who shows up for ..." 4
+from 41 (10%): too few to call, but the one with the shop's name is ahead.
+
+- **Home page pictures.** The "Your website on a phone" section only shows when there's a picture, and most audits had
+  none: the hub took three pictures at the end of each run, usually after Claude had written the audit. Now each audit's
+  picture is taken just before it goes to Claude (up to 25 at once), so the write-up sees it, and the end of each run adds
+  pictures to audits already written (8 a run, strongest first). Pages are drawn when they're opened, so those audits show
+  the section from then on. If PageSpeed can't take one after two tries, the Events tab says why (`site_shot_failed`). A
+  429 there means `PAGESPEED_API_KEY` is missing from Script Properties (setup step 4, "Before your first site audit").
+- **Subject A is a setting (`COLD_SUBJECT_A`, "How does {business} show up on Google?").** It replaces "Who shows up for
+  ..." on both tracks and takes turns with `COLD_SUBJECT_B` ("Made this for {business}"). Changing either one starts a
+  fresh even split. Results are counted by each subject's wording, so earlier subjects stay in Where the audits are as
+  "Earlier" lines. Clear the A cell to go back to the built-in subjects.
+- **Emails 2 and 3 swapped.** Email 2 now carries what a booked job costs in ads (it was email 3), since it's the follow-up
+  most likely to be read, and email 3 has the one thing to do first. A shop whose email 2 already went out gets the money
+  email as its third, so nobody gets the same one twice. Shops running ads keep their order.
+- **Optional: fewer bounces with ZeroBounce.** Bounces are published addresses that no longer take mail, and 8% is high
+  for a domain a week into sending. With `ZEROBOUNCE_API_KEY` in Script Properties, each cold audit's address is checked
+  when the audit comes back, and an address that won't take mail is skipped before it reaches you (shared inboxes like
+  info@ still go ahead). ZeroBounce gives 100 free checks a month; past that, pay-as-you-go starts at US$39 for 2,000.
+  Until bounces drop, keep `COLD_PER_DAY_MAX` at 10.
+
+Ship it:
+1. Paste `Code.gs` into Apps Script and save, then **Deploy > Manage deployments >** pencil **> New version > Deploy**.
+   The web app and the hourly runs need to be on the same version: this update moves the sheet's version number, and an
+   older web app would move it back.
+2. The `COLD_SUBJECT_A` row appears on the Settings tab after the next run.
+3. Upload `Code.gs`, `cold-sequence.md`, and `SETUP.md` to GitHub.
+4. Optional: sign up at zerobounce.net, then add the API key to Script Properties as `ZEROBOUNCE_API_KEY`.
+
+## Where you were (Nov 18): the queue keeps itself full
 
 **Why it ran dry.** New shops were only found once a week, in one area. Monday's run was Okotoks: 29 new shops, 24 of
 them held (lower priority or not residential), so the whole week produced 3 audits while cold email can send 50 first
